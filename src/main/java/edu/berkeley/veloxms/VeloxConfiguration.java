@@ -6,28 +6,30 @@ import org.hibernate.validator.constraints.NotEmpty;
 
 public class VeloxConfiguration extends Configuration {
     @NotEmpty
-    private String template;
+    private String itemModelLoc;
 
     @NotEmpty
-    private String defaultName = "Stranger";
+    private String userModelLoc;
+
 
     @JsonProperty
-    public String getTemplate() {
-        return template;
+    public String getItemModelLoc() {
+        return itemModelLoc;
     }
 
     @JsonProperty
-    public void setTemplate(String template) {
-        this.template = template;
+    public void setItemModelLoc(String itemModelLoc) {
+        this.itemModelLoc = itemModelLoc;
     }
 
     @JsonProperty
-    public String getDefaultName() {
-        return defaultName;
+    public String getUserModelLoc() {
+        return userModelLoc;
     }
 
     @JsonProperty
-    public void setDefaultName(String name) {
-        this.defaultName = name;
+    public void setUserModelLoc(String userModelLoc) {
+        this.userModelLoc = userModelLoc;
     }
+
 }

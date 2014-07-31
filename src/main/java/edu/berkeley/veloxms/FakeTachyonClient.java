@@ -23,6 +23,4 @@ public class FakeTachyonClient {
     public static double[] doubleArray(double... elems) {
         return elems;
     }
-
-
 }

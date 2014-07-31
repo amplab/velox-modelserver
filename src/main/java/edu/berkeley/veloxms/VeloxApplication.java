@@ -7,7 +7,8 @@ import edu.berkeley.veloxms.resources.PredictItemResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import tachyon.client.kv.KVStore;
+import tachyon.r.sorted.ClientStore;
+import tachyon.TachyonURI;
 
 public class VeloxApplication extends Application<VeloxConfiguration> {
 
@@ -19,7 +20,7 @@ public class VeloxApplication extends Application<VeloxConfiguration> {
 
     @Override
     public String getName() {
-        return "hello-world";
+        return "velox-modelserver, serving models since 2014";
     }
 
     @Override
@@ -29,19 +30,26 @@ public class VeloxApplication extends Application<VeloxConfiguration> {
     }
 
     @Override
-    public void run(VeloxConfiguration configuration,
+    public void run(VeloxConfiguration config,
             Environment environment) {
-        FakeTachyonClient kvstore = new FakeTachyonClient();
+        ClientStore userModel = null;
+        ClientStore itemModel = null;
         try {
-            KVStore tachyonclient = KVStore.get("/veloxms/test-model");
+            userModel = ClientStore.getStore(new TachyonURI(config.getUserModelLoc()));
+            itemModel = ClientStore.getStore(new TachyonURI(config.getItemModelLoc()));
         } catch (Exception e) {
 
-            LOGGER.info("Caught Tachyon exception: " + e.getMessage());
+            LOGGER.error("Caught Tachyon exception: " + e.getMessage());
         }
-        final PredictItemResource userPredictor = new PredictItemResource(kvstore);
+        if (userModel == null || itemModel == null) {
+
+            throw new RuntimeException("couldn't initialize models");
+        }
+        TachyonClientManager tachyonClientManager = new TachyonClientManager(userModel, itemModel);
+        environment.lifecycle().manage(tachyonClientManager);
+
+        final PredictItemResource userPredictor =
+            new PredictItemResource(userModel, itemModel);
         environment.jersey().register(userPredictor);
-
     }
-
-
 }

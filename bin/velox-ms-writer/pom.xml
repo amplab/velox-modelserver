@@ -3,67 +3,15 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>edu.berkeley.veloxms</groupId>
-  <artifactId>velox-model-server</artifactId>
+  <artifactId>velox-model-writer</artifactId>
   <version>0.0.1-SNAPSHOT</version>
 
   <dependencies>
-    <dependency>
-      <groupId>io.dropwizard</groupId>
-      <artifactId>dropwizard-core</artifactId>
-      <version>${dropwizard.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>org.slf4j</groupId>
-          <artifactId>log4j-over-slf4j</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
+
     <dependency>
       <groupId>org.tachyonproject</groupId>
       <artifactId>tachyon-parent</artifactId>
       <version>0.6.0-SNAPSHOT</version>
-      <!-- <exclusions> -->
-      <!--   <exclusion> -->
-      <!--     <groupId>com.fasterxml.jackson.core</groupId> -->
-      <!--     <artifactId>jackson&#45;databind</artifactId> -->
-      <!--   </exclusion> -->
-      <!--   <exclusion> -->
-      <!--     <groupId>log4j</groupId> -->
-      <!--     <artifactId>log4j</artifactId> -->
-      <!--   </exclusion> -->
-      <!--   <exclusion> -->
-      <!--     <groupId>org.apache.commons</groupId> -->
-      <!--     <artifactId>commons&#45;lang3</artifactId> -->
-      <!--   </exclusion> -->
-      <!--   <exclusion> -->
-      <!--     <groupId>org.jboss.netty</groupId> -->
-      <!--     <artifactId>netty</artifactId> -->
-      <!--   </exclusion> -->
-      <!--   <exclusion> -->
-      <!--     <groupId>org.slf4j</groupId> -->
-      <!--     <artifactId>slf4j&#45;log4j12</artifactId> -->
-      <!--   </exclusion> -->
-      <!--   <exclusion> -->
-      <!--     <groupId>org.codehaus.jackson</groupId> -->
-      <!--     <artifactId>jackson&#45;core&#45;asl</artifactId> -->
-      <!--   </exclusion> -->
-      <!--   <exclusion> -->
-      <!--     <groupId>org.jboss.netty</groupId> -->
-      <!--     <artifactId>netty</artifactId> -->
-      <!--   </exclusion> -->
-      <!--   <exclusion> -->
-      <!--     <groupId>org.slf4j</groupId> -->
-      <!--     <artifactId>slf4j&#45;api</artifactId> -->
-      <!--   </exclusion> -->
-      <!--   <exclusion> -->
-      <!-- <groupId>org.eclipse.jetty</groupId> -->
-      <!-- <artifactId>jetty&#45;server</artifactId> -->
-      <!--   </exclusion> -->
-      <!--   <exclusion> -->
-      <!--     <groupId>com.google.guava</groupId> -->
-      <!--     <artifactId>guava</artifactId> -->
-      <!--   </exclusion> -->
-      <!-- </exclusions> -->
     </dependency>
     <dependency>
       <groupId>org.apache.commons</groupId>
@@ -119,7 +67,7 @@
               <transformers>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                  <mainClass>edu.berkeley.veloxms.VeloxApplication</mainClass>
+                  <mainClass>edu.berkeley.veloxms.writer.WriteModel</mainClass>
                 </transformer>
               </transformers>
             </configuration>
