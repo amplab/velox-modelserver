@@ -45,11 +45,21 @@ public class VeloxApplication extends Application<VeloxConfiguration> {
 
             throw new RuntimeException("couldn't initialize models");
         }
+
+
         TachyonClientManager tachyonClientManager = new TachyonClientManager(userModel, itemModel);
         environment.lifecycle().manage(tachyonClientManager);
 
         final PredictItemResource userPredictor =
-            new PredictItemResource(userModel, itemModel);
+            new PredictItemResource(new TachyonStorage(userModel, itemModel));
         environment.jersey().register(userPredictor);
+        final AddRatingResource addRatings = new AddRatingResource();
+        environment.jersey().register(addRatings);
     }
 }
+
+
+
+
+
+

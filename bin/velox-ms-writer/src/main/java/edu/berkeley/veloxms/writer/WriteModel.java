@@ -14,9 +14,86 @@ public class WriteModel {
     private static String userModelLoc = "tachyon://localhost:19998/user-model";
     private static int numFeatures = 50;
 
-    public static void main(String[] args) {
-        int partition = Integer.parseInt(args[1]);
-        boolean create = Boolean.parseBoolean(args[2]);
+    public static byte[] long2ByteArr(long id) {
+        ByteBuffer key = ByteBuffer.allocate(8);
+        key.putLong(id);
+        return key.array();
+    }
+
+    public static double[] parseFactors(String[] splits) {
+        double[] factors = new double[splits.length - 1];
+        for (int i = 1; i < splits.length; ++i) {
+            factors[i - 1] = Double.parseDouble(splits[i]);
+        }
+        return factors;
+    }
+
+    public static double[] randomArray(int length) {
+        Random rand = new Random();
+        double[] arr = new double[length];
+        for (int i = 0; i < length; ++i) {
+            arr[i] = rand.nextDouble();
+        }
+        return arr;
+    }
+
+    public void writeModelsFromFile(String[] args) {
+        String userModelFile = args[0];
+        String itemModelFile = args[1];
+        // Read user model
+        HashMap<Long, double[]> userModel = readModel(userModelFile);
+        writeHashMapToTachyon(userModelFile, userModelLoc);
+        // Read item model
+        HashMap<Long, double[]> itemModel = readModel(itemModelFile);
+        writeHashMapToTachyon(itemModel, itemModelLoc);
+    }
+
+    public void writeHashMapToTachyon(HashMap<Long, double[]> model, String tachyonLoc) {
+        try {
+            ClientStore store = ClientStore.createStore(new TachyonURI(tachyonLoc));
+            int partition = 0;
+            store.createPartition(partition);
+            for (Long k : model.keySet()) {
+                store.put(partition,
+                          long2ByteArr(k.longValue()),
+                          SerializationUtils.serialize(model[k]));
+            }
+
+            store.closePartition(partition);
+    }
+
+    public HashMap<Long, double[]> readModel(String modelFile) {
+        HashMap<Long, double[]> model = new HashMap<Long, double[]>();
+        FileInputStream fis = null;
+        InputStreamReader isr = null;
+        BufferReader br = null;
+        try {
+            fis = new FileInputStream(modelFile);
+            isr = new InputStreamReader(fis);
+            br = new BufferReader(isr);
+            boolean done = false;
+            while (!done) {
+                String line = br.readLine();
+                if (line == null) {
+                    done = true;
+                } else {
+                    String[] splits = line.split(",");
+                    long key = Long.parseLong(splits[0]);
+                    double[] factors = parseFactors(splits);
+                    model.put(key, factors);
+                }
+            }
+        } finally {
+            IOUtils.closeQuietly(br);
+            IOUtils.closeQuietly(isr);
+            IOUtils.closeQuietly(fis);
+        }
+        return model;
+    }
+
+    public void writeRandomModels(String[] args) {
+        int partition = Integer.parseInt(args[0]);
+        boolean create = Boolean.parseBoolean(args[1]);
         ClientStore items = null;
         try {
 
@@ -76,24 +153,20 @@ public class WriteModel {
         } catch (Exception e) {
             System.out.println("Exception with users: " + e.getMessage());
         }
+
     }
 
-    public static byte[] long2ByteArr(long id) {
-        ByteBuffer key = ByteBuffer.allocate(8);
-        key.putLong(id);
-        return key.array();
-    }
 
-    public static double[] randomArray(int length) {
-        Random rand = new Random();
-        double[] arr = new double[length];
-        for (int i = 0; i < length; ++i) {
-            arr[i] = rand.nextDouble();
+    public static void main(String[] args) {
+        WriteModel modelWrite = new WriteModel();
+        String command = args[1];
+        String[] droppedArgs = Array.copyOfRange(args, 2, args.length);
+        if (args[1] == "randomModel") {
+            // drop first 2 elements of args (program name, operation)
+            modelWrite.writeRandomModels(droppedArgs);
+        } else if (args[1] == "writeModels") {
+            modelWrite.writeModelsFromFile(args);
         }
-        return arr;
     }
-
-
-
 
 }

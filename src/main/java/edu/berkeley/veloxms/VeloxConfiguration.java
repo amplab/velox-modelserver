@@ -11,6 +11,9 @@ public class VeloxConfiguration extends Configuration {
     @NotEmpty
     private String userModelLoc;
 
+    @NotEmpty
+    private String ratingsLoc;
+
 
     @JsonProperty
     public String getItemModelLoc() {
@@ -30,6 +33,16 @@ public class VeloxConfiguration extends Configuration {
     @JsonProperty
     public void setUserModelLoc(String userModelLoc) {
         this.userModelLoc = userModelLoc;
+    }
+
+    @JsonProperty
+    public String getRatingsLoc() {
+        return ratingsLoc;
+    }
+
+    @JsonProperty
+    public void setRatingsLoc(String ratingsLoc) {
+        this.ratingsLoc = ratingsLoc;
     }
 
 }

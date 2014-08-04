@@ -15,3 +15,6 @@ target/
 hs_err_pid*
 
 data/
+
+# vim swap files
+*.sw*
