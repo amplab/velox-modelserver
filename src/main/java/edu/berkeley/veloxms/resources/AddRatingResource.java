@@ -44,7 +44,7 @@ public class AddRatingResource {
     public double[] updateUserModel(user) {
 
 
-        List<double[]> ratedMovieFactors = ratings.g
+        // List<double[]> ratedMovieFactors = ratings.g 
 
 
 

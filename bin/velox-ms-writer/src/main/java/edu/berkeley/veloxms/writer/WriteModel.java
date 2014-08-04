@@ -5,8 +5,14 @@ import tachyon.r.sorted.ClientStore;
 import tachyon.TachyonURI;
 import org.apache.commons.lang3.SerializationUtils;
 import java.util.Random;
+import java.util.Arrays;
 import java.nio.ByteBuffer;
 import java.io.IOException;
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
+import java.io.FileInputStream;
+import org.apache.commons.io.IOUtils;
+import java.util.HashMap;
 
 public class WriteModel {
 
@@ -42,35 +48,39 @@ public class WriteModel {
         String itemModelFile = args[1];
         // Read user model
         HashMap<Long, double[]> userModel = readModel(userModelFile);
-        writeHashMapToTachyon(userModelFile, userModelLoc);
+        writeHashMapToTachyon(userModel, userModelLoc);
         // Read item model
         HashMap<Long, double[]> itemModel = readModel(itemModelFile);
         writeHashMapToTachyon(itemModel, itemModelLoc);
     }
 
     public void writeHashMapToTachyon(HashMap<Long, double[]> model, String tachyonLoc) {
+        int partition = 0;
+        ClientStore store = null;
         try {
-            ClientStore store = ClientStore.createStore(new TachyonURI(tachyonLoc));
-            int partition = 0;
+            store = ClientStore.createStore(new TachyonURI(tachyonLoc));
             store.createPartition(partition);
             for (Long k : model.keySet()) {
                 store.put(partition,
-                          long2ByteArr(k.longValue()),
-                          SerializationUtils.serialize(model[k]));
+                        long2ByteArr(k.longValue()),
+                        SerializationUtils.serialize(model.get(k)));
             }
-
             store.closePartition(partition);
+        } catch (Exception e) {
+            System.out.println("Tachyon error: " + e.getMessage());
+        }
+
     }
 
     public HashMap<Long, double[]> readModel(String modelFile) {
         HashMap<Long, double[]> model = new HashMap<Long, double[]>();
         FileInputStream fis = null;
         InputStreamReader isr = null;
-        BufferReader br = null;
+        BufferedReader br = null;
         try {
             fis = new FileInputStream(modelFile);
             isr = new InputStreamReader(fis);
-            br = new BufferReader(isr);
+            br = new BufferedReader(isr);
             boolean done = false;
             while (!done) {
                 String line = br.readLine();
@@ -83,6 +93,8 @@ public class WriteModel {
                     model.put(key, factors);
                 }
             }
+        } catch (Exception e) {
+            System.out.println("Error: " + e.getMessage());
         } finally {
             IOUtils.closeQuietly(br);
             IOUtils.closeQuietly(isr);
@@ -160,7 +172,7 @@ public class WriteModel {
     public static void main(String[] args) {
         WriteModel modelWrite = new WriteModel();
         String command = args[1];
-        String[] droppedArgs = Array.copyOfRange(args, 2, args.length);
+        String[] droppedArgs = Arrays.copyOfRange(args, 2, args.length);
         if (args[1] == "randomModel") {
             // drop first 2 elements of args (program name, operation)
             modelWrite.writeRandomModels(droppedArgs);
