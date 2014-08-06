@@ -16,15 +16,20 @@ public class TachyonStorage implements ModelStorage {
     private final ClientStore users;
     private final ClientStore items;
     private final ClientStore ratings;
+    private final int numFactors;
 
     // TODO eventually we will want a shared cache among resources
     /* private final ConcurrentHashMap<Long, double[]> itemCache; */
     /* private final ConcurrentHashMap<Long, double[]> userCache; */
 
-    public TachyonStorage(ClientStore users, ClientStore items, ClientStore ratings) {
+    public TachyonStorage(ClientStore users,
+                          ClientStore items,
+                          ClientStore ratings,
+                          int numFactors) {
         this.users = users;
         this.items = items;
         this.ratings = ratings;
+        this.numFactors = numFactors;
     }
 
     @Override
@@ -58,5 +63,10 @@ public class TachyonStorage implements ModelStorage {
             LOGGER.warn("Caught tachyon exception: " + e.getMessage());
         }
         return null;
+    }
+
+    @Override
+    public int getNumFactors() {
+        return this.numFactors;
     }
 }

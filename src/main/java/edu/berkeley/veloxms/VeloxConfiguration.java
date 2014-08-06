@@ -14,6 +14,19 @@ public class VeloxConfiguration extends Configuration {
     @NotEmpty
     private String ratingsLoc;
 
+    @NotEmpty
+    private int numFactors;
+
+    @JsonProperty
+    public int getNumFactors() {
+        return numFactors;
+    }
+
+    @JsonProperty
+    public void setNumFactors(int numFactors) {
+        this.numFactors = numFactors;
+    }
+
 
     @JsonProperty
     public String getItemModelLoc() {

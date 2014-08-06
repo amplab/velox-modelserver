@@ -19,6 +19,8 @@ public interface ModelStorage {
      */
     public HashMap<Long, Integer> getRatedMovies (long userId);
 
+    public int getNumFactors();
+
 }
 
 
