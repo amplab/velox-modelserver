@@ -12,13 +12,20 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.FileInputStream;
 import org.apache.commons.io.IOUtils;
-import java.util.HashMap;
+import java.util.TreeMap;
+import java.io.File;
+import tachyon.r.sorted.Utils;
 
 public class WriteModel {
 
     private static String itemModelLoc = "tachyon://localhost:19998/item-model";
     private static String userModelLoc = "tachyon://localhost:19998/user-model";
     private static int numFeatures = 50;
+
+    public WriteModel() {
+        System.out.println("Creating new model.");
+
+    }
 
     public static byte[] long2ByteArr(long id) {
         ByteBuffer key = ByteBuffer.allocate(8);
@@ -45,22 +52,27 @@ public class WriteModel {
 
     public void writeModelsFromFile(String[] args) {
         String userModelFile = args[0];
+        System.out.println("user file: " + userModelFile);
         String itemModelFile = args[1];
+        System.out.println("item file: " + itemModelFile);
         // Read user model
-        HashMap<Long, double[]> userModel = readModel(userModelFile);
-        writeHashMapToTachyon(userModel, userModelLoc);
+        TreeMap<Long, double[]> userModel = readModel(userModelFile);
+        writeTreeMapToTachyon(userModel, userModelLoc);
         // Read item model
-        HashMap<Long, double[]> itemModel = readModel(itemModelFile);
-        writeHashMapToTachyon(itemModel, itemModelLoc);
+        TreeMap<Long, double[]> itemModel = readModel(itemModelFile);
+        writeTreeMapToTachyon(itemModel, itemModelLoc);
     }
 
-    public void writeHashMapToTachyon(HashMap<Long, double[]> model, String tachyonLoc) {
+    public void writeTreeMapToTachyon(TreeMap<Long, double[]> model, String tachyonLoc) {
         int partition = 0;
         ClientStore store = null;
         try {
             store = ClientStore.createStore(new TachyonURI(tachyonLoc));
             store.createPartition(partition);
+            // Set<Long> keyset = model.keySet(); 
+
             for (Long k : model.keySet()) {
+                // System.out.println(k); 
                 store.put(partition,
                         long2ByteArr(k.longValue()),
                         SerializationUtils.serialize(model.get(k)));
@@ -72,13 +84,13 @@ public class WriteModel {
 
     }
 
-    public HashMap<Long, double[]> readModel(String modelFile) {
-        HashMap<Long, double[]> model = new HashMap<Long, double[]>();
+    public TreeMap<Long, double[]> readModel(String modelFile) {
+        TreeMap<Long, double[]> model = new TreeMap<Long, double[]>();
         FileInputStream fis = null;
         InputStreamReader isr = null;
         BufferedReader br = null;
         try {
-            fis = new FileInputStream(modelFile);
+            fis = new FileInputStream(new File(modelFile));
             isr = new InputStreamReader(fis);
             br = new BufferedReader(isr);
             boolean done = false;
@@ -95,6 +107,7 @@ public class WriteModel {
             }
         } catch (Exception e) {
             System.out.println("Error: " + e.getMessage());
+            e.printStackTrace();
         } finally {
             IOUtils.closeQuietly(br);
             IOUtils.closeQuietly(isr);
@@ -168,16 +181,37 @@ public class WriteModel {
 
     }
 
+    public static void testByteArrCompare() {
+
+        for (long i = 1L; i <= 128L; ++i) {
+            int result = Utils.compare(long2ByteArr(i), long2ByteArr(i + 1));
+            // System.out.println(result); 
+            if (result >= 0) {
+                System.out.println("uh oh: " + i);
+            }
+        }
+    }
+
 
     public static void main(String[] args) {
         WriteModel modelWrite = new WriteModel();
         String command = args[1];
         String[] droppedArgs = Arrays.copyOfRange(args, 2, args.length);
-        if (args[1] == "randomModel") {
+        if (command.equals("randomModel")) {
             // drop first 2 elements of args (program name, operation)
             modelWrite.writeRandomModels(droppedArgs);
-        } else if (args[1] == "writeModels") {
-            modelWrite.writeModelsFromFile(args);
+        } else if (command.equals("writeModels")) {
+            System.out.println("Writing models from file.");
+            modelWrite.writeModelsFromFile(droppedArgs);
+        } else if (command.equals("testcompare")) {
+            testByteArrCompare();
+        } else {
+            // byte[] test = long2ByteArr(135L); 
+            // for (int i = 0; i < test.length; ++i) { 
+            //     System.out.println(test[i]); 
+            // } 
+            System.out.println(args[1] + " is not a valid command.");
+
         }
     }
 

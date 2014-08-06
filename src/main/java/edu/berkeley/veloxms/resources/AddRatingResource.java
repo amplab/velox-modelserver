@@ -23,13 +23,11 @@ import tachyon.r.sorted.ClientStore;
 public class AddRatingResource {
 
 
-    private RatingsMatrix ratings;
     private ModelStorage model;
     private static final double lambda = 0.2L;
 
-    public AddRatingResource(ModelStorage model, RatingsMatrix ratings) {
+    public AddRatingResource(ModelStorage model) {
         this.model = model;
-        this.ratings = ratings;
     }
 
     @POST
@@ -41,10 +39,16 @@ public class AddRatingResource {
 
     }
 
-    public double[] updateUserModel(user) {
+    public double[] updateUserModel(long user) {
 
 
         // List<double[]> ratedMovieFactors = ratings.g 
+        Map<Long, Integer> userMovieRatings = model.getRatedMovies(user);
+
+
+        // Can compute the matrix inverse using Solve(A, I) where A is the matrix
+        // we want to invert and I is the identity matrix?
+
 
 
 

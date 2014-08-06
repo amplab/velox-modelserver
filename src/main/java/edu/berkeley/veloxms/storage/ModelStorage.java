@@ -12,7 +12,12 @@ public interface ModelStorage {
      */
     public double[] getItemFactors(long itemId);
 
-    public double[] getUserFactors(long itemId);
+    public double[] getUserFactors(long userId);
+
+    /**
+     * Gets a list of all movies this user has rated and the associated ratings.
+     */
+    public HashMap<Long, Integer> getRatedMovies (long userId);
 
 }
 

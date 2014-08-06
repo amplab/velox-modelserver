@@ -15,37 +15,48 @@ public class TachyonStorage implements ModelStorage {
 
     private final ClientStore users;
     private final ClientStore items;
+    private final ClientStore ratings;
 
     // TODO eventually we will want a shared cache among resources
     /* private final ConcurrentHashMap<Long, double[]> itemCache; */
     /* private final ConcurrentHashMap<Long, double[]> userCache; */
 
-    public TachyonStorage(ClientStore users, ClientStore items) {
+    public TachyonStorage(ClientStore users, ClientStore items, ClientStore ratings) {
         this.users = users;
         this.items = items;
+        this.ratings = ratings;
     }
 
+    @Override
     public double[] getItemFactors(long itemId) {
         return getFeatures(itemId, items);
     }
 
+    @Override
     public double[] getUserFactors(long userId) {
         return getFeatures(userId, users);
     }
 
-    public static double[] getFactors(long id, ClientStore model) {
-        ByteBuffer key = ByteBuffer.allocate(8);
-        key.putLong(id);
-        byte[] rawBytes = null;
+    private static double[] getFactors(long id, ClientStore model) {
+        // ByteBuffer key = ByteBuffer.allocate(8); 
+        // key.putLong(id); 
         try {
-            rawBytes = model.get(key.array());
+            byte[] rawBytes = model.get(TachyonUtils.long2ByteArr(id));
             return (double[]) SerializationUtils.deserialize(rawBytes);
         } catch (IOException e) {
             LOGGER.warn("Caught tachyon exception: " + e.getMessage());
         }
         return null;
     }
-
-    // public boolean updateUser 
-
+    
+    @Override
+    public HashMap<Long, Integer> getRatedMovies(long userId) {
+        try {
+            byte[] rawBytes = ratings.get(TachyonUtils.long2ByteArr(id));
+            return (HashMap<Long, Integer>) SerializationUtils.deserialize(rawBytes);
+        } catch (IOException e) {
+            LOGGER.warn("Caught tachyon exception: " + e.getMessage());
+        }
+        return null;
+    }
 }
