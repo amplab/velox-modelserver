@@ -1,15 +1,24 @@
 package edu.berkeley.veloxms;
 
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public class MovieRating {
 
     private long movieId;
     private long userId;
     private int rating;
 
-    public MovieRating(long userId, long movieId int rating) {
+    public MovieRating(long userId, long movieId, int rating) {
         this.movieId = movieId;
         this.userId = userId;
         this.rating = rating;
+    }
+
+    public MovieRating() {
+        this.movieId = -1;
+        this.userId = -1;
+        this.rating = -1;
     }
 
     @JsonProperty
@@ -42,25 +51,25 @@ public class MovieRating {
         this.rating = r;
     }
 
-    @Override
-    public boolean equals(Object o) {
-        if (o == this) {
-            return true;
-        }
-        if (!(o instanceof MovieRating)) {
-            return false;
-        }
-        MovieRating m = (MovieRating) o;
-        return (userId == m.userId && movieId == m.movieId);
-    }
-
-    @Override
-    public int hashCode() {
-        int result = 17;
-        result = result*31 + userId;
-        result = result*31 + movieId;
-        return result;
-
-    }
+    // @Override 
+    // public boolean equals(Object o) { 
+    //     if (o == this) { 
+    //         return true; 
+    //     } 
+    //     if (!(o instanceof MovieRating)) { 
+    //         return false; 
+    //     } 
+    //     MovieRating m = (MovieRating) o; 
+    //     return (userId == m.userId && movieId == m.movieId); 
+    // } 
+    //
+    // @Override 
+    // public int hashCode() { 
+    //     int result = 17; 
+    //     result = result*31 + (int) userId; 
+    //     result = result*31 + (int) movieId; 
+    //     return result; 
+    //
+    // } 
 
 }

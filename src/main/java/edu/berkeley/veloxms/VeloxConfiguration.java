@@ -4,6 +4,8 @@ import io.dropwizard.Configuration;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import org.hibernate.validator.constraints.NotEmpty;
 
+import javax.validation.constraints.NotNull;
+
 public class VeloxConfiguration extends Configuration {
     @NotEmpty
     private String itemModelLoc;
@@ -14,19 +16,18 @@ public class VeloxConfiguration extends Configuration {
     @NotEmpty
     private String ratingsLoc;
 
-    @NotEmpty
-    private int numFactors;
+    @NotNull
+    private Integer numFactors;
 
     @JsonProperty
-    public int getNumFactors() {
+    public Integer getNumFactors() {
         return numFactors;
     }
 
     @JsonProperty
-    public void setNumFactors(int numFactors) {
+    public void setNumFactors(Integer numFactors) {
         this.numFactors = numFactors;
     }
-
 
     @JsonProperty
     public String getItemModelLoc() {

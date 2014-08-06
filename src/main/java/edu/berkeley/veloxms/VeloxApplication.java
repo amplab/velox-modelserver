@@ -1,14 +1,16 @@
 package edu.berkeley.veloxms;
 
+import edu.berkeley.veloxms.resources.AddRatingResource;
+import edu.berkeley.veloxms.resources.PredictItemResource;
+import edu.berkeley.veloxms.storage.ModelStorage;
+import edu.berkeley.veloxms.storage.TachyonStorage;
 import io.dropwizard.Application;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
-import edu.berkeley.veloxms.resources.PredictItemResource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import tachyon.r.sorted.ClientStore;
 import tachyon.TachyonURI;
+import tachyon.r.sorted.ClientStore;
 
 public class VeloxApplication extends Application<VeloxConfiguration> {
 
@@ -49,17 +51,23 @@ public class VeloxApplication extends Application<VeloxConfiguration> {
         }
 
 
-        TachyonClientManager tachyonClientManager =
-            new TachyonClientManager(userModel, itemModel, ratings, config.getNumFactors());
-        environment.lifecycle().manage(tachyonClientManager);
+        // TachyonClientManager tachyonClientManager = 
+        //     new TachyonClientManager(userModel, itemModel);
+        // environment.lifecycle().manage(tachyonClientManager); 
+
+        ModelStorage model = new TachyonStorage(userModel,
+                                                  itemModel,
+                                                  ratings,
+                                                  config.getNumFactors());
 
         final PredictItemResource userPredictor =
-            new PredictItemResource(new TachyonStorage(userModel, itemModel));
+            new PredictItemResource(model);
         environment.jersey().register(userPredictor);
-        final AddRatingResource addRatings = new AddRatingResource();
+        final AddRatingResource addRatings = new AddRatingResource(model);
         environment.jersey().register(addRatings);
     }
 }
+
 
 
 

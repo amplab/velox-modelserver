@@ -1,21 +1,15 @@
 package edu.berkeley.veloxms.resources;
 
+import edu.berkeley.veloxms.storage.ModelStorage;
+import io.dropwizard.jersey.params.LongParam;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import javax.ws.rs.GET;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
-import java.util.Random;
-import io.dropwizard.jersey.params.LongParam;
-import java.util.*;
-import org.apache.commons.lang3.SerializationUtils;
-import java.nio.ByteBuffer;
-import java.io.IOException;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import tachyon.r.sorted.ClientStore;
 
 @Path("/predict-item/{item}/{user}")
 @Produces(MediaType.APPLICATION_JSON)

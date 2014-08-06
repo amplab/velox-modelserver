@@ -1,15 +1,13 @@
 package edu.berkeley.veloxms.storage;
 
 
-import java.util.*;
 import org.apache.commons.lang3.SerializationUtils;
-import java.nio.ByteBuffer;
-import java.io.IOException;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import tachyon.r.sorted.ClientStore;
+
+import java.io.IOException;
+import java.util.HashMap;
 
 public class TachyonStorage implements ModelStorage {
 
@@ -17,6 +15,8 @@ public class TachyonStorage implements ModelStorage {
     private final ClientStore items;
     private final ClientStore ratings;
     private final int numFactors;
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(TachyonStorage.class);
 
     // TODO eventually we will want a shared cache among resources
     /* private final ConcurrentHashMap<Long, double[]> itemCache; */
@@ -34,12 +34,12 @@ public class TachyonStorage implements ModelStorage {
 
     @Override
     public double[] getItemFactors(long itemId) {
-        return getFeatures(itemId, items);
+        return getFactors(itemId, items);
     }
 
     @Override
     public double[] getUserFactors(long userId) {
-        return getFeatures(userId, users);
+        return getFactors(userId, users);
     }
 
     private static double[] getFactors(long id, ClientStore model) {
@@ -57,7 +57,7 @@ public class TachyonStorage implements ModelStorage {
     @Override
     public HashMap<Long, Integer> getRatedMovies(long userId) {
         try {
-            byte[] rawBytes = ratings.get(TachyonUtils.long2ByteArr(id));
+            byte[] rawBytes = ratings.get(TachyonUtils.long2ByteArr(userId));
             return (HashMap<Long, Integer>) SerializationUtils.deserialize(rawBytes);
         } catch (IOException e) {
             LOGGER.warn("Caught tachyon exception: " + e.getMessage());

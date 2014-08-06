@@ -1,5 +1,8 @@
 package edu.berkeley.veloxms.storage;
 
+
+import java.util.HashMap;
+
 /**
  * Simple interface to abstract out the KV storage backend used to store
  * the models from the application logic to access them.

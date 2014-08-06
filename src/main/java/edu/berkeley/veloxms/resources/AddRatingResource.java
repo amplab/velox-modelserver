@@ -1,33 +1,31 @@
 package edu.berkeley.veloxms.resources;
 
-import javax.ws.rs.GET;
-import javax.ws.rs.Path;
-import javax.ws.rs.PathParam;
-import javax.ws.rs.Produces;
-import javax.ws.rs.core.MediaType;
-import java.util.Random;
+import edu.berkeley.veloxms.MovieRating;
+import edu.berkeley.veloxms.storage.ModelStorage;
 import io.dropwizard.jersey.params.LongParam;
-import java.util.*;
-import org.apache.commons.lang3.SerializationUtils;
-import java.nio.ByteBuffer;
-import java.io.IOException;
-
+import org.jblas.DoubleMatrix;
+import org.jblas.Solve;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import org.jblas.DoubleMatrix;
-import org.jblas.Solve;
-
-import tachyon.r.sorted.ClientStore;
+import javax.validation.Valid;
+import javax.ws.rs.Consumes;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.PathParam;
+import javax.ws.rs.core.MediaType;
+import java.util.Arrays;
+import java.util.HashMap;
 
 @Path("/add-rating/{user}")
-@Consumes(MediaType.APPLICATION_JSON) 
+@Consumes(MediaType.APPLICATION_JSON)
 // @Produces(MediaType.APPLICATION_JSON) 
 public class AddRatingResource {
 
 
     private ModelStorage model;
-    private static final double lambda = 0.2L;
+    private static final double lambda = 0.2;
+    private static final Logger LOGGER = LoggerFactory.getLogger(AddRatingResource.class);
 
     public AddRatingResource(ModelStorage model) {
         this.model = model;
@@ -36,21 +34,30 @@ public class AddRatingResource {
     @POST
     public Boolean rateMovie(@PathParam("user") LongParam userId,
                              @Valid MovieRating rating) {
-        ratings.addRating(rating, userId.get().longValue());
+        // TODO do something with the new user model
+        long uid = userId.get().longValue();
+        double[] newUserFactor = updateUserModel(uid, rating);
+        LOGGER.info("old user factors: " + Arrays.toString(model.getUserFactors(uid)));
+        LOGGER.info("new user factors: " + Arrays.toString(newUserFactor));
+        return true;
+
 
     }
 
-    public double[] updateUserModel(long user) {
+    // TODO write the new rating somewhere
+    public double[] updateUserModel(long user, MovieRating newRating) {
 
         // List<double[]> ratedMovieFactors = ratings.g 
-        Map<Long, Integer> userMovieRatings = model.getRatedMovies(user);
+        HashMap<Long, Integer> userMovieRatings = model.getRatedMovies(user);
+        userMovieRatings.put(newRating.getMovieId(), newRating.getRating());
+
 
         // construct movie matrix:
         int k = model.getNumFactors();
         DoubleMatrix movieSum = DoubleMatrix.zeros(k, k);
-        DoubleMatrix movieRatingsProductMatrix = new DoubleMatrix.zeros(k);
+        DoubleMatrix movieRatingsProductMatrix = DoubleMatrix.zeros(k);
 
-        foreach(Long movieId: userMovieRatings.keySet()) {
+        for(Long movieId: userMovieRatings.keySet()) {
             DoubleMatrix movieFactors = new DoubleMatrix(model.getItemFactors(movieId));
             DoubleMatrix result = movieFactors.mmul(movieFactors.transpose());
             // TODO make sure this addition is in place
@@ -62,7 +69,7 @@ public class AddRatingResource {
         }
 
         // add regularization term
-        DoubleMatrix regularization = new DoubleMatrix.eye(k);
+        DoubleMatrix regularization = DoubleMatrix.eye(k);
         regularization.muli(lambda*k);
         // TODO make sure this addition is in place
         movieSum.addi(regularization);
@@ -76,68 +83,4 @@ public class AddRatingResource {
         // back and forth between matrices and arrays
         return newUserFactors.toArray();
     }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    // private final ClientStore users; 
-    // private final ClientStore items; 
-    // private static final Logger LOGGER = LoggerFactory.getLogger(AddRatingResource.class); 
-    //
-    // // TODO eventually we will want a shared cache among resources 
-    // /* private final ConcurrentHashMap<Long, double[]> itemCache; */ 
-    // /* private final ConcurrentHashMap<Long, double[]> userCache; */ 
-    //
-    // public AddRatingResource(ClientStore users, ClientStore items) { 
-    //     this.users = users; 
-    //     this.items = items; 
-    // } 
-    //
-    // @GET 
-    // public double getPrediction(@PathParam("user") LongParam userId, 
-    //         @PathParam("item") LongParam itemId) { 
-    //     double[] userFeatures = getFeatures(userId.get().longValue(), users); 
-    //     double[] itemFeatures = getFeatures(itemId.get().longValue(), items); 
-    //     return makePrediction(userFeatures, itemFeatures); 
-    // } 
-    //
-    //
-    // public static double[] getFeatures(long id, ClientStore model) { 
-    //     ByteBuffer key = ByteBuffer.allocate(8); 
-    //     key.putLong(id); 
-    //     byte[] rawBytes = null; 
-    //     try { 
-    //         rawBytes = model.get(key.array()); 
-    //         return (double[]) SerializationUtils.deserialize(rawBytes); 
-    //     } catch (IOException e) { 
-    //         LOGGER.warn("Caught tachyon exception: " + e.getMessage()); 
-    //     } 
-    //     return null; 
-    // } 
-    //
-    //
-    // private double makePrediction(double[] userFeatures, double[] itemFeatures) { 
-    //     double sum = 0; 
-    //     for (int i = 0; i < userFeatures.length; ++i) { 
-    //         sum += itemFeatures[i]*userFeatures[i]; 
-    //     } 
-    //     return sum; 
-    // } 
-
 }

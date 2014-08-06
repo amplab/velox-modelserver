@@ -13,13 +13,16 @@ import java.io.InputStreamReader;
 import java.io.FileInputStream;
 import org.apache.commons.io.IOUtils;
 import java.util.TreeMap;
+import java.util.HashMap;
 import java.io.File;
 import tachyon.r.sorted.Utils;
+import java.io.Serializable;
 
 public class WriteModel {
 
     private static String itemModelLoc = "tachyon://localhost:19998/item-model";
     private static String userModelLoc = "tachyon://localhost:19998/user-model";
+    private static String ratingsLoc = "tachyon://localhost:19998/movie-ratings";
     private static int numFeatures = 50;
 
     public WriteModel() {
@@ -55,15 +58,19 @@ public class WriteModel {
         System.out.println("user file: " + userModelFile);
         String itemModelFile = args[1];
         System.out.println("item file: " + itemModelFile);
+        String ratingsFile = args[2];
+        System.out.println("ratings file: " + ratingsFile);
         // Read user model
         TreeMap<Long, double[]> userModel = readModel(userModelFile);
-        writeTreeMapToTachyon(userModel, userModelLoc);
+        WriteModel.writeTreeMapToTachyon(userModel, userModelLoc);
         // Read item model
         TreeMap<Long, double[]> itemModel = readModel(itemModelFile);
-        writeTreeMapToTachyon(itemModel, itemModelLoc);
+        WriteModel.writeTreeMapToTachyon(itemModel, itemModelLoc);
+        TreeMap<Long, HashMap<Long, Integer>> ratings = readRatings(ratingsFile);
+        WriteModel.writeTreeMapToTachyon(ratings, ratingsLoc);
     }
 
-    public void writeTreeMapToTachyon(TreeMap<Long, double[]> model, String tachyonLoc) {
+    public static void writeTreeMapToTachyon(TreeMap<Long, ? extends Serializable> model, String tachyonLoc) {
         int partition = 0;
         ClientStore store = null;
         try {
@@ -114,6 +121,51 @@ public class WriteModel {
             IOUtils.closeQuietly(fis);
         }
         return model;
+    }
+
+    public TreeMap<Long, HashMap<Long, Integer>> readRatings(String ratingsFile) {
+        TreeMap<Long, HashMap<Long, Integer>> ratings =
+            new TreeMap<Long, HashMap<Long, Integer>>();
+
+        FileInputStream fis = null;
+        InputStreamReader isr = null;
+        BufferedReader br = null;
+        try {
+            fis = new FileInputStream(new File(ratingsFile));
+            isr = new InputStreamReader(fis);
+            br = new BufferedReader(isr);
+            boolean done = false;
+            long currentUser = -1L;
+            HashMap<Long, Integer> currentUserRatings = null;
+            while (!done) {
+                String line = br.readLine();
+                if (line == null) {
+                    done = true;
+                } else {
+                    String[] splits = line.split("\\s+");
+                    long userId = Long.parseLong(splits[0]);
+                    long itemId = Long.parseLong(splits[1]);
+                    int rating = Integer.parseInt(splits[2]);
+                    // ignore timestamp for now
+                    long timestamp = Long.parseLong(splits[3]);
+                    // assume input file sorted by user id
+                    if (userId > currentUser) {
+                        currentUser = userId;
+                        currentUserRatings = new HashMap<Long, Integer>();
+                        ratings.put(currentUser, currentUserRatings);
+                    }
+                    currentUserRatings.put(itemId, rating);
+                }
+            }
+        } catch (Exception e) {
+            System.out.println("Error: " + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            IOUtils.closeQuietly(br);
+            IOUtils.closeQuietly(isr);
+            IOUtils.closeQuietly(fis);
+        }
+        return ratings;
     }
 
     public void writeRandomModels(String[] args) {
