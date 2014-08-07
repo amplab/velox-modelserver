@@ -36,6 +36,8 @@ public class AddRatingResource {
                              @Valid MovieRating rating) {
         // TODO do something with the new user model
         long uid = userId.get().longValue();
+        LOGGER.info("adding rating for user: " + uid);
+
         double[] newUserFactor = updateUserModel(uid, rating);
         LOGGER.info("old user factors: " + Arrays.toString(model.getUserFactors(uid)));
         LOGGER.info("new user factors: " + Arrays.toString(newUserFactor));

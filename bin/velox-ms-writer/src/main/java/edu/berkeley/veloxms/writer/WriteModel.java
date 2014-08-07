@@ -1,28 +1,28 @@
 package edu.berkeley.veloxms.writer;
 
 
-import tachyon.r.sorted.ClientStore;
-import tachyon.TachyonURI;
-import org.apache.commons.lang3.SerializationUtils;
-import java.util.Random;
-import java.util.Arrays;
-import java.nio.ByteBuffer;
-import java.io.IOException;
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.io.FileInputStream;
 import org.apache.commons.io.IOUtils;
-import java.util.TreeMap;
-import java.util.HashMap;
-import java.io.File;
+import org.apache.commons.lang3.SerializationUtils;
+import tachyon.TachyonURI;
+import tachyon.r.sorted.ClientStore;
 import tachyon.r.sorted.Utils;
+
 import java.io.Serializable;
+import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Random;
+import java.util.TreeMap;
+import java.io.*;
+import java.nio.ByteBuffer;
+
 
 public class WriteModel {
 
     private static String itemModelLoc = "tachyon://localhost:19998/item-model";
     private static String userModelLoc = "tachyon://localhost:19998/user-model";
     private static String ratingsLoc = "tachyon://localhost:19998/movie-ratings";
+    private static String testLoc = "tachyon://localhost:19998/test-loc";
     private static int numFeatures = 50;
 
     public WriteModel() {
@@ -62,15 +62,16 @@ public class WriteModel {
         System.out.println("ratings file: " + ratingsFile);
         // Read user model
         TreeMap<Long, double[]> userModel = readModel(userModelFile);
-        WriteModel.writeTreeMapToTachyon(userModel, userModelLoc);
+        WriteModel.writeTreeMapToTachyon(userModel, userModelLoc, false);
         // Read item model
         TreeMap<Long, double[]> itemModel = readModel(itemModelFile);
-        WriteModel.writeTreeMapToTachyon(itemModel, itemModelLoc);
+        WriteModel.writeTreeMapToTachyon(itemModel, itemModelLoc, false);
+
         TreeMap<Long, HashMap<Long, Integer>> ratings = readRatings(ratingsFile);
-        WriteModel.writeTreeMapToTachyon(ratings, ratingsLoc);
+        WriteModel.writeTreeMapToTachyon(ratings, ratingsLoc, true);
     }
 
-    public static void writeTreeMapToTachyon(TreeMap<Long, ? extends Serializable> model, String tachyonLoc) {
+    public static void writeTreeMapToTachyon(TreeMap<Long, ? extends Serializable> model, String tachyonLoc, boolean output) {
         int partition = 0;
         ClientStore store = null;
         try {
@@ -79,7 +80,9 @@ public class WriteModel {
             // Set<Long> keyset = model.keySet(); 
 
             for (Long k : model.keySet()) {
-                // System.out.println(k); 
+                if (output) {
+                    System.out.println("Writing: " + k + ", " + model.get(k));
+                }
                 store.put(partition,
                         long2ByteArr(k.longValue()),
                         SerializationUtils.serialize(model.get(k)));
@@ -234,12 +237,58 @@ public class WriteModel {
     }
 
     public static void testByteArrCompare() {
+        System.out.println("Testing byte arrays");
 
-        for (long i = 1L; i <= 128L; ++i) {
-            int result = Utils.compare(long2ByteArr(i), long2ByteArr(i + 1));
-            // System.out.println(result); 
-            if (result >= 0) {
-                System.out.println("uh oh: " + i);
+        for (long i = 2L; i <= 10000L; ++i) {
+            for (long j = 1L; j < i; ++j) {
+                int result = Utils.compare(ByteBuffer.wrap(long2ByteArr(j)), ByteBuffer.wrap(long2ByteArr(i)));
+                // System.out.println(result); 
+                if (result >= 0) {
+                    System.out.println("uh oh, i: " + i + ", j: " + j);
+                }
+            }
+        }
+    }
+
+    public static void testLookup(long start, long end) {
+        System.out.println("Writing to test lookups.");
+        
+        ClientStore writeRatings = null;
+        try {
+            writeRatings = ClientStore.createStore(new TachyonURI(testLoc));
+            writeRatings.createPartition(0);
+            for (long i = start; i < end; ++i) {
+                writeRatings.put(0, long2ByteArr(i), long2ByteArr(i*100));
+            }
+            writeRatings.closePartition(0);
+            Thread.sleep(10);
+        } catch (Exception e) {
+            // do nothing
+
+        }
+
+
+
+        System.out.println("Testing lookups");
+
+        ClientStore ratings = null;
+        try {
+            ratings = ClientStore.getStore(new TachyonURI(testLoc));
+        } catch (Exception e) {
+            System.out.println("Couldn't find store");
+            return;
+        }
+        byte[] rawBytes = null;
+        for (long i = start; i < end; ++i) {
+            try {
+                rawBytes = ratings.get(long2ByteArr(i));
+            } catch (Exception e) {
+                // do nothing
+            }
+            if (rawBytes != null) {
+                System.out.println("Successfully found: " + i);
+            } else {
+                System.out.println("Uh oh. Should have found: " + i);
             }
         }
     }
@@ -257,6 +306,8 @@ public class WriteModel {
             modelWrite.writeModelsFromFile(droppedArgs);
         } else if (command.equals("testcompare")) {
             testByteArrCompare();
+        } else if (command.equals("testlookups")) {
+            testLookup(Long.parseLong(droppedArgs[0]), Long.parseLong(droppedArgs[1]));
         } else {
             // byte[] test = long2ByteArr(135L); 
             // for (int i = 0; i < test.length; ++i) { 
