@@ -65,33 +65,30 @@ public class WriteModel {
         WriteModel.writeTreeMapToTachyon(userModel, userModelLoc, false);
         // Read item model
         TreeMap<Long, double[]> itemModel = readModel(itemModelFile);
+
         WriteModel.writeTreeMapToTachyon(itemModel, itemModelLoc, false);
 
         TreeMap<Long, HashMap<Long, Integer>> ratings = readRatings(ratingsFile);
         WriteModel.writeTreeMapToTachyon(ratings, ratingsLoc, true);
     }
 
-    public static void writeTreeMapToTachyon(TreeMap<Long, ? extends Serializable> model, String tachyonLoc, boolean output) {
+    public static void writeTreeMapToTachyon(TreeMap<Long, T extends Serializable> model, String tachyonLoc, boolean output) throws Exception {
         int partition = 0;
-        ClientStore store = null;
-        try {
-            store = ClientStore.createStore(new TachyonURI(tachyonLoc));
-            store.createPartition(partition);
-            // Set<Long> keyset = model.keySet(); 
-
-            for (Long k : model.keySet()) {
-                if (output) {
-                    System.out.println("Writing: " + k + ", " + model.get(k));
-                }
-                store.put(partition,
-                        long2ByteArr(k.longValue()),
-                        SerializationUtils.serialize(model.get(k)));
+        TreeMap<byte[], T> byteKeys = new TreeMap<byte[], T>(new Comparator<byte[]> () {
+            public int compare(byte[] a, byte[] b) {
+                Utils.compare(a, b);
             }
-            store.closePartition(partition);
-        } catch (Exception e) {
-            System.out.println("Tachyon error: " + e.getMessage());
-        }
+        });
 
+        for(Long k: model.keySet()) {
+            byteKeys.put(long2ByteArr(k), model.get(k));
+        }
+        ClientStore store = ClientStore.createStore(new TachyonURI(tachyonLoc));
+        store.createPartition(partition);
+        for (byte[] k : byteKeys.keySet()) {
+            store.put(partition, k, SerializationUtils.serialize(byteKeys.get(k)));
+        }
+        store.closePartition(partition);
     }
 
     public TreeMap<Long, double[]> readModel(String modelFile) {
@@ -250,47 +247,43 @@ public class WriteModel {
         }
     }
 
-    public static void testLookup(long start, long end) {
-        System.out.println("Writing to test lookups.");
-        
-        ClientStore writeRatings = null;
-        try {
-            writeRatings = ClientStore.createStore(new TachyonURI(testLoc));
-            writeRatings.createPartition(0);
-            for (long i = start; i < end; ++i) {
-                writeRatings.put(0, long2ByteArr(i), long2ByteArr(i*100));
-            }
-            writeRatings.closePartition(0);
-            Thread.sleep(10);
-        } catch (Exception e) {
-            // do nothing
-
-        }
-
-
-
-        System.out.println("Testing lookups");
-
-        ClientStore ratings = null;
-        try {
-            ratings = ClientStore.getStore(new TachyonURI(testLoc));
-        } catch (Exception e) {
-            System.out.println("Couldn't find store");
-            return;
-        }
-        byte[] rawBytes = null;
-        for (long i = start; i < end; ++i) {
-            try {
-                rawBytes = ratings.get(long2ByteArr(i));
-            } catch (Exception e) {
-                // do nothing
-            }
-            if (rawBytes != null) {
-                System.out.println("Successfully found: " + i);
-            } else {
-                System.out.println("Uh oh. Should have found: " + i);
-            }
-        }
+    public static void testLookup(long start, long end) throws Exception{
+        // System.out.println("Writing to test lookups."); 
+        //
+        // ClientStore writeRatings = null; 
+        // try { 
+        //     writeRatings = ClientStore.createStore(new TachyonURI(testLoc)); 
+        //     writeRatings.createPartition(0); 
+        //     for (long i = start; i < end; ++i) { 
+        //         writeRatings.put(0, long2ByteArr(i), long2ByteArr(i*100)); 
+        //     } 
+        //     writeRatings.closePartition(0); 
+        //     Thread.sleep(10); 
+        // } catch (Exception e) { 
+        //     // do nothing 
+        //
+        // } 
+        //
+        //
+        //
+        // System.out.println("Testing lookups"); 
+        //
+        // ClientStore ratings = null; 
+        // try { 
+        //     ratings = ClientStore.getStore(new TachyonURI(testLoc)); 
+        // } catch (Exception e) { 
+        //     System.out.println("Couldn't find store"); 
+        //     return; 
+        // } 
+        // byte[] rawBytes = null; 
+        // for (long i = start; i < end; ++i) { 
+        //         rawBytes = ratings.get(long2ByteArr(i)); 
+        //     if (rawBytes != null) { 
+        //         System.out.println("Successfully found: " + i); 
+        //     } else { 
+        //         System.out.println("Uh oh. Should have found: " + i); 
+        //     } 
+        // } 
     }
 
 

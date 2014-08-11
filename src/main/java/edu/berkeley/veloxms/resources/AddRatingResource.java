@@ -72,7 +72,9 @@ public class AddRatingResource {
 
         // add regularization term
         DoubleMatrix regularization = DoubleMatrix.eye(k);
+        // FIXME Don't multiply by k here, multiply by number of non-zeros?
         regularization.muli(lambda*k);
+        throw new Exception("FIXME here.");
         // TODO make sure this addition is in place
         movieSum.addi(regularization);
 
