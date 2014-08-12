@@ -15,6 +15,7 @@ import java.util.Random;
 import java.util.TreeMap;
 import java.io.*;
 import java.nio.ByteBuffer;
+import java.util.Comparator;
 
 
 public class WriteModel {
@@ -25,10 +26,10 @@ public class WriteModel {
     private static String testLoc = "tachyon://localhost:19998/test-loc";
     private static int numFeatures = 50;
 
-    public WriteModel() {
-        System.out.println("Creating new model.");
-
-    }
+    // public WriteModel() { 
+    //     System.out.println("Creating new model."); 
+    //
+    // } 
 
     public static byte[] long2ByteArr(long id) {
         ByteBuffer key = ByteBuffer.allocate(8);
@@ -53,7 +54,7 @@ public class WriteModel {
         return arr;
     }
 
-    public void writeModelsFromFile(String[] args) {
+    public static void writeModelsFromFile(String[] args) throws Exception {
         String userModelFile = args[0];
         System.out.println("user file: " + userModelFile);
         String itemModelFile = args[1];
@@ -61,38 +62,36 @@ public class WriteModel {
         String ratingsFile = args[2];
         System.out.println("ratings file: " + ratingsFile);
         // Read user model
-        TreeMap<Long, double[]> userModel = readModel(userModelFile);
-        WriteModel.writeTreeMapToTachyon(userModel, userModelLoc, false);
+        writeTreeMapToTachyon(readModel(userModelFile), userModelLoc);
         // Read item model
-        TreeMap<Long, double[]> itemModel = readModel(itemModelFile);
-
-        WriteModel.writeTreeMapToTachyon(itemModel, itemModelLoc, false);
-
-        TreeMap<Long, HashMap<Long, Integer>> ratings = readRatings(ratingsFile);
-        WriteModel.writeTreeMapToTachyon(ratings, ratingsLoc, true);
+        writeTreeMapToTachyon(readModel(itemModelFile), itemModelLoc);
+        // read ratings
+        writeTreeMapToTachyon(readRatings(ratingsFile), ratingsLoc);
     }
 
-    public static void writeTreeMapToTachyon(TreeMap<Long, T extends Serializable> model, String tachyonLoc, boolean output) throws Exception {
+    public static void writeTreeMapToTachyon(TreeMap<byte[], byte[]> data, String tachyonLoc) throws Exception {
         int partition = 0;
-        TreeMap<byte[], T> byteKeys = new TreeMap<byte[], T>(new Comparator<byte[]> () {
-            public int compare(byte[] a, byte[] b) {
-                Utils.compare(a, b);
-            }
-        });
-
-        for(Long k: model.keySet()) {
-            byteKeys.put(long2ByteArr(k), model.get(k));
-        }
         ClientStore store = ClientStore.createStore(new TachyonURI(tachyonLoc));
         store.createPartition(partition);
-        for (byte[] k : byteKeys.keySet()) {
-            store.put(partition, k, SerializationUtils.serialize(byteKeys.get(k)));
+        for (byte[] k : data.keySet()) {
+            store.put(partition, k, data.get(k));
         }
         store.closePartition(partition);
     }
 
-    public TreeMap<Long, double[]> readModel(String modelFile) {
-        TreeMap<Long, double[]> model = new TreeMap<Long, double[]>();
+    private static class ByteComparator implements Comparator<byte[]> {
+        public int compare(byte[] a, byte[] b) {
+            return Utils.compare(a, b);
+        }
+    }
+
+    public static TreeMap<byte[], byte[]> readModel(String modelFile) {
+        // TreeMap<byte[], byte[]> model = new TreeMap<byte[], byte[]>(new Comparator<byte[]> () { 
+        //     public int compare(byte[] a, byte[] b) { 
+        //         return Utils.compare(a, b); 
+        //     } 
+        // }); 
+        TreeMap<byte[], byte[]> model = new TreeMap<byte[], byte[]>(new ByteComparator());
         FileInputStream fis = null;
         InputStreamReader isr = null;
         BufferedReader br = null;
@@ -109,7 +108,7 @@ public class WriteModel {
                     String[] splits = line.split(",");
                     long key = Long.parseLong(splits[0]);
                     double[] factors = parseFactors(splits);
-                    model.put(key, factors);
+                    model.put(long2ByteArr(key), SerializationUtils.serialize(factors));
                 }
             }
         } catch (Exception e) {
@@ -123,9 +122,14 @@ public class WriteModel {
         return model;
     }
 
-    public TreeMap<Long, HashMap<Long, Integer>> readRatings(String ratingsFile) {
-        TreeMap<Long, HashMap<Long, Integer>> ratings =
-            new TreeMap<Long, HashMap<Long, Integer>>();
+    // public TreeMap<Long, HashMap<Long, Integer>> readRatings(String ratingsFile) { 
+    public static TreeMap<byte[], byte[]> readRatings(String ratingsFile) {
+        // TreeMap<byte[], byte[]> ratings = new TreeMap<byte[], byte[]>(new Comparator<byte[]> () { 
+        //     public int compare(byte[] a, byte[] b) { 
+        //         return Utils.compare(a, b); 
+        //     } 
+        // }); 
+        TreeMap<byte[], byte[]> ratings = new TreeMap<byte[], byte[]>(new ByteComparator());
 
         FileInputStream fis = null;
         InputStreamReader isr = null;
@@ -150,12 +154,18 @@ public class WriteModel {
                     long timestamp = Long.parseLong(splits[3]);
                     // assume input file sorted by user id
                     if (userId > currentUser) {
+                        if (currentUserRatings != null) {
+                            ratings.put(long2ByteArr(currentUser), SerializationUtils.serialize(currentUserRatings));
+                        }
                         currentUser = userId;
                         currentUserRatings = new HashMap<Long, Integer>();
-                        ratings.put(currentUser, currentUserRatings);
                     }
                     currentUserRatings.put(itemId, rating);
                 }
+            }
+            // Last entry won't get added, so add after done reading file
+            if (currentUserRatings != null) {
+                ratings.put(long2ByteArr(currentUser), SerializationUtils.serialize(currentUserRatings));
             }
         } catch (Exception e) {
             System.out.println("Error: " + e.getMessage());
@@ -168,7 +178,7 @@ public class WriteModel {
         return ratings;
     }
 
-    public void writeRandomModels(String[] args) {
+    public static void writeRandomModels(String[] args) {
         int partition = Integer.parseInt(args[0]);
         boolean create = Boolean.parseBoolean(args[1]);
         ClientStore items = null;
@@ -287,20 +297,19 @@ public class WriteModel {
     }
 
 
-    public static void main(String[] args) {
-        WriteModel modelWrite = new WriteModel();
+    public static void main(String[] args) throws Exception {
         String command = args[1];
         String[] droppedArgs = Arrays.copyOfRange(args, 2, args.length);
         if (command.equals("randomModel")) {
             // drop first 2 elements of args (program name, operation)
-            modelWrite.writeRandomModels(droppedArgs);
+            writeRandomModels(droppedArgs);
         } else if (command.equals("writeModels")) {
             System.out.println("Writing models from file.");
-            modelWrite.writeModelsFromFile(droppedArgs);
-        } else if (command.equals("testcompare")) {
-            testByteArrCompare();
-        } else if (command.equals("testlookups")) {
-            testLookup(Long.parseLong(droppedArgs[0]), Long.parseLong(droppedArgs[1]));
+            writeModelsFromFile(droppedArgs);
+        // } else if (command.equals("testcompare")) { 
+        //     testByteArrCompare(); 
+        // } else if (command.equals("testlookups")) { 
+        //     testLookup(Long.parseLong(droppedArgs[0]), Long.parseLong(droppedArgs[1])); 
         } else {
             // byte[] test = long2ByteArr(135L); 
             // for (int i = 0; i < test.length; ++i) { 

@@ -10,6 +10,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.validation.Valid;
 import javax.ws.rs.Consumes;
+import javax.ws.rs.Produces;
 import javax.ws.rs.POST;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
@@ -19,7 +20,7 @@ import java.util.HashMap;
 
 @Path("/add-rating/{user}")
 @Consumes(MediaType.APPLICATION_JSON)
-// @Produces(MediaType.APPLICATION_JSON) 
+@Produces(MediaType.APPLICATION_JSON)
 public class AddRatingResource {
 
 
@@ -74,8 +75,8 @@ public class AddRatingResource {
         DoubleMatrix regularization = DoubleMatrix.eye(k);
         // FIXME Don't multiply by k here, multiply by number of non-zeros?
         regularization.muli(lambda*k);
-        throw new Exception("FIXME here.");
-        // TODO make sure this addition is in place
+        // throw new Exception("FIXME here."); 
+        // TODO make sure this addition is an in-place operation
         movieSum.addi(regularization);
 
 
