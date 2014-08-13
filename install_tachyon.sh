@@ -3,14 +3,14 @@
 TACHYON_HOME=~/tachyon
 
 if [ ! -d "$TACHYON_HOME" ]; then
-  git clone https://github.com/amplab/tachyon.git $TACHYON_HOME
+  git clone https://github.com/dcrankshaw/tachyon.git $TACHYON_HOME
 fi
 cd $TACHYON_HOME
 # check out a known working version of tachyon
 # this SHA is head of branch nrr2 as of 8/12/14
-git show-ref --verify --quiet refs/heads/<branch-name>
+# git show-ref --verify --quiet refs/heads/<branch-name>
 # $? == 0 means local branch with <branch-name> exists. 
-git checkout 662f3db54ab08c7ff5f9bbcdf0431d7704929783
+git checkout velox-build
 mvn package -DskipTests
 mvn install:install-file -Dfile=core/target/tachyon-0.6.0-SNAPSHOT-jar-with-dependencies.jar -DgroupId=org.tachyonproject -DartifactId=tachyon-parent -Dversion=0.6.0-SNAPSHOT -Dpackaging=jar
 cd -
