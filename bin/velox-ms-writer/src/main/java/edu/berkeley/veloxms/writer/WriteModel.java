@@ -9,10 +9,7 @@ import tachyon.r.sorted.Utils;
 
 import java.io.Serializable;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Random;
-import java.util.TreeMap;
+import java.util.*;
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.util.Comparator;
@@ -27,10 +24,10 @@ public class WriteModel {
     private static String matPredictionsLoc = "tachyon://localhost:19998/mat-predictions";
     private static int numFeatures = 50;
 
-    // public WriteModel() { 
-    //     System.out.println("Creating new model."); 
-    //
-    // } 
+    public WriteModel() {
+        System.out.println("Creating new model writer.");
+
+    }
 
     public static byte[] long2ByteArr(long id) {
         ByteBuffer key = ByteBuffer.allocate(8);
@@ -84,36 +81,139 @@ public class WriteModel {
 
     }
 
-    public static void materializeAllPredictions(String[] args) throws Exception {
+    private class WritePredictions implements Runnable {
+        private final NavigableMap<Long, double[]> userModel;
+        private final NavigableMap<Long, double[]> itemModel;
+        private TachyonURI writeLoc;
+        private int part;
+        private int threadNum;
+        // 5*10^6
+        public static final int PART_SIZE = 5*1000000;
+
+        public WritePredictions(NavigableMap<Long, double[]> users, NavigableMap<Long, double[]> items, int partitionStart, int threadNum) {
+            this.userModel = users;
+            this.itemModel = items;
+            this.writeLoc = new TachyonURI(matPredictionsLoc);
+            this.part = partitionStart;
+            this.threadNum = threadNum;
+        }
+
+        private double makePrediction(double[] userFeatures, double[] itemFeatures) {
+            double sum = 0;
+            for (int i = 0; i < userFeatures.length; ++i) {
+                sum += itemFeatures[i]*userFeatures[i];
+            }
+            return sum;
+        }
+
+        public void run() {
+            ClientStore store = null;
+            try {
+                store = ClientStore.getStore(writeLoc);
+            } catch (IOException e) {
+                System.out.println("Tachyon exception: " + e.getMessage());
+                System.err.println("Returning early.");
+                return;
+            }
+            TreeMap<byte[], byte[]> predictions = new TreeMap<byte[], byte[]>(new ByteComparator());
+            int partition = this.part;
+            int numPredictions = 0;
+            for (Long userId: userModel.keySet()) {
+                for (Long itemId: itemModel.keySet()) {
+                    byte[] key = WriteModel.twoDimensionKey(userId.longValue(), itemId.longValue());
+                    byte[] value = WriteModel.double2ByteArr(makePrediction(userModel.get(userId),
+                            itemModel.get(itemId)));
+                    predictions.put(key, value);
+                    numPredictions++;
+                    if (numPredictions % PART_SIZE == 0) {
+                        try {
+                            store.createPartition(partition);
+                            for (byte[] k: predictions.keySet()) {
+                                store.put(partition, k, predictions.get(k));
+                            }
+                            // empty map
+                            predictions.clear();
+                            store.closePartition(partition);
+                        } catch (IOException e) {
+                            System.out.println("Tachyon exception: " + e.getMessage());
+                        }
+                        System.out.println("Thread: " + threadNum + " writing partition: " + partition);
+                        partition += 1;
+                    }
+                }
+            }
+
+            try {
+                store.createPartition(partition);
+                for (byte[] k: predictions.keySet()) {
+                    store.put(partition, k, predictions.get(k));
+                }
+                // empty map
+                predictions.clear();
+                store.closePartition(partition);
+            } catch (IOException e) {
+                System.out.println("Tachyon exception: " + e.getMessage());
+            }
+        }
+    }
+
+    public void materializeAllPredictions(String[] args) throws Exception {
         String userModelFile = args[0];
         System.out.println("user file: " + userModelFile);
         String itemModelFile = args[1];
         System.out.println("item file: " + itemModelFile);
-        TreeMap<Long, double[]> userModel = readModel(userModelFile);
-        TreeMap<Long, double[]> itemModel = readModel(itemModelFile);
-        TreeMap<byte[], byte[]> predictions = new TreeMap<byte[], byte[]>(new ByteComparator());
-        int partition = 0;
-        int numPredictions = 0;
-        int partitionSize = 5 * Math.pow(10, 6);
-        ClientStore store = ClientStore.createStore(new TachyonURI(matPredictionsLoc));
-        for (Long userId: userModel.keySet()) {
-            for (Long itemId: itemModel.keySet()) {
-                byte[] key = twoDimensionKey(userId.longValue(), itemId.longValue());
-                byte[] value = double2ByteArr(makePrediction(userModel.get(userId),
-                                                             itemModel.get(itemId)));
-                predictions.put(key, value);
-                numPredictions++;
+        final TreeMap<Long, double[]> userModel = readModel(userModelFile);
+        final TreeMap<Long, double[]> itemModel = readModel(itemModelFile);
+
+        try {
+            ClientStore store = ClientStore.createStore(new TachyonURI(matPredictionsLoc));
+        } catch (IOException e) {
+            System.out.println("Tachyon exception: " + e.getMessage());
+            System.err.println("Returning early.");
+            return;
+        }
+
+        int totalPredictions = userModel.size() * itemModel.size();
+        int numThreads = 16;
+        int userModelPartSize = userModel.size() / numThreads;
+        int threadNum = 0;
+        List<Thread> threads = new ArrayList<Thread>(16);
+        Long startKey = userModel.firstKey();
+        int curPartCount = 0;
+        for (Long k: userModel.keySet()) {
+            curPartCount += 1;
+            if (curPartCount == userModelPartSize && threadNum < (numThreads - 1)) {
+                threads.add(new Thread(new WritePredictions(
+                                userModel.subMap(startKey, true, k, false),
+                                itemModel,
+                                threadNum*10,
+                                threadNum)));
+
+                curPartCount = 0;
+                startKey = k;
+                threadNum += 1;
             }
         }
-        writeTreeMapToTachyon(predictions, matPredictionsLoc);
-    }
 
-    private static double makePrediction(double[] userFeatures, double[] itemFeatures) {
-        double sum = 0;
-        for (int i = 0; i < userFeatures.length; ++i) {
-            sum += itemFeatures[i]*userFeatures[i];
+        threads.add(new Thread(new WritePredictions(
+                        userModel.subMap(startKey, true, userModel.lastKey(), true),
+                        itemModel,
+                        threadNum*10,
+                        threadNum)));
+
+        System.out.println("Threads starting.");
+        // start threads
+        for (Thread t: threads) {
+            t.start();
         }
-        return sum;
+
+        // wait for threads to finish
+        int i = 0;
+        for (Thread t: threads) {
+            t.join();
+            i += 1;
+            System.out.println(i + " threads have completed.");
+        }
     }
 
     public static void writeTreeMapToTachyon(TreeMap<byte[], byte[]> data, String tachyonLoc) throws Exception {
@@ -351,8 +451,9 @@ public class WriteModel {
             System.out.println("Writing models from file.");
             writeModelsFromFile(droppedArgs);
         } else if (command.equals("matPredictions")) {
-            System.out.println("Writing models from file.");
-            materializeAllPredictions(droppedArgs);
+            System.out.println("Materializing all predictions.");
+            WriteModel modelWriter = new WriteModel();
+            modelWriter.materializeAllPredictions(droppedArgs);
         } else {
             System.out.println(args[0] + " is not a valid command.");
         }
