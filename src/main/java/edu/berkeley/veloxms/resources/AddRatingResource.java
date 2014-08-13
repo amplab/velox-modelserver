@@ -3,6 +3,7 @@ package edu.berkeley.veloxms.resources;
 import edu.berkeley.veloxms.MovieRating;
 import edu.berkeley.veloxms.storage.ModelStorage;
 import io.dropwizard.jersey.params.LongParam;
+import com.codahale.metrics.annotation.Timed;
 import org.jblas.DoubleMatrix;
 import org.jblas.Solve;
 import org.slf4j.Logger;
@@ -33,6 +34,7 @@ public class AddRatingResource {
     }
 
     @POST
+    @Timed
     public Boolean rateMovie(@PathParam("user") LongParam userId,
                              @Valid MovieRating rating) {
         // TODO do something with the new user model

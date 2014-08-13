@@ -37,10 +37,12 @@ public class VeloxApplication extends Application<VeloxConfiguration> {
         ClientStore userModel = null;
         ClientStore itemModel = null;
         ClientStore ratings = null;
+        ClientStore matPredictions = null;
         try {
             userModel = ClientStore.getStore(new TachyonURI(config.getUserModelLoc()));
             itemModel = ClientStore.getStore(new TachyonURI(config.getItemModelLoc()));
             ratings = ClientStore.getStore(new TachyonURI(config.getRatingsLoc()));
+            matPredictions = ClientStore.getStore(new TachyonURI(config.getMatPredictionsLoc()));
         } catch (Exception e) {
 
             LOGGER.error("Caught Tachyon exception: " + e.getMessage());
@@ -58,6 +60,7 @@ public class VeloxApplication extends Application<VeloxConfiguration> {
         ModelStorage model = new TachyonStorage(userModel,
                                                   itemModel,
                                                   ratings,
+                                                  matPredictions,
                                                   config.getNumFactors());
 
         final PredictItemResource userPredictor =

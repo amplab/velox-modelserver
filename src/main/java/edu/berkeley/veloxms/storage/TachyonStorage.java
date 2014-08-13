@@ -8,12 +8,14 @@ import tachyon.r.sorted.ClientStore;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.nio.ByteBuffer;
 
 public class TachyonStorage implements ModelStorage {
 
     private final ClientStore users;
     private final ClientStore items;
     private final ClientStore ratings;
+    private final ClientStore matPredictions;
     private final int numFactors;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TachyonStorage.class);
@@ -25,10 +27,12 @@ public class TachyonStorage implements ModelStorage {
     public TachyonStorage(ClientStore users,
                           ClientStore items,
                           ClientStore ratings,
+                          ClientStore matPredictions,
                           int numFactors) {
         this.users = users;
         this.items = items;
         this.ratings = ratings;
+        this.matPredictions = matPredictions;
         this.numFactors = numFactors;
     }
 
@@ -75,4 +79,22 @@ public class TachyonStorage implements ModelStorage {
     public int getNumFactors() {
         return this.numFactors;
     }
+
+
+    // TODO deicde if a single KV pair per prediction is the best way to do this
+    @Override
+    public double getMaterializedPrediction(long userId, long movieId) {
+        double prediction = -1.0;
+        try {
+            byte[] rawPrediction =
+                matPredictions.get(TachyonUtils.twoDimensionKey(userId, movieId));
+            if (rawPrediction != null) {
+                prediction = ByteBuffer.wrap(rawPrediction).getDouble();
+            }
+        } catch (IOException e) {
+            LOGGER.warn("Caught tachyon exception: " + e.getMessage());
+        }
+        return prediction;
+    }
 }
+

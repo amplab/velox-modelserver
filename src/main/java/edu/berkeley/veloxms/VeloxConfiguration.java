@@ -16,6 +16,9 @@ public class VeloxConfiguration extends Configuration {
     @NotEmpty
     private String ratingsLoc;
 
+    @NotEmpty
+    private String matPredictionsLoc;
+
     @NotNull
     private Integer numFactors;
 
@@ -57,6 +60,16 @@ public class VeloxConfiguration extends Configuration {
     @JsonProperty
     public void setRatingsLoc(String ratingsLoc) {
         this.ratingsLoc = ratingsLoc;
+    }
+
+    @JsonProperty
+    public String getMatPredictionsLoc() {
+        return matPredictionsLoc;
+    }
+
+    @JsonProperty
+    public void setMatPredictionsLoc(String matPredictionsLoc) {
+        this.matPredictionsLoc = matPredictionsLoc;
     }
 
 }

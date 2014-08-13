@@ -24,6 +24,9 @@ public interface ModelStorage {
 
     public int getNumFactors();
 
+    // optional method
+    public double getMaterializedPrediction(long userId, long itemId);
+
 }
 
 

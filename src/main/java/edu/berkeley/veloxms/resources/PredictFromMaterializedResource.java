@@ -12,14 +12,14 @@ import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 
-@Path("/predict-item/{item}/{user}")
+@Path("/predict-item-materialized/{item}/{user}")
 @Produces(MediaType.APPLICATION_JSON)
-public class PredictItemResource {
+public class PredictFromMaterializedResource {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(PredictItemResource.class);
     private final ModelStorage model;
 
-    public PredictItemResource(ModelStorage model) {
+    public PredictFromMaterializedResource(ModelStorage model) {
         this.model = model;
     }
 
@@ -27,17 +27,7 @@ public class PredictItemResource {
     @Timed
     public double getPrediction(@PathParam("user") LongParam userId,
             @PathParam("item") LongParam itemId) {
-        double[] userFeatures = model.getUserFactors(userId.get().longValue());
-        double[] itemFeatures = model.getItemFactors(itemId.get().longValue());
-        return makePrediction(userFeatures, itemFeatures);
+        return model.getMaterializedPrediction(userId.get().longValue(),
+                                               itemId.get().longValue());
     }
-
-    private double makePrediction(double[] userFeatures, double[] itemFeatures) {
-        double sum = 0;
-        for (int i = 0; i < userFeatures.length; ++i) {
-            sum += itemFeatures[i]*userFeatures[i];
-        }
-        return sum;
-    }
-
 }

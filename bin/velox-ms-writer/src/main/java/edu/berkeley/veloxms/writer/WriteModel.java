@@ -24,6 +24,7 @@ public class WriteModel {
     private static String userModelLoc = "tachyon://localhost:19998/user-model";
     private static String ratingsLoc = "tachyon://localhost:19998/movie-ratings";
     private static String testLoc = "tachyon://localhost:19998/test-loc";
+    private static String matPredictionsLoc = "tachyon://localhost:19998/mat-predictions";
     private static int numFeatures = 50;
 
     // public WriteModel() { 
@@ -34,6 +35,19 @@ public class WriteModel {
     public static byte[] long2ByteArr(long id) {
         ByteBuffer key = ByteBuffer.allocate(8);
         key.putLong(id);
+        return key.array();
+    }
+
+    public static byte[] double2ByteArr(double d) {
+        ByteBuffer key = ByteBuffer.allocate(8);
+        key.putDouble(d);
+        return key.array();
+    }
+
+    public static byte[] twoDimensionKey(long key1, long key2) {
+        ByteBuffer key = ByteBuffer.allocate(16);
+        key.putLong(key1);
+        key.putLong(key2);
         return key.array();
     }
 
@@ -62,11 +76,39 @@ public class WriteModel {
         String ratingsFile = args[2];
         System.out.println("ratings file: " + ratingsFile);
         // Read user model
-        writeTreeMapToTachyon(readModel(userModelFile), userModelLoc);
+        writeTreeMapToTachyon(serializeModel(readModel(userModelFile)), userModelLoc);
         // Read item model
-        writeTreeMapToTachyon(readModel(itemModelFile), itemModelLoc);
+        writeTreeMapToTachyon(serializeModel(readModel(itemModelFile)), itemModelLoc);
         // read ratings
         writeTreeMapToTachyon(readRatings(ratingsFile), ratingsLoc);
+
+    }
+
+    public static void materializeAllPredictions(String[] args) throws Exception {
+        String userModelFile = args[0];
+        System.out.println("user file: " + userModelFile);
+        String itemModelFile = args[1];
+        System.out.println("item file: " + itemModelFile);
+        TreeMap<Long, double[]> userModel = readModel(userModelFile);
+        TreeMap<Long, double[]> itemModel = readModel(itemModelFile);
+        TreeMap<byte[], byte[]> predictions = new TreeMap<byte[], byte[]>(new ByteComparator());
+        for (Long userId: userModel.keySet()) {
+            for (Long itemId: itemModel.keySet()) {
+                byte[] key = twoDimensionKey(userId.longValue(), itemId.longValue());
+                byte[] value = double2ByteArr(makePrediction(userModel.get(userId),
+                                                             itemModel.get(itemId)));
+                predictions.put(key, value);
+            }
+        }
+        writeTreeMapToTachyon(predictions, matPredictionsLoc);
+    }
+
+    private static double makePrediction(double[] userFeatures, double[] itemFeatures) {
+        double sum = 0;
+        for (int i = 0; i < userFeatures.length; ++i) {
+            sum += itemFeatures[i]*userFeatures[i];
+        }
+        return sum;
     }
 
     public static void writeTreeMapToTachyon(TreeMap<byte[], byte[]> data, String tachyonLoc) throws Exception {
@@ -85,13 +127,17 @@ public class WriteModel {
         }
     }
 
-    public static TreeMap<byte[], byte[]> readModel(String modelFile) {
-        // TreeMap<byte[], byte[]> model = new TreeMap<byte[], byte[]>(new Comparator<byte[]> () { 
-        //     public int compare(byte[] a, byte[] b) { 
-        //         return Utils.compare(a, b); 
-        //     } 
-        // }); 
-        TreeMap<byte[], byte[]> model = new TreeMap<byte[], byte[]>(new ByteComparator());
+    public static TreeMap<byte[], byte[]> serializeModel(TreeMap<Long, double[]> model) {
+        TreeMap<byte[], byte[]> byteArrModel =
+            new TreeMap<byte[], byte[]>(new ByteComparator());
+        for (long key: model.keySet()) {
+            byteArrModel.put(long2ByteArr(key), SerializationUtils.serialize(model.get(key)));
+        }
+        return byteArrModel;
+    }
+
+    public static TreeMap<Long, double[]> readModel(String modelFile) {
+        TreeMap<Long, double[]> model = new TreeMap<Long, double[]>();
         FileInputStream fis = null;
         InputStreamReader isr = null;
         BufferedReader br = null;
@@ -108,7 +154,7 @@ public class WriteModel {
                     String[] splits = line.split(",");
                     long key = Long.parseLong(splits[0]);
                     double[] factors = parseFactors(splits);
-                    model.put(long2ByteArr(key), SerializationUtils.serialize(factors));
+                    model.put(key, factors);
                 }
             }
         } catch (Exception e) {
@@ -122,13 +168,7 @@ public class WriteModel {
         return model;
     }
 
-    // public TreeMap<Long, HashMap<Long, Integer>> readRatings(String ratingsFile) { 
     public static TreeMap<byte[], byte[]> readRatings(String ratingsFile) {
-        // TreeMap<byte[], byte[]> ratings = new TreeMap<byte[], byte[]>(new Comparator<byte[]> () { 
-        //     public int compare(byte[] a, byte[] b) { 
-        //         return Utils.compare(a, b); 
-        //     } 
-        // }); 
         TreeMap<byte[], byte[]> ratings = new TreeMap<byte[], byte[]>(new ByteComparator());
 
         FileInputStream fis = null;
@@ -243,19 +283,18 @@ public class WriteModel {
 
     }
 
-    public static void testByteArrCompare() {
-        System.out.println("Testing byte arrays");
-
-        for (long i = 2L; i <= 10000L; ++i) {
-            for (long j = 1L; j < i; ++j) {
-                int result = Utils.compare(ByteBuffer.wrap(long2ByteArr(j)), ByteBuffer.wrap(long2ByteArr(i)));
-                // System.out.println(result); 
-                if (result >= 0) {
-                    System.out.println("uh oh, i: " + i + ", j: " + j);
-                }
-            }
-        }
-    }
+    // public static void testByteArrCompare() { 
+    //     System.out.println("Testing byte arrays"); 
+    //     for (long i = 2L; i <= 10000L; ++i) { 
+    //         for (long j = 1L; j < i; ++j) { 
+    //             int result = Utils.compare(ByteBuffer.wrap(long2ByteArr(j)), ByteBuffer.wrap(long2ByteArr(i))); 
+    //             // System.out.println(result);  
+    //             if (result >= 0) { 
+    //                 System.out.println("uh oh, i: " + i + ", j: " + j); 
+    //             } 
+    //         } 
+    //     } 
+    // } 
 
     public static void testLookup(long start, long end) throws Exception{
         // System.out.println("Writing to test lookups."); 
@@ -306,17 +345,11 @@ public class WriteModel {
         } else if (command.equals("writeModels")) {
             System.out.println("Writing models from file.");
             writeModelsFromFile(droppedArgs);
-        // } else if (command.equals("testcompare")) { 
-        //     testByteArrCompare(); 
-        // } else if (command.equals("testlookups")) { 
-        //     testLookup(Long.parseLong(droppedArgs[0]), Long.parseLong(droppedArgs[1])); 
+        } else if (command.equals("mapPredictions")) {
+            System.out.println("Writing models from file.");
+            materializeAllPredictions(droppedArgs);
         } else {
-            // byte[] test = long2ByteArr(135L); 
-            // for (int i = 0; i < test.length; ++i) { 
-            //     System.out.println(test[i]); 
-            // } 
             System.out.println(args[1] + " is not a valid command.");
-
         }
     }
 
