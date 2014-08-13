@@ -92,12 +92,17 @@ public class WriteModel {
         TreeMap<Long, double[]> userModel = readModel(userModelFile);
         TreeMap<Long, double[]> itemModel = readModel(itemModelFile);
         TreeMap<byte[], byte[]> predictions = new TreeMap<byte[], byte[]>(new ByteComparator());
+        int partition = 0;
+        int numPredictions = 0;
+        int partitionSize = 5 * Math.pow(10, 6);
+        ClientStore store = ClientStore.createStore(new TachyonURI(matPredictionsLoc));
         for (Long userId: userModel.keySet()) {
             for (Long itemId: itemModel.keySet()) {
                 byte[] key = twoDimensionKey(userId.longValue(), itemId.longValue());
                 byte[] value = double2ByteArr(makePrediction(userModel.get(userId),
                                                              itemModel.get(itemId)));
                 predictions.put(key, value);
+                numPredictions++;
             }
         }
         writeTreeMapToTachyon(predictions, matPredictionsLoc);
@@ -180,16 +185,17 @@ public class WriteModel {
             br = new BufferedReader(isr);
             boolean done = false;
             long currentUser = -1L;
-            HashMap<Long, Integer> currentUserRatings = null;
+            HashMap<Long, Float> currentUserRatings = null;
             while (!done) {
                 String line = br.readLine();
                 if (line == null) {
                     done = true;
                 } else {
-                    String[] splits = line.split("\\s+");
+                    // String[] splits = line.split("\\s+"); 
+                    String[] splits = line.split("::");
                     long userId = Long.parseLong(splits[0]);
                     long itemId = Long.parseLong(splits[1]);
-                    int rating = Integer.parseInt(splits[2]);
+                    float rating = Float.parseFloat(splits[2]);
                     // ignore timestamp for now
                     long timestamp = Long.parseLong(splits[3]);
                     // assume input file sorted by user id
@@ -198,7 +204,7 @@ public class WriteModel {
                             ratings.put(long2ByteArr(currentUser), SerializationUtils.serialize(currentUserRatings));
                         }
                         currentUser = userId;
-                        currentUserRatings = new HashMap<Long, Integer>();
+                        currentUserRatings = new HashMap<Long, Float>();
                     }
                     currentUserRatings.put(itemId, rating);
                 }
@@ -337,19 +343,18 @@ public class WriteModel {
 
 
     public static void main(String[] args) throws Exception {
-        String command = args[1];
-        String[] droppedArgs = Arrays.copyOfRange(args, 2, args.length);
+        String command = args[0];
+        String[] droppedArgs = Arrays.copyOfRange(args, 1, args.length);
         if (command.equals("randomModel")) {
-            // drop first 2 elements of args (program name, operation)
             writeRandomModels(droppedArgs);
         } else if (command.equals("writeModels")) {
             System.out.println("Writing models from file.");
             writeModelsFromFile(droppedArgs);
-        } else if (command.equals("mapPredictions")) {
+        } else if (command.equals("matPredictions")) {
             System.out.println("Writing models from file.");
             materializeAllPredictions(droppedArgs);
         } else {
-            System.out.println(args[1] + " is not a valid command.");
+            System.out.println(args[0] + " is not a valid command.");
         }
     }
 

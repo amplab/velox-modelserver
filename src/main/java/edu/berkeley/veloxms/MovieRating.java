@@ -7,9 +7,9 @@ public class MovieRating {
 
     private long movieId;
     private long userId;
-    private int rating;
+    private float rating;
 
-    public MovieRating(long userId, long movieId, int rating) {
+    public MovieRating(long userId, long movieId, float rating) {
         this.movieId = movieId;
         this.userId = userId;
         this.rating = rating;
@@ -18,7 +18,7 @@ public class MovieRating {
     public MovieRating() {
         this.movieId = -1;
         this.userId = -1;
-        this.rating = -1;
+        this.rating = -1.0f;
     }
 
     @JsonProperty
@@ -42,12 +42,12 @@ public class MovieRating {
     }
 
     @JsonProperty
-    public int getRating() {
+    public float getRating() {
         return this.rating;
     }
 
     @JsonProperty
-    public void setRating(int r) {
+    public void setRating(float r) {
         this.rating = r;
     }
 

@@ -59,13 +59,13 @@ public class TachyonStorage implements ModelStorage {
     }
     
     @Override
-    public HashMap<Long, Integer> getRatedMovies(long userId) {
-        HashMap<Long, Integer> ratedMovies = null;
+    public HashMap<Long, Float> getRatedMovies(long userId) {
+        HashMap<Long, Float> ratedMovies = null;
         try {
             LOGGER.info("Looking for ratings for user: " + userId);
             byte[] rawBytes = ratings.get(TachyonUtils.long2ByteArr(userId));
             if (rawBytes != null) {
-                ratedMovies = (HashMap<Long, Integer>) SerializationUtils.deserialize(rawBytes);
+                ratedMovies = (HashMap<Long, Float>) SerializationUtils.deserialize(rawBytes);
             } else {
                 LOGGER.warn("no value found in ratings for user: " + userId);
             }

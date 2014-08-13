@@ -20,7 +20,7 @@ public interface ModelStorage {
     /**
      * Gets a list of all movies this user has rated and the associated ratings.
      */
-    public HashMap<Long, Integer> getRatedMovies (long userId);
+    public HashMap<Long, Float> getRatedMovies (long userId);
 
     public int getNumFactors();
 

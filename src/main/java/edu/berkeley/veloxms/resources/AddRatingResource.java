@@ -53,7 +53,7 @@ public class AddRatingResource {
     public double[] updateUserModel(long user, MovieRating newRating) {
 
         // List<double[]> ratedMovieFactors = ratings.g 
-        HashMap<Long, Integer> userMovieRatings = model.getRatedMovies(user);
+        HashMap<Long, Float> userMovieRatings = model.getRatedMovies(user);
         userMovieRatings.put(newRating.getMovieId(), newRating.getRating());
 
 
