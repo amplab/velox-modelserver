@@ -4,6 +4,7 @@ package edu.berkeley.veloxms.writer;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.SerializationUtils;
 import tachyon.TachyonURI;
+import tachyon.Pair;
 import tachyon.r.sorted.ClientStore;
 import tachyon.r.sorted.Utils;
 
@@ -17,11 +18,12 @@ import java.util.Comparator;
 
 public class WriteModel {
 
-    private static String itemModelLoc = "tachyon://localhost:19998/item-model";
-    private static String userModelLoc = "tachyon://localhost:19998/user-model";
-    private static String ratingsLoc = "tachyon://localhost:19998/movie-ratings";
-    private static String testLoc = "tachyon://localhost:19998/test-loc";
-    private static String matPredictionsLoc = "tachyon://localhost:19998/mat-predictions";
+    private static String TACHYON_HOST = "ec2-54-87-239-99.compute-1.amazonaws.com";
+    private static String itemModelLoc = "tachyon://" + TACHYON_HOST + ":19998/item-model";
+    private static String userModelLoc = "tachyon://" + TACHYON_HOST + ":19998/user-model";
+    private static String ratingsLoc = "tachyon://" + TACHYON_HOST + ":19998/movie-ratings";
+    private static String testLoc = "tachyon://" + TACHYON_HOST + ":19998/test-loc";
+    private static String matPredictionsLoc = "tachyon://" + TACHYON_HOST + ":19998/mat-predictions";
     private static int numFeatures = 50;
 
     public WriteModel() {
@@ -82,7 +84,7 @@ public class WriteModel {
     }
 
     private class WritePredictions implements Runnable {
-        private final NavigableMap<Long, double[]> userModel;
+        private final NavigableMap<byte[], Pair<Long, double[]>> userModel;
         private final NavigableMap<Long, double[]> itemModel;
         private TachyonURI writeLoc;
         private int part;
@@ -90,7 +92,7 @@ public class WriteModel {
         // 5*10^5
         public static final int PART_SIZE = 5*100000;
 
-        public WritePredictions(NavigableMap<Long, double[]> users, NavigableMap<Long, double[]> items, int partitionStart, int threadNum) {
+        public WritePredictions(NavigableMap<byte[], Pair<Long, double[]>> users, NavigableMap<Long, double[]> items, int partitionStart, int threadNum) {
             this.userModel = users;
             this.itemModel = items;
             this.writeLoc = new TachyonURI(matPredictionsLoc);
@@ -118,10 +120,12 @@ public class WriteModel {
             TreeMap<byte[], byte[]> predictions = new TreeMap<byte[], byte[]>(new ByteComparator());
             int partition = this.part;
             int numPredictions = 0;
-            for (Long userId: userModel.keySet()) {
+            for (byte[] userIdBytes: userModel.keySet()) {
+                long userId = userModel.get(userIdBytes).getFirst(); 
+                double[] userFeatures = userModel.get(userIdBytes).getSecond();
                 for (Long itemId: itemModel.keySet()) {
-                    byte[] key = WriteModel.twoDimensionKey(userId.longValue(), itemId.longValue());
-                    byte[] value = WriteModel.double2ByteArr(makePrediction(userModel.get(userId),
+                    byte[] key = WriteModel.twoDimensionKey(userId, itemId.longValue());
+                    byte[] value = WriteModel.double2ByteArr(makePrediction(userFeatures,
                             itemModel.get(itemId)));
                     predictions.put(key, value);
                     numPredictions++;
@@ -163,6 +167,11 @@ public class WriteModel {
         String itemModelFile = args[1];
         System.out.println("item file: " + itemModelFile);
         final TreeMap<Long, double[]> userModel = readModel(userModelFile);
+        TreeMap<byte[], Pair<Long, double[]>> userModelSorted = new TreeMap<byte[], Pair<Long, double[]>>(new ByteComparator());
+        for (Long k: userModel.keySet()) {
+            userModelSorted.put(long2ByteArr(k.longValue()), new Pair<Long, double[]>(k, userModel.get(k)));
+        }
+
         final TreeMap<Long, double[]> itemModel = readModel(itemModelFile);
 
         try {
@@ -178,15 +187,16 @@ public class WriteModel {
         int userModelPartSize = userModel.size() / numThreads;
         int threadNum = 0;
         List<Thread> threads = new ArrayList<Thread>(16);
-        Long startKey = userModel.firstKey();
+        byte[] startKey = userModelSorted.firstKey();
         int curPartCount = 0;
-        for (Long k: userModel.keySet()) {
+        int threadCountSpread = 200;
+        for (byte[] k: userModelSorted.keySet()) {
             curPartCount += 1;
             if (curPartCount == userModelPartSize && threadNum < (numThreads - 1)) {
                 threads.add(new Thread(new WritePredictions(
-                                userModel.subMap(startKey, true, k, false),
+                                userModelSorted.subMap(startKey, true, k, false),
                                 itemModel,
-                                threadNum*100,
+                                threadNum*threadCountSpread,
                                 threadNum)));
 
                 curPartCount = 0;
@@ -196,9 +206,9 @@ public class WriteModel {
         }
 
         threads.add(new Thread(new WritePredictions(
-                        userModel.subMap(startKey, true, userModel.lastKey(), true),
+                        userModelSorted.subMap(startKey, true, userModelSorted.lastKey(), true),
                         itemModel,
-                        threadNum*100,
+                        threadNum*threadCountSpread,
                         threadNum)));
 
         System.out.println("Threads starting.");

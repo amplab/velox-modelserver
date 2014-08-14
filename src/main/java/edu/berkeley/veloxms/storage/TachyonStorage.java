@@ -38,20 +38,24 @@ public class TachyonStorage implements ModelStorage {
 
     @Override
     public double[] getItemFactors(long itemId) {
-        return getFactors(itemId, items);
+        return getFactors(itemId, items, "item-model");
     }
 
     @Override
     public double[] getUserFactors(long userId) {
-        return getFactors(userId, users);
+        return getFactors(userId, users, "user-model");
     }
 
-    private static double[] getFactors(long id, ClientStore model) {
+    private static double[] getFactors(long id, ClientStore model, String debug) {
         // ByteBuffer key = ByteBuffer.allocate(8); 
         // key.putLong(id); 
         try {
             byte[] rawBytes = model.get(TachyonUtils.long2ByteArr(id));
-            return (double[]) SerializationUtils.deserialize(rawBytes);
+            if (rawBytes != null) {
+                return (double[]) SerializationUtils.deserialize(rawBytes);
+            } else {
+                LOGGER.warn("no value found in " + debug + " for : " + id);
+            }
         } catch (IOException e) {
             LOGGER.warn("Caught tachyon exception: " + e.getMessage());
         }
