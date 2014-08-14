@@ -2,6 +2,7 @@ package edu.berkeley.veloxms;
 
 import edu.berkeley.veloxms.resources.AddRatingResource;
 import edu.berkeley.veloxms.resources.PredictItemResource;
+import edu.berkeley.veloxms.resources.PredictFromMaterializedResource;
 import edu.berkeley.veloxms.storage.ModelStorage;
 import edu.berkeley.veloxms.storage.TachyonStorage;
 import io.dropwizard.Application;
@@ -66,6 +67,9 @@ public class VeloxApplication extends Application<VeloxConfiguration> {
         final PredictItemResource userPredictor =
             new PredictItemResource(model);
         environment.jersey().register(userPredictor);
+        final PredictFromMaterializedResource matPredictor =
+            new PredictFromMaterializedResource(model);
+        environment.jersey().register(matPredictor);
         final AddRatingResource addRatings = new AddRatingResource(model);
         environment.jersey().register(addRatings);
     }

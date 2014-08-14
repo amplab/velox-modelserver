@@ -87,8 +87,8 @@ public class WriteModel {
         private TachyonURI writeLoc;
         private int part;
         private int threadNum;
-        // 5*10^6
-        public static final int PART_SIZE = 5*1000000;
+        // 5*10^5
+        public static final int PART_SIZE = 5*100000;
 
         public WritePredictions(NavigableMap<Long, double[]> users, NavigableMap<Long, double[]> items, int partitionStart, int threadNum) {
             this.userModel = users;
@@ -186,7 +186,7 @@ public class WriteModel {
                 threads.add(new Thread(new WritePredictions(
                                 userModel.subMap(startKey, true, k, false),
                                 itemModel,
-                                threadNum*10,
+                                threadNum*100,
                                 threadNum)));
 
                 curPartCount = 0;
@@ -198,7 +198,7 @@ public class WriteModel {
         threads.add(new Thread(new WritePredictions(
                         userModel.subMap(startKey, true, userModel.lastKey(), true),
                         itemModel,
-                        threadNum*10,
+                        threadNum*100,
                         threadNum)));
 
         System.out.println("Threads starting.");
