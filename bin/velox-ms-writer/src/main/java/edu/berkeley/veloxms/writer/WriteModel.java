@@ -89,7 +89,7 @@ public class WriteModel {
         private TachyonURI writeLoc;
         private int part;
         private int threadNum;
-        // 5*10^5
+        // 2*10^6
         public static final int PART_SIZE = 5*100000;
 
         public WritePredictions(NavigableMap<byte[], Pair<Long, double[]>> users, NavigableMap<Long, double[]> items, int partitionStart, int threadNum) {
@@ -189,7 +189,7 @@ public class WriteModel {
         List<Thread> threads = new ArrayList<Thread>(16);
         byte[] startKey = userModelSorted.firstKey();
         int curPartCount = 0;
-        int threadCountSpread = 200;
+        int threadCountSpread = 100;
         for (byte[] k: userModelSorted.keySet()) {
             curPartCount += 1;
             if (curPartCount == userModelPartSize && threadNum < (numThreads - 1)) {

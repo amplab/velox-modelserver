@@ -3,3 +3,25 @@ userModelLoc: tachyon://ec2-54-87-239-99.compute-1.amazonaws.com:19998/user-mode
 ratingsLoc: tachyon://ec2-54-87-239-99.compute-1.amazonaws.com:19998/movie-ratings
 matPredictionsLoc: tachyon://ec2-54-87-239-99.compute-1.amazonaws.com:19998/mat-predictions
 numFactors: 50
+logging:
+  appenders:
+    - type: file
+      # The file to which current statements will be logged.
+      currentLogFilename: ./logs/velox.log
+      archivedLogFilenamePattern: ./logs/velox-%d.log.gz
+      archivedFileCount: 5
+      timeZone: UTC
+    - type: console
+      threshold: INFO
+      target: stderr
+    
+server:
+  requestLog:
+    timeZone: UTC
+    appenders:
+      - type: file
+        currentLogFilename: ./logs/requests.log
+        threshold: ALL
+        archive: true
+        archivedLogFilenamePattern: ./logs/requests.%d.log.gz
+        archivedFileCount: 5
