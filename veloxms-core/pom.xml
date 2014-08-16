@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>edu.berkeley.veloxms</groupId>
+    <artifactId>velox-parent</artifactId>
+    <version>0.0.1-SNAPSHOT</version>
+  </parent>
+  <artifactId>veloxms-core</artifactId>
+  <name>Velox Model Server</name>
+
+  <dependencies>
+    <dependency>
+      <groupId>io.dropwizard</groupId>
+      <artifactId>dropwizard-core</artifactId>
+      <version>${dropwizard.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.slf4j</groupId>
+          <artifactId>log4j-over-slf4j</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <!-- <dependency> -->
+    <!--   <groupId>org.tachyonproject</groupId> -->
+    <!--   <artifactId>tachyon&#45;parent</artifactId> -->
+    <!--   <version>0.6.0&#45;SNAPSHOT</version> -->
+      <!-- <exclusions> -->
+      <!--   <exclusion> -->
+      <!--     <groupId>com.fasterxml.jackson.core</groupId> -->
+      <!--     <artifactId>jackson&#45;databind</artifactId> -->
+      <!--   </exclusion> -->
+      <!--   <exclusion> -->
+      <!--     <groupId>log4j</groupId> -->
+      <!--     <artifactId>log4j</artifactId> -->
+      <!--   </exclusion> -->
+      <!--   <exclusion> -->
+      <!--     <groupId>org.apache.commons</groupId> -->
+      <!--     <artifactId>commons&#45;lang3</artifactId> -->
+      <!--   </exclusion> -->
+      <!--   <exclusion> -->
+      <!--     <groupId>org.jboss.netty</groupId> -->
+      <!--     <artifactId>netty</artifactId> -->
+      <!--   </exclusion> -->
+      <!--   <exclusion> -->
+      <!--     <groupId>org.slf4j</groupId> -->
+      <!--     <artifactId>slf4j&#45;log4j12</artifactId> -->
+      <!--   </exclusion> -->
+      <!--   <exclusion> -->
+      <!--     <groupId>org.codehaus.jackson</groupId> -->
+      <!--     <artifactId>jackson&#45;core&#45;asl</artifactId> -->
+      <!--   </exclusion> -->
+      <!--   <exclusion> -->
+      <!--     <groupId>org.jboss.netty</groupId> -->
+      <!--     <artifactId>netty</artifactId> -->
+      <!--   </exclusion> -->
+      <!--   <exclusion> -->
+      <!--     <groupId>org.slf4j</groupId> -->
+      <!--     <artifactId>slf4j&#45;api</artifactId> -->
+      <!--   </exclusion> -->
+      <!--   <exclusion> -->
+      <!-- <groupId>org.eclipse.jetty</groupId> -->
+      <!-- <artifactId>jetty&#45;server</artifactId> -->
+      <!--   </exclusion> -->
+      <!--   <exclusion> -->
+      <!--     <groupId>com.google.guava</groupId> -->
+      <!--     <artifactId>guava</artifactId> -->
+      <!--   </exclusion> -->
+      <!-- </exclusions> -->
+    <!-- </dependency> -->
+    <!-- <dependency> -->
+    <!--   <groupId>org.apache.commons</groupId> -->
+    <!--   <artifactId>commons&#45;lang3</artifactId> -->
+    <!--   <version>3.3.2</version> -->
+    <!-- </dependency> -->
+    <dependency>
+      <groupId>org.jblas</groupId>
+      <artifactId>jblas</artifactId>
+      <version>1.2.3</version>
+    </dependency>
+  </dependencies>
+
+  <properties>
+    <!-- use UTF-8 for everything -->
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <dropwizard.version>0.7.0</dropwizard.version>
+  </properties>
+
+  <build>
+    <plugins>
+      <!-- <plugin> -->
+      <!--   <groupId>org.apache.maven.plugins</groupId> -->
+      <!--   <artifactId>maven&#45;compiler&#45;plugin</artifactId> -->
+      <!--   <version>3.1</version> -->
+      <!--   <!&#45;&#45; compile for Java 1.7 &#45;&#45;> -->
+      <!--   <configuration> -->
+      <!--     <source>1.7</source> -->
+      <!--     <target>1.7</target> -->
+      <!--     <encoding>UTF&#45;8</encoding> -->
+      <!--   </configuration> -->
+      <!-- </plugin> -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>1.6</version>
+        <configuration>
+          <createDependencyReducedPom>true</createDependencyReducedPom>
+          <filters>
+            <filter>
+              <artifact>*:*</artifact>
+              <excludes>
+                <exclude>META-INF/*.SF</exclude>
+                <exclude>META-INF/*.DSA</exclude>
+                <exclude>META-INF/*.RSA</exclude>
+              </excludes>
+            </filter>
+          </filters>
+        </configuration>
+        <executions>
+          <execution>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+            <configuration>
+              <transformers>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
+                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <mainClass>edu.berkeley.veloxms.VeloxApplication</mainClass>
+                </transformer>
+              </transformers>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

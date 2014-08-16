@@ -3,21 +3,29 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>edu.berkeley.veloxms</groupId>
-  <artifactId>velox-model-server</artifactId>
+  <artifactId>velox-parent</artifactId>
   <version>0.0.1-SNAPSHOT</version>
 
+  <packaging>pom</packaging>
+  <name>Velox ModelServer Parent</name>
+  <modules>
+    <module>veloxms-core</module>
+    <module>veloxms-writer</module>
+  </modules>
+
+
   <dependencies>
-    <dependency>
-      <groupId>io.dropwizard</groupId>
-      <artifactId>dropwizard-core</artifactId>
-      <version>${dropwizard.version}</version>
-      <exclusions>
-        <exclusion>
-          <groupId>org.slf4j</groupId>
-          <artifactId>log4j-over-slf4j</artifactId>
-        </exclusion>
-      </exclusions>
-    </dependency>
+    <!-- <dependency> -->
+    <!--   <groupId>io.dropwizard</groupId> -->
+    <!--   <artifactId>dropwizard&#45;core</artifactId> -->
+    <!--   <version>${dropwizard.version}</version> -->
+    <!--   <exclusions> -->
+    <!--     <exclusion> -->
+    <!--       <groupId>org.slf4j</groupId> -->
+    <!--       <artifactId>log4j&#45;over&#45;slf4j</artifactId> -->
+    <!--     </exclusion> -->
+    <!--   </exclusions> -->
+    <!-- </dependency> -->
     <dependency>
       <groupId>org.tachyonproject</groupId>
       <artifactId>tachyon-parent</artifactId>
@@ -70,11 +78,11 @@
       <artifactId>commons-lang3</artifactId>
       <version>3.3.2</version>
     </dependency>
-    <dependency>
-      <groupId>org.jblas</groupId>
-      <artifactId>jblas</artifactId>
-      <version>1.2.3</version>
-    </dependency>
+    <!-- <dependency> -->
+    <!--   <groupId>org.jblas</groupId> -->
+    <!--   <artifactId>jblas</artifactId> -->
+    <!--   <version>1.2.3</version> -->
+    <!-- </dependency> -->
   </dependencies>
 
   <properties>
@@ -97,40 +105,40 @@
           <encoding>UTF-8</encoding>
         </configuration>
       </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-shade-plugin</artifactId>
-        <version>1.6</version>
-        <configuration>
-          <createDependencyReducedPom>true</createDependencyReducedPom>
-          <filters>
-            <filter>
-              <artifact>*:*</artifact>
-              <excludes>
-                <exclude>META-INF/*.SF</exclude>
-                <exclude>META-INF/*.DSA</exclude>
-                <exclude>META-INF/*.RSA</exclude>
-              </excludes>
-            </filter>
-          </filters>
-        </configuration>
-        <executions>
-          <execution>
-            <phase>package</phase>
-            <goals>
-              <goal>shade</goal>
-            </goals>
-            <configuration>
-              <transformers>
-                <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
-                <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                  <mainClass>edu.berkeley.veloxms.VeloxApplication</mainClass>
-                </transformer>
-              </transformers>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
+      <!-- <plugin> -->
+      <!--   <groupId>org.apache.maven.plugins</groupId> -->
+      <!--   <artifactId>maven&#45;shade&#45;plugin</artifactId> -->
+      <!--   <version>1.6</version> -->
+      <!--   <configuration> -->
+      <!--     <createDependencyReducedPom>true</createDependencyReducedPom> -->
+      <!--     <filters> -->
+      <!--       <filter> -->
+      <!--         <artifact>*:*</artifact> -->
+      <!--         <excludes> -->
+      <!--           <exclude>META&#45;INF/*.SF</exclude> -->
+      <!--           <exclude>META&#45;INF/*.DSA</exclude> -->
+      <!--           <exclude>META&#45;INF/*.RSA</exclude> -->
+      <!--         </excludes> -->
+      <!--       </filter> -->
+      <!--     </filters> -->
+      <!--   </configuration> -->
+      <!--   <executions> -->
+      <!--     <execution> -->
+      <!--       <phase>package</phase> -->
+      <!--       <goals> -->
+      <!--         <goal>shade</goal> -->
+      <!--       </goals> -->
+      <!--       <configuration> -->
+      <!--         <transformers> -->
+      <!--           <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/> -->
+      <!--           <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer"> -->
+      <!--             <mainClass>edu.berkeley.veloxms.VeloxApplication</mainClass> -->
+      <!--           </transformer> -->
+      <!--         </transformers> -->
+      <!--       </configuration> -->
+      <!--     </execution> -->
+      <!--   </executions> -->
+      <!-- </plugin> -->
     </plugins>
   </build>
 </project>
