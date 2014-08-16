@@ -23,7 +23,7 @@ def test_predict_item(requests_file):
             u_id = int(splits[0])
             m_id = int(splits[1])
             actual_rating = float(splits[2])
-            req_str = baseurl % {'resource': 'predict-item', 'item': m_id, 'user': u_id}
+            req_str = baseurl % {'resource': 'predict-item-materialized', 'item': m_id, 'user': u_id}
             r = requests.get(req_str)
             prediction = r.json()
             # i += 1
@@ -33,8 +33,8 @@ def test_predict_item(requests_file):
 def run_tests(ratings_file, out_file):
     users, items = read_ratings(ratings_file)
     print 'finished reading user and item ids, found %d users and %d items' % (len(users), len(items))
-    # num_trials = 10000
-    num_trials = 10
+    num_trials = 10000
+    # num_trials = 10
     set_sizes = (1, 10, 25, 50, 75, 100, 150, 200, 500, 1000)
     all_results = {}
     for s in set_sizes:
@@ -60,7 +60,7 @@ def test_base_itemset(set_size, numtrials, users, items):
         itemset = random.sample(items, set_size)
         user = random.sample(users, 1)[0]
         # itemset_json = json.dumps(itemset)
-        url = posturl % {'resource': 'predict-item', 'user': user}
+        url = posturl % {'resource': 'predict-item-materialized', 'user': user}
         itemset_json = json.dumps({'items': itemset})
         # print itemset_json
         headers = {'Content-type': 'application/json'}
@@ -69,7 +69,7 @@ def test_base_itemset(set_size, numtrials, users, items):
         # print r.json()
     # get metrics
     metrics_req = requests.get('http://localhost:8081/metrics')
-    base_itemset_timing = metrics_req.json()[u'timers'][u'edu.berkeley.veloxms.resources.PredictItemResource.predictionFromBaseSet']
+    base_itemset_timing = metrics_req.json()[u'timers'][u'edu.berkeley.veloxms.resources.PredictFromMaterializedResource.predictionFromBaseSet']
     return base_itemset_timing
     # print 'mean: %f stdev: %f' % (base_itemset_timing[u'mean'], base_itemset_timing[u'stddev'])
 

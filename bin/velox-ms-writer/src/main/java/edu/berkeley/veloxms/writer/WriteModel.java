@@ -18,7 +18,7 @@ import java.util.Comparator;
 
 public class WriteModel {
 
-    private static String TACHYON_HOST = "ec2-54-87-239-99.compute-1.amazonaws.com";
+    private static String TACHYON_HOST = "ec2-54-83-94-120.compute-1.amazonaws.com";
     private static String itemModelLoc = "tachyon://" + TACHYON_HOST + ":19998/item-model";
     private static String userModelLoc = "tachyon://" + TACHYON_HOST + ":19998/user-model";
     private static String ratingsLoc = "tachyon://" + TACHYON_HOST + ":19998/movie-ratings";
@@ -85,14 +85,15 @@ public class WriteModel {
 
     private class WritePredictions implements Runnable {
         private final NavigableMap<byte[], Pair<Long, double[]>> userModel;
-        private final NavigableMap<Long, double[]> itemModel;
+        private final NavigableMap<byte[], Pair<Long, double[]>> itemModel;
         private TachyonURI writeLoc;
         private int part;
         private int threadNum;
-        // 2*10^6
-        public static final int PART_SIZE = 5*100000;
 
-        public WritePredictions(NavigableMap<byte[], Pair<Long, double[]>> users, NavigableMap<Long, double[]> items, int partitionStart, int threadNum) {
+        // x*10^6
+        public final int PART_SIZE = (int) Math.pow(10, 6); //1*1000000;
+
+        public WritePredictions(NavigableMap<byte[], Pair<Long, double[]>> users, NavigableMap<byte[], Pair<Long, double[]>> items, int partitionStart, int threadNum) {
             this.userModel = users;
             this.itemModel = items;
             this.writeLoc = new TachyonURI(matPredictionsLoc);
@@ -123,10 +124,12 @@ public class WriteModel {
             for (byte[] userIdBytes: userModel.keySet()) {
                 long userId = userModel.get(userIdBytes).getFirst(); 
                 double[] userFeatures = userModel.get(userIdBytes).getSecond();
-                for (Long itemId: itemModel.keySet()) {
-                    byte[] key = WriteModel.twoDimensionKey(userId, itemId.longValue());
+                for (byte[] itemIdBytes: itemModel.keySet()) {
+                    long itemId = itemModel.get(itemIdBytes).getFirst(); 
+                    double[] itemFeatures = itemModel.get(itemIdBytes).getSecond();
+                    byte[] key = WriteModel.twoDimensionKey(userId, itemId);
                     byte[] value = WriteModel.double2ByteArr(makePrediction(userFeatures,
-                            itemModel.get(itemId)));
+                            itemFeatures));
                     predictions.put(key, value);
                     numPredictions++;
                     if (numPredictions % PART_SIZE == 0) {
@@ -173,6 +176,10 @@ public class WriteModel {
         }
 
         final TreeMap<Long, double[]> itemModel = readModel(itemModelFile);
+        TreeMap<byte[], Pair<Long, double[]>> itemModelSorted = new TreeMap<byte[], Pair<Long, double[]>>(new ByteComparator());
+        for (Long k: itemModel.keySet()) {
+            itemModelSorted.put(long2ByteArr(k.longValue()), new Pair<Long, double[]>(k, itemModel.get(k)));
+        }
 
         try {
             ClientStore store = ClientStore.createStore(new TachyonURI(matPredictionsLoc));
@@ -195,7 +202,7 @@ public class WriteModel {
             if (curPartCount == userModelPartSize && threadNum < (numThreads - 1)) {
                 threads.add(new Thread(new WritePredictions(
                                 userModelSorted.subMap(startKey, true, k, false),
-                                itemModel,
+                                itemModelSorted,
                                 threadNum*threadCountSpread,
                                 threadNum)));
 
@@ -207,7 +214,7 @@ public class WriteModel {
 
         threads.add(new Thread(new WritePredictions(
                         userModelSorted.subMap(startKey, true, userModelSorted.lastKey(), true),
-                        itemModel,
+                        itemModelSorted,
                         threadNum*threadCountSpread,
                         threadNum)));
 

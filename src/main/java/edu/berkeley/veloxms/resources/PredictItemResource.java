@@ -5,7 +5,6 @@ import io.dropwizard.jersey.params.LongParam;
 import com.codahale.metrics.annotation.Timed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import edu.berkeley.veloxms.BaseItemSet;
 
 import javax.validation.Valid;
