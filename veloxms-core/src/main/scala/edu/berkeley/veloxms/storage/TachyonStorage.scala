@@ -1,41 +1,29 @@
-package edu.berkeley.veloxms.storage;
+package edu.berkeley.veloxms.storage
 
 
-import org.apache.commons.lang3.SerializationUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import tachyon.r.sorted.ClientStore;
+import org.apache.commons.lang3.SerializationUtils
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+import tachyon.r.sorted.ClientStore
 
-import java.io.IOException;
-import java.util.HashMap;
-import java.nio.ByteBuffer;
+import java.io.IOException
+import java.util.HashMap
+import java.nio.ByteBuffer
 
-public class TachyonStorage implements ModelStorage {
-
-    private final ClientStore users;
-    private final ClientStore items;
-    private final ClientStore ratings;
-    private final int numFactors;
+class TachyonStorage(
+    users: ClienStore,
+    items: ClientStore,
+    ratings: ClientStore,
+    numFactors: Int) extends ModelStorage {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(TachyonStorage.class);
 
-    // TODO eventually we will want a shared cache among resources
-    /* private final ConcurrentHashMap<Long, double[]> itemCache; */
-    /* private final ConcurrentHashMap<Long, double[]> userCache; */
-
-    public TachyonStorage(ClientStore users,
-                          ClientStore items,
-                          ClientStore ratings,
-                          int numFactors) {
-        this.users = users;
-        this.items = items;
-        this.ratings = ratings;
-        this.numFactors = numFactors;
+    override def getItemFactors(itemId: Long): Array[Double] = {
+        getFactors(itemId, items, "item-model");
     }
 
-    @Override
-    public double[] getItemFactors(long itemId) {
-        return getFactors(itemId, items, "item-model");
+    override def getUserFactors(userId: Long): Array[Double] = {
+        getFactors(userId, users, "item-model");
     }
 
     @Override
@@ -43,7 +31,7 @@ public class TachyonStorage implements ModelStorage {
         return getFactors(userId, users, "user-model");
     }
 
-    private static double[] getFactors(long id, ClientStore model, String debug) {
+    private static double[] getFactors(id: Long, model: ClientStore, debug: String = "unspecified") {
         // ByteBuffer key = ByteBuffer.allocate(8); 
         // key.putLong(id); 
         try {
