@@ -1,7 +1,7 @@
 package edu.berkeley.veloxms.storage
 
 
-import java.util.HashMap
+import scala.util.Try
 
 /**
  * Simple interface to abstract out the KV storage backend used to store

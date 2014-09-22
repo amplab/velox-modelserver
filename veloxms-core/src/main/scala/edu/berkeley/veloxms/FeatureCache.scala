@@ -6,20 +6,31 @@ package edu.berkeley.veloxms.resources
 
 import java.util.concurrent.ConcurrentHashMap
 
-class FeatureCache(budget: Int) {
+class FeatureCache[T](budget: Int) {
 
   // TODO: maybe we should universally represent features in JBLAS format
   // so I don't have to keep transforming them between vectors and arrays
   private val cache = new ConcurrentHashMap[Long, Array[Double]]()
 
-  def addItem(data: Array[Byte], features: Array[Double]): Boolean = {
-
+  def addItem(data: T, features: Array[Double]): Boolean = {
+    // TODO implement
+    false
   }
 
-  def getItem(data: Array[Byte]): Option[Array[Double]] = {
-
+  def getItem(data: T): Option[Array[Double]] = {
+    // TODO implement
+    None
   }
 
 
+
+}
+
+
+object FeatureCache {
+
+  // Totally arbitrary placeholder until we figure out what
+  // a cache budget means
+  val tempBudget = 100
 
 }

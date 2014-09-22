@@ -3,6 +3,7 @@ package edu.berkeley.veloxms.storage
 import java.nio.ByteBuffer
 import java.io.IOException
 import scala.util.{Try, Success, Failure}
+import tachyon.r.sorted.ClientStore
 
 
 /**
@@ -14,7 +15,6 @@ object TachyonUtils {
     def long2ByteArr(id: Long): Array[byte] = {
         val key = ByteBuffer.allocate(8)
         key.putLong(id).array()
-
     }
 
     // could make this a z-curve key instead

@@ -8,11 +8,12 @@ package edu.berkeley.veloxms.resources
 
 import edu.berkeley.veloxms.storage.ModelStorage
 import edu.berkeley.veloxms._
-import io.dropwizard.jersey.params.LongParam
 import com.codahale.metrics.annotation.Timed
+// import net.nicktelford.dropwizard.scala.jersey.LongParam
+// import net.nicktelford.dropwizard.scala.jersey.IntParam
+// import net.nicktelford.dropwizard.scala.jersey.BooleanParam
 // import org.slf4j.Logger
 // import org.slf4j.LoggerFactory
-import edu.berkeley.veloxms.BaseItemSet
 
 import javax.validation.Valid
 import javax.ws.rs.GET
@@ -24,21 +25,25 @@ import javax.ws.rs.Consumes
 import javax.ws.rs.Produces
 import javax.ws.rs.core.MediaType
 import java.util._
-import com.typesafe.scalalogging.LazyLogging
+import com.typesafe.scalalogging._
+import com.massrelevance.dropwizard.scala.params.{LongParam, IntParam, BooleanParam}
 
 @Path("/predict")
 @Consumes(MediaType.APPLICATION_JSON)
 @Produces(MediaType.APPLICATION_JSON)
 class PointPredictionResource(models: Map[Int, Model],
-    featureCache: FeatureCache(budget)) extends LazyLogging {
+    featureCache: FeatureCache) extends LazyLogging {
 
   @POST
   @Timed
-  def predict(@QueryParam("model") modelId: IntParam,
+  def predict(
+      @QueryParam("model") modelId: IntParam,
       @QueryParam("user") userId: LongParam,
-      data: Array[Byte]) : (Array[Byte], Float) = {
+      data: Array[Byte])
+      : (Array[Byte], Double) = {
     val model = models.get(modelId)
-    val features = featureCache.getItem(data) match {
+    val deserializedData = model.deserializeInput(data)
+    val features = featureCache.getItem(deserializedData) match {
       case Some(f) => f
       case None => {
         val f = model.computeFeatures(item)
@@ -49,9 +54,9 @@ class PointPredictionResource(models: Map[Int, Model],
 
     val weightVector = model.getWeightVector(userId)
     var i = 0
-    var score = 0
+    var score = 0.0
     while (i < model.numFeature) {
-      score += features[i]*weightVector
+      score += features(i)*weightVector
     }
     score
   }
@@ -59,12 +64,5 @@ class PointPredictionResource(models: Map[Int, Model],
 }
 
 
-object PointPredictionResource {
-
-  // Totally arbitrary placeholder until we figure out what
-  // a cache budget means
-  val budget = 100
-
-}
 
 

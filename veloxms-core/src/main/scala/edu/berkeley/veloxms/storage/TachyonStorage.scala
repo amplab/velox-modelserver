@@ -11,7 +11,7 @@ import scala.util._
 import java.io.IOException
 import java.util.HashMap
 import java.nio.ByteBuffer
-import com.typesafe.scalalogging.LazyLogging
+import com.typesafe.scalalogging._
 
 class TachyonStorage[U] (
     users: ClientStore,
@@ -21,30 +21,52 @@ class TachyonStorage[U] (
 
     def getFeatureData(itemId: Long): Try[U] = {
         // getFactors(itemId, items, "item-model")
-        Failure(new NotImplementedException("getItemFactors not implemented yet")
+        // for {
+        //     rawBytes <- Try(items.get(TachyonUtils.long2ByteArr(userId)))
+        //     array <- Try(SerializationUtils.deserialize(rawBytes))
+        //     result <- Try(array match
+        //         case Failure(u) => array
+        //         case Success(u) => u.asInstanceOf[U]
+        //     )
+        // } yield result
+
+        val result = for {
+            rawBytes <- Try(items.get(TachyonUtils.long2ByteArr(userId)))
+            array <- Try(SerializationUtils.deserialize(rawBytes))
+            // result <- Try(array match
+            //     case Failure(u) => array
+            //     case Success(u) => u.asInstanceOf[U]
+            // )
+        } yield array
+        result match {
+            case Success(u) => Success(u.asInstanceOf[U])
+            case Failure(u) => array
+        }
+
     }
 
     def getUserFactors(userId: Long): Try[Array[Double]] = {
-        // getFactors(userId, users, "item-model");
-        for {
-            rawBytes <- Try(users.get(TachyonUtils.long2ByteArr(userId)))
-            array <- Try(SerializationUtils.deserialize(rawBytes))
-            result <- Try(array match
-                case Failure(u) => array
-                case Success(u) => u.asInstanceOf[Array[Double]]
-            )
-        } yield result
+        Failure (new NotImplementedException("getUserFactors"))
+        // for {
+        //     rawBytes <- Try(users.get(TachyonUtils.long2ByteArr(userId)))
+        //     array <- Try(SerializationUtils.deserialize(rawBytes))
+        //     result <- Try(array match
+        //         case Failure(u) => array
+        //         case Success(u) => u.asInstanceOf[Array[Double]]
+        //     )
+        // } yield result
     }
 
     def getAllObservations(userId: Long): Try[HashMap[Long, Float]] = {
-        for {
-            rawBytes <- Try(ratings.get(TachyonUtils.long2ByteArr(userId)))
-            array <- Try(SerializationUtils.deserialize(rawBytes))
-            result <- Try(array match
-                case Failure(u) => array
-                case Success(u) => u.asInstanceOf[HashMap[Long, Float]]
-            )
-        } yield result
+        Failure (new NotImplementedException("getAllObservations"))
+        // for {
+        //     rawBytes <- Try(ratings.get(TachyonUtils.long2ByteArr(userId)))
+        //     array <- Try(SerializationUtils.deserialize(rawBytes))
+        //     result <- Try(array match
+        //         case Failure(u) => array
+        //         case Success(u) => u.asInstanceOf[HashMap[Long, Float]]
+        //     )
+        // } yield result
     }
 }
 
