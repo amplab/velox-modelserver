@@ -6,6 +6,10 @@ package edu.berkeley.veloxms.resources
 
 import java.util.concurrent.ConcurrentHashMap
 
+/**
+ * @tparam T type of the item whose features are being stored.
+ */
+// TODO make sure that T is hashable
 class FeatureCache[T](budget: Int) {
 
   // TODO: maybe we should universally represent features in JBLAS format

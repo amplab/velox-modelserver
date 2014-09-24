@@ -7,6 +7,14 @@ import scala.util.Failure
 import scala.util.Try
 import edu.berkeley.veloxms.storage._
 
+/**
+ * Model interface
+ * @tparam T The scala type of the item, deserialized from Array[Byte]
+ * We defer deserialization to the model interface to encapsulate everything
+ * the user must implement into a single class.
+ * @tparam U The type of per-item data being stored in the
+ * KV store
+ */
 trait Model[T, U] extends LazyLogging {
 
   /** The number of features in this model.
@@ -30,7 +38,7 @@ trait Model[T, U] extends LazyLogging {
   /** Deserialize object representation from raw bytes to
    * the type of expected
    */
-  def deserializeItem(data: Array[Byte]) : T
+  def deserializeInput(data: Array[Byte]) : T
 
   /**
    * Velox implemented - fetch from local Tachyon partition

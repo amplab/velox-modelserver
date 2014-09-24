@@ -59,13 +59,15 @@ object VeloxApplication extends ScalaApplication[VeloxConfiguration] with LazyLo
         }
 
         val modelStorage = 
-            new TachyonStorage(userModel, itemModel, ratings, config.numFactors)
+            new TachyonStorage[Array[Double]](userModel, itemModel, ratings, config.numFactors)
+        val averageUser = Array.fill[Double](config.numFactors)(1.0)
         val matrixFactorizationModel =
-            new MatrixFactorizationModel(config.numFactors, modelStorage)
+            new MatrixFactorizationModel(config.numFactors, modelStorage, averageUser)
 
         val featureCache = new FeatureCache[Long](FeatureCache.tempBudget)
 
-        env.jersey().register(new PredictItemResource(Map(0 -> matrixFactorizationModel)))
+        env.jersey().register(new MatrixFactorizationPredictionResource(
+            matrixFactorizationModel, featureCache))
         // env.jersey().register(addRatings)
     }
 }

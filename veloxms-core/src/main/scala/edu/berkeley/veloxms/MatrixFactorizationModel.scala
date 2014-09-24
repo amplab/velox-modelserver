@@ -8,8 +8,10 @@ import scala.util.Try
 import java.nio.ByteBuffer
 import java.io.IOException
 
-class MatrixFactorizationModel(numFeatures: Int,
-    modelStorage: ModelStorage[Array[Double]]) extends Model[Long, Array[Double]]
+class MatrixFactorizationModel(
+    val numFeatures: Int,
+    val modelStorage: ModelStorage[Array[Double]],
+    val averageUser: Array[Double]) extends Model[Long, Array[Double]]
     with LazyLogging {
 
   /**
