@@ -1,4 +1,3 @@
-ec2-54-83-94-120.compute-1.amazonaws.com
 itemModelLoc: tachyon://ec2-54-83-94-120.compute-1.amazonaws.com:19998/item-model
 userModelLoc: tachyon://ec2-54-83-94-120.compute-1.amazonaws.com:19998/user-model
 ratingsLoc: tachyon://ec2-54-83-94-120.compute-1.amazonaws.com:19998/movie-ratings

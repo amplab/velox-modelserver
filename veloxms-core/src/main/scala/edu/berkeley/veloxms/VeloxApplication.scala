@@ -6,8 +6,8 @@ import io.dropwizard.Configuration
 // import net.nicktelford.dropwizard.scala._
 import io.dropwizard.setup.Bootstrap
 import io.dropwizard.setup.Environment
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
+// import org.slf4j.Logger
+// import org.slf4j.LoggerFactory
 import tachyon.TachyonURI
 import tachyon.r.sorted.ClientStore
 import scala.util.{Try, Success, Failure}

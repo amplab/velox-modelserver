@@ -50,15 +50,15 @@ object VeloxMSBuild extends Build {
     // resolvers += Resolver.sonatypeRepo("snapshots"),
 
     libraryDependencies ++= Seq(
-      "org.slf4j" % "slf4j-api" % "1.7.2",
-      "org.slf4j" % "slf4j-log4j12" % "1.7.2",
+      // "org.slf4j" % "slf4j-api" % "1.7.2",
+      // "org.slf4j" % "slf4j-log4j12" % "1.7.2",
       "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0",
       // "org.scalatest" % "scalatest" %% "2.2.3-SNAP1",
       // "com.typesafe" %% "scalalogging-slf4j" % "1.0.1",
       //"com.massrelevance" %% "dropwizard-scala" % "0.7.1",
       // https://oss.sonatype.org/content/repositories/snapshots/net/nicktelford/dropwizard/scala/dropwizard-scala_2.10/0.7.1-1-SNAPSHOT/
       // "net.nicktelford.dropwizard.scala" % "dropwizard-scala_2.10" % "0.7.1-1-SNAPSHOT",
-      "com.massrelevance" %% "dropwizard-scala" % "0.7.1",
+      "com.massrelevance" %% "dropwizard-scala" % "0.7.1" exclude("org.slf4j", "log4j-over-slf4j"),
       // "io.dropwizard" % "dropwizard-core" % "0.7.1",
       "org.apache.commons" % "commons-lang3" % "3.3.2",
       "org.tachyonproject" % "tachyon-parent" % "0.6.0-SNAPSHOT"
@@ -70,9 +70,16 @@ object VeloxMSBuild extends Build {
   )
 
   def coreSettings = sharedSettings ++ Seq(
-    name := "veloxms-core"
+    name := "veloxms-core",
 
-    // libraryDependencies ++= Seq(
+      // <groupId>org.jblas</groupId>
+      // <artifactId>jblas</artifactId>
+      // <version>1.2.3</version>
+
+    libraryDependencies ++= Seq(
+      "org.jblas" % "jblas" % "1.2.3"
+    )
+
     //   "com.github.scopt" %% "scopt" % "3.2.0",
     //   "com.esotericsoftware.kryo" % "kryo" % "2.23.0",
     //   // "com.twitter" % "chill_2.10" % "0.3.5",
