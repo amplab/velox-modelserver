@@ -24,7 +24,8 @@ case class VeloxConfiguration(
     @NotEmpty itemModelLoc: String,
     @NotEmpty userModelLoc: String,
     @NotEmpty ratingsLoc: String,
-    @NotNull numFactors: Integer
+    @NotNull numFactors: Integer,
+    sparkMaster: String
     ) extends Configuration
 
 object VeloxApplication extends ScalaApplication[VeloxConfiguration] with LazyLogging {

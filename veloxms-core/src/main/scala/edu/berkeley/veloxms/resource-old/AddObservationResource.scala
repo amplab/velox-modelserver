@@ -49,7 +49,17 @@ class MatrixFactorizationPredication(model: MatrixFactorizationModel,
     val k = model.numFeatures
     val newUserWeights = OnlineUpdateUtils.updateUserWeights(
       allItemFeatures, allObservationScores, k)
+
+    // TODO Write new observation, new user weights to Tachyon
+    // TODO evaluate model quality
     true
+  }
+
+  @GET
+  @Timed
+  def retrainModel: Boolean = {
+
+
   }
 
 }

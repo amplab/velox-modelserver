@@ -77,7 +77,8 @@ object VeloxMSBuild extends Build {
       // <version>1.2.3</version>
 
     libraryDependencies ++= Seq(
-      "org.jblas" % "jblas" % "1.2.3"
+      "org.jblas" % "jblas" % "1.2.3",
+      "org.apache.spark" % "spark-core_2.10" % "1.1.0"
     )
 
     //   "com.github.scopt" %% "scopt" % "3.2.0",

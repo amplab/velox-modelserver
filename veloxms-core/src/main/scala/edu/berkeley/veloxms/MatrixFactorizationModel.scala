@@ -8,6 +8,17 @@ import scala.util.Try
 import java.nio.ByteBuffer
 import java.io.IOException
 
+import tachyon.TachyonURI;
+import tachyon.Pair;
+import tachyon.r.sorted.ClientStore;
+import tachyon.r.sorted.Utils;
+
+import org.apache.spark._
+import org.apache.spark.rdd.RDD
+import org.apache.spark.SparkContext._
+import org.apache.spark.mllib.recommendation.ALS
+import org.apache.spark.mllib.recommendation.Rating
+
 class MatrixFactorizationModel(
     val numFeatures: Int,
     val modelStorage: ModelStorage[FeatureVector],
@@ -44,7 +55,38 @@ class MatrixFactorizationModel(
       }
   }
 
+  def retrainInSpark(sparkMaster: String, trainingDataLoc: String) {
+
+
+
+    val numFeatures = 50
+    val numIters = 20
+    val lambda = 1
+
+    val sc = new SparkContext(sparkMaster, "RetrainVeloxModel")
+    val data = sc.textFile(trainingDataLoc)
+    val ratings = data.map(_.split("::") match {
+      case Array(user, item, score, date) => Rating(user.toInt, item.toInt, score.toDouble)
+    })
+
+    val model = ALS.train(ratings, 50, 20, 1)
+
+    /*
+
+    val userFeatures = model.userFeatures
+    val userFeaturesFlat = userFeatures.map{case (a, b) => (a, b.mkString(","))}
+    userFeaturesFlat.saveAsTextFile("userFeatures10M-r1.txt")
+
+    val productFeatures = model.productFeatures
+    val productFeaturesFlat = productFeatures.map{case (a, b) => (a, b.mkString(","))}
+    productFeaturesFlat.saveAsTextFile("productFeatures10M-r1.txt")
+    */
+
+
+  }
+
 }
+
 
 
 
