@@ -9,7 +9,7 @@ import tachyon.r.sorted.ClientStore
 import tachyon.TachyonURI
 import scala.util._
 import java.io.IOException
-import java.util.HashMap
+// import java.util.HashMap
 import java.nio.ByteBuffer
 import com.typesafe.scalalogging._
 import scala.collection.mutable
@@ -58,14 +58,14 @@ class TachyonStorage[U] (
         // } yield result
     }
 
-    def getAllObservations(userId: Long): Try[mutable.HashMap[Long, Float]] = {
+    def getAllObservations(userId: Long): Try[Map[Long, Float]] = {
         Failure (new NotImplementedException("getAllObservations"))
         // for {
         //     rawBytes <- Try(ratings.get(TachyonUtils.long2ByteArr(userId)))
         //     array <- Try(SerializationUtils.deserialize(rawBytes))
         //     result <- Try(array match
         //         case Failure(u) => array
-        //         case Success(u) => u.asInstanceOf[HashMap[Long, Float]]
+        //         case Success(u) => u.asInstanceOf[Map[Long, Float]]
         //     )
         // } yield result
     }

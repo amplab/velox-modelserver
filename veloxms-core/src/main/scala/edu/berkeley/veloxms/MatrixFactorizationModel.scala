@@ -10,15 +10,15 @@ import java.io.IOException
 
 class MatrixFactorizationModel(
     val numFeatures: Int,
-    val modelStorage: ModelStorage[Array[Double]],
-    val averageUser: Array[Double]) extends Model[Long, Array[Double]]
+    val modelStorage: ModelStorage[FeatureVector],
+    val averageUser: WeightVector) extends Model[Long, FeatureVector]
     with LazyLogging {
 
   /**
    * User provided implementation for the given model. Will be called
    * by Velox on feature cache miss.
    */
-  def computeFeatures(data: Long): Array[Double] = {
+  def computeFeatures(data: Long): FeatureVector = {
     modelStorage.getFeatureData(data) match {
       case Success(features) => features
       case Failure(thrown) => {
@@ -33,6 +33,17 @@ class MatrixFactorizationModel(
     ByteBuffer.wrap(data).getLong
 
   }
+
+  def getFeatures(item: Long, cache: FeatureCache[Long]): FeatureVector = {
+    featureCache.getItem(item) match {
+      case Some(f) => f
+      case None => {
+        val f = model.computeFeatures(item)
+        featureCache.addItem(item, f)
+        f
+      }
+  }
+
 }
 
 

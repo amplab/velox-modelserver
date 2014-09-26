@@ -6,8 +6,6 @@ import io.dropwizard.jersey.params.LongParam;
 import com.codahale.metrics.annotation.Timed;
 import org.jblas.DoubleMatrix;
 import org.jblas.Solve;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import javax.validation.Valid;
 import javax.ws.rs.Consumes;
@@ -82,10 +80,12 @@ public class AddRatingResource {
         movieSum.addi(regularization);
 
 
-        // Compute matrix inverse by solving movieSum*X=I for X
-        DoubleMatrix inverseMovieSum = Solve.solve(movieSum, DoubleMatrix.eye(k));
+        DoubleMatrix newUserFactors = Solve.solve(movieSum, movieRatingsProductMatrix);
 
-        DoubleMatrix newUserFactors = inverseMovieSum.mmul(movieRatingsProductMatrix);
+        /* // Compute matrix inverse by solving movieSum*X=I for X */
+        /* DoubleMatrix inverseMovieSum = Solve.solve(movieSum, DoubleMatrix.eye(k)); */
+        /*  */
+        /* DoubleMatrix newUserFactors = inverseMovieSum.mmul(movieRatingsProductMatrix); */
         // TODO we can probably just keep everything as DoubleMatrix type, no need to convert
         // back and forth between matrices and arrays
         return newUserFactors.toArray();

@@ -44,6 +44,7 @@ class MatrixFactorizationPredictionResource(model: MatrixFactorizationModel,
       : (Array[Byte], Double) = {
     // val model = models.get(modelId.value)
     val item = model.deserializeInput(data)
+    println(s"item: $item")
     val features = featureCache.getItem(item) match {
       case Some(f) => f
       case None => {
@@ -61,7 +62,6 @@ class MatrixFactorizationPredictionResource(model: MatrixFactorizationModel,
     }
     (data, score)
   }
-
 }
 
 

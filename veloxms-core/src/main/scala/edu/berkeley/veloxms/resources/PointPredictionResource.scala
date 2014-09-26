@@ -66,4 +66,33 @@
 
 
 
+@Path("/predict/matrixfact")
+@Consumes(Array(MediaType.APPLICATION_JSON))
+@Produces(Array(MediaType.APPLICATION_JSON))
+// TODO figure out how to make map of models of different types
+class MatrixFactorizationPredictionResource(model: MatrixFactorizationModel,
+    featureCache: FeatureCache[Long]) extends LazyLogging {
+
+  @POST
+  @Timed
+  def predict(
+      // @QueryParam("model") modelId: IntParam,
+      @QueryParam("user") userId: LongParam,
+      data: Long)
+      : Long, Double) = {
+    // val model = models.get(modelId.value)
+    // val item = model.deserializeInput(data)
+    val item = data
+    println(s"item: $item")
+    val features = model.getFeatures(item, featureCache)
+    val weightVector = model.getWeightVector(userId.value)
+    var i = 0
+    var score = 0.0
+    while (i < model.numFeatures) {
+      score += features(i)*weightVector(i)
+    }
+    (data, score)
+  }
+}
+
 

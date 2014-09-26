@@ -27,13 +27,13 @@ trait Model[T, U] extends LazyLogging {
   /** Average user weight vector.
    * Used for warmstart for new users
    */
-  val averageUser: Array[Double]
+  val averageUser: WeightVector
 
   /**
    * User provided implementation for the given model. Will be called
    * by Velox on feature cache miss.
    */
-  def computeFeatures(data: T) : Array[Double]
+  def computeFeatures(data: T) : FeatureVector
 
   /** Deserialize object representation from raw bytes to
    * the type of expected
@@ -43,7 +43,7 @@ trait Model[T, U] extends LazyLogging {
   /**
    * Velox implemented - fetch from local Tachyon partition
    */
-  final def getWeightVector(userId: Long) : Array[Double] = {
+  final def getWeightVector(userId: Long) : WeightVector = {
     val result: Try[Array[Double]] = modelStorage.getUserFactors(userId)
     result match {
       case Success(u) => u

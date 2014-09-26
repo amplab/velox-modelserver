@@ -2,7 +2,7 @@ package edu.berkeley.veloxms.storage
 
 
 import scala.util.Try
-import scala.collection.mutable
+// import scala.collection.immutable.HashMap
 
 /**
  * Simple interface to abstract out the KV storage backend used to store
@@ -25,7 +25,7 @@ trait ModelStorage[U] {
     /**
      * Gets a list of all movies this user has rated and the associated ratings.
      */
-    def getAllObservations(userId: Long): Try[mutable.HashMap[Long, Float]]
+    def getAllObservations(userId: Long): Try[Map[Long, Float]]
 
     val numFactors: Int
 }
