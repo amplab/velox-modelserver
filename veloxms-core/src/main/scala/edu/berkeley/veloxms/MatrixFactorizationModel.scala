@@ -71,6 +71,8 @@ class MatrixFactorizationModel(
 
     val model = ALS.train(ratings, 50, 20, 1)
 
+    // model.userFeatures.mapPartitions( )//write to Tachyon)
+
     /*
 
     val userFeatures = model.userFeatures
@@ -82,11 +84,15 @@ class MatrixFactorizationModel(
     productFeaturesFlat.saveAsTextFile("productFeatures10M-r1.txt")
     */
 
-
   }
 
 }
 
+
+object MatrixFactorizationModel {
+
+
+}
 
 
 

@@ -19,13 +19,13 @@ trait ModelStorage[U] {
      */
     def getFeatureData(itemId: Long): Try[U]
 
-    def getUserFactors(userId: Long): Try[Array[Double]]
+    def getUserFactors(userId: Long): Try[WeightVector]
 
 
     /**
      * Gets a list of all movies this user has rated and the associated ratings.
      */
-    def getAllObservations(userId: Long): Try[Map[Long, Float]]
+    def getAllObservations(userId: Long): Try[Map[Long, Double]]
 
     val numFactors: Int
 }

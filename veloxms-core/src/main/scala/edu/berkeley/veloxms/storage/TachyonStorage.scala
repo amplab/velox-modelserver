@@ -34,10 +34,6 @@ class TachyonStorage[U] (
         val result = for {
             rawBytes <- Try(items.get(TachyonUtils.long2ByteArr(itemId)))
             array <- Try(SerializationUtils.deserialize(rawBytes))
-            // result <- Try(array match
-            //     case Failure(u) => array
-            //     case Success(u) => u.asInstanceOf[U]
-            // )
         } yield array
         result match {
             case Success(u) => Success(u.asInstanceOf[U])
@@ -46,28 +42,28 @@ class TachyonStorage[U] (
 
     }
 
-    def getUserFactors(userId: Long): Try[Array[Double]] = {
-        Failure (new NotImplementedException("getUserFactors"))
-        // for {
-        //     rawBytes <- Try(users.get(TachyonUtils.long2ByteArr(userId)))
-        //     array <- Try(SerializationUtils.deserialize(rawBytes))
-        //     result <- Try(array match
-        //         case Failure(u) => array
-        //         case Success(u) => u.asInstanceOf[Array[Double]]
-        //     )
-        // } yield result
+    def getUserFactors(userId: Long): Try[WeightVector] = {
+        val result = for {
+            rawBytes <- Try(users.get(TachyonUtils.long2ByteArr(userId)))
+            array <- Try(SerializationUtils.deserialize(rawBytes))
+        } yield array
+        result match {
+            case Success(u) => Success(u.asInstanceOf[WeightVector])
+            case Failure(u) => result
+        }
     }
 
-    def getAllObservations(userId: Long): Try[Map[Long, Float]] = {
-        Failure (new NotImplementedException("getAllObservations"))
-        // for {
-        //     rawBytes <- Try(ratings.get(TachyonUtils.long2ByteArr(userId)))
-        //     array <- Try(SerializationUtils.deserialize(rawBytes))
-        //     result <- Try(array match
-        //         case Failure(u) => array
-        //         case Success(u) => u.asInstanceOf[Map[Long, Float]]
-        //     )
-        // } yield result
+    def getAllObservations(userId: Long): Try[Map[Long, Double]] = {
+
+
+        val result = for {
+            rawBytes <- Try(ratings.get(TachyonUtils.long2ByteArr(userId)))
+            array <- Try(SerializationUtils.deserialize(rawBytes))
+        } yield array
+        result match {
+            case Success(u) => Success(u.asInstanceOf[Map[Long, Double]])
+            case Failure(u) => result
+        }
     }
 }
 
@@ -96,65 +92,4 @@ object TachyonUtils {
 }
 
 
-
-    //
-    // @Override
-    // public double[] getUserFactors(long userId) {
-    //     return getFactors(userId, users, "user-model");
-    // }
-
-    // private static double[] getFactors(id: Long, model: ClientStore, debug: String = "unspecified") {
-    //     // ByteBuffer key = ByteBuffer.allocate(8); 
-    //     // key.putLong(id); 
-    //     try {
-    //         byte[] rawBytes = model.get(TachyonUtils.long2ByteArr(id));
-    //         if (rawBytes != null) {
-    //             return (double[]) SerializationUtils.deserialize(rawBytes);
-    //         } else {
-    //             LOGGER.warn("no value found in " + debug + " for : " + id);
-    //         }
-    //     } catch (IOException e) {
-    //         LOGGER.warn("Caught tachyon exception: " + e.getMessage());
-    //     }
-    //     return null;
-    // }
-    
-    // @Override
-    // public HashMap<Long, Float> getRatedMovies(long userId) {
-    //     HashMap<Long, Float> ratedMovies = null;
-    //     try {
-    //         LOGGER.info("Looking for ratings for user: " + userId);
-    //         byte[] rawBytes = ratings.get(TachyonUtils.long2ByteArr(userId));
-    //         if (rawBytes != null) {
-    //             ratedMovies = (HashMap<Long, Float>) SerializationUtils.deserialize(rawBytes);
-    //         } else {
-    //             LOGGER.warn("no value found in ratings for user: " + userId);
-    //         }
-    //     } catch (IOException e) {
-    //         LOGGER.warn("Caught tachyon exception: " + e.getMessage());
-    //     }
-    //     return ratedMovies;
-    // }
-    //
-    // @Override
-    // public int getNumFactors() {
-    //     return this.numFactors;
-    // }
-
-
-    // TODO deicde if a single KV pair per prediction is the best way to do this
-    // @Override 
-    // public double getMaterializedPrediction(long userId, long movieId) { 
-    //     double prediction = -1.0; 
-    //     try { 
-    //         byte[] rawPrediction = 
-    //             matPredictions.get(TachyonUtils.twoDimensionKey(userId, movieId)); 
-    //         if (rawPrediction != null) { 
-    //             prediction = ByteBuffer.wrap(rawPrediction).getDouble(); 
-    //         } 
-    //     } catch (IOException e) { 
-    //         LOGGER.warn("Caught tachyon exception: " + e.getMessage()); 
-    //     } 
-    //     return prediction; 
-    // } 
 

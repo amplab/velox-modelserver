@@ -71,7 +71,8 @@
 @Produces(Array(MediaType.APPLICATION_JSON))
 // TODO figure out how to make map of models of different types
 class MatrixFactorizationPredictionResource(model: MatrixFactorizationModel,
-    featureCache: FeatureCache[Long]) extends LazyLogging {
+    featureCache: FeatureCache[Long],
+    sparkMaster: String) extends LazyLogging {
 
   @POST
   @Timed

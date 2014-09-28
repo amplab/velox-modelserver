@@ -25,8 +25,12 @@ case class VeloxConfiguration(
     @NotEmpty userModelLoc: String,
     @NotEmpty ratingsLoc: String,
     @NotNull numFactors: Integer,
-    sparkMaster: String
+    sparkMaster: String,
+    // whether to do preprocessing of dataset for testing purposes
+    reloadTachyon: Boolean,
+    rawDataLoc: String
     ) extends Configuration
+
 
 object VeloxApplication extends ScalaApplication[VeloxConfiguration] with LazyLogging {
 
@@ -68,10 +72,14 @@ object VeloxApplication extends ScalaApplication[VeloxConfiguration] with LazyLo
         val featureCache = new FeatureCache[Long](FeatureCache.tempBudget)
 
         env.jersey().register(new MatrixFactorizationPredictionResource(
-            matrixFactorizationModel, featureCache))
+            matrixFactorizationModel, featureCache, config.sparkMaster))
         // env.jersey().register(addRatings)
     }
 }
+
+
+
+
 
 
 
