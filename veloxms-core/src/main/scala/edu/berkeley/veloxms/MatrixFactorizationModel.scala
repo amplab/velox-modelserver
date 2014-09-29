@@ -46,22 +46,23 @@ class MatrixFactorizationModel(
   }
 
   def getFeatures(item: Long, cache: FeatureCache[Long]): FeatureVector = {
-    featureCache.getItem(item) match {
+    cache.getItem(item) match {
       case Some(f) => f
       case None => {
-        val f = model.computeFeatures(item)
-        featureCache.addItem(item, f)
+        val f = computeFeatures(item)
+        cache.addItem(item, f)
         f
       }
+    }
   }
 
   def retrainInSpark(sparkMaster: String, trainingDataLoc: String) {
 
 
+    // TODO finish implementing this method
 
     val numFeatures = 50
     val numIters = 20
-    val lambda = 1
 
     val sc = new SparkContext(sparkMaster, "RetrainVeloxModel")
     val data = sc.textFile(trainingDataLoc)
@@ -90,6 +91,8 @@ class MatrixFactorizationModel(
 
 
 object MatrixFactorizationModel {
+  val lambda = 1
+
 
 
 }

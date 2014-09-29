@@ -2,6 +2,7 @@ package edu.berkeley.veloxms
 
 import edu.berkeley.veloxms.resources._
 import edu.berkeley.veloxms.storage._
+import edu.berkeley.veloxms.misc.WriteModelsResource
 import io.dropwizard.Configuration
 // import net.nicktelford.dropwizard.scala._
 import io.dropwizard.setup.Bootstrap
@@ -72,7 +73,12 @@ object VeloxApplication extends ScalaApplication[VeloxConfiguration] with LazyLo
         val featureCache = new FeatureCache[Long](FeatureCache.tempBudget)
 
         env.jersey().register(new MatrixFactorizationPredictionResource(
+            matrixFactorizationModel, featureCache))
+
+        env.jersey().register(new MatrixFactorizationUpdateResource(
             matrixFactorizationModel, featureCache, config.sparkMaster))
+
+        env.jersey().register(new WriteModelsResource)
         // env.jersey().register(addRatings)
     }
 }

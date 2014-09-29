@@ -31,7 +31,7 @@ object VeloxMSBuild extends Build {
   lazy val allDeps = packages
 
 
-  lazy val assembleDeps = TaskKey[Unit]("assemble-deps", "Build assembly of dependencies and packages Spark projects")
+  lazy val assembleDeps = TaskKey[Unit]("assemble-deps", "Build assembly of dependencies and packages VeloxMS projects")
 
   def sharedSettings = Defaults.defaultSettings ++ Seq(
     organization := "edu.berkeley.veloxms",
@@ -78,7 +78,8 @@ object VeloxMSBuild extends Build {
 
     libraryDependencies ++= Seq(
       "org.jblas" % "jblas" % "1.2.3",
-      "org.apache.spark" % "spark-core_2.10" % "1.1.0"
+      "org.apache.spark" % "spark-core_2.10" % "1.1.0",
+      "org.apache.spark" % "spark-mllib_2.10" % "1.1.0"
     )
 
     //   "com.github.scopt" %% "scopt" % "3.2.0",

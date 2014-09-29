@@ -2,7 +2,7 @@
  * Caches features on a per-item basis. Basically a simple wrapper for
  * thread-safe hashmap.
  */
-package edu.berkeley.veloxms.resources
+package edu.berkeley.veloxms
 
 import java.util.concurrent.ConcurrentHashMap
 

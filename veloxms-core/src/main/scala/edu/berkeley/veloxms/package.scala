@@ -1,4 +1,4 @@
-package edu.berkeley.veloxms
+package edu.berkeley
 
 
 package object veloxms {

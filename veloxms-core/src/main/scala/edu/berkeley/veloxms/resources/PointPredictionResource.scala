@@ -4,29 +4,29 @@
  */
 
 
-// package edu.berkeley.veloxms.resources
-//
-// import edu.berkeley.veloxms.storage.ModelStorage
-// import edu.berkeley.veloxms._
-// import com.codahale.metrics.annotation.Timed
-// // import net.nicktelford.dropwizard.scala.jersey.LongParam
-// // import net.nicktelford.dropwizard.scala.jersey.IntParam
-// // import net.nicktelford.dropwizard.scala.jersey.BooleanParam
-// // import org.slf4j.Logger
-// // import org.slf4j.LoggerFactory
-//
-// import javax.validation.Valid
-// import javax.ws.rs.GET
-// import javax.ws.rs.POST
-// import javax.ws.rs.Path
-// import javax.ws.rs.PathParam
-// import javax.ws.rs.QueryParam
-// import javax.ws.rs.Consumes
-// import javax.ws.rs.Produces
-// import javax.ws.rs.core.MediaType
-// import java.util._
-// import com.typesafe.scalalogging._
-// import com.massrelevance.dropwizard.scala.params.{LongParam, IntParam, BooleanParam}
+package edu.berkeley.veloxms.resources
+
+import edu.berkeley.veloxms.storage.ModelStorage
+import edu.berkeley.veloxms._
+import com.codahale.metrics.annotation.Timed
+// import net.nicktelford.dropwizard.scala.jersey.LongParam
+// import net.nicktelford.dropwizard.scala.jersey.IntParam
+// import net.nicktelford.dropwizard.scala.jersey.BooleanParam
+// import org.slf4j.Logger
+// import org.slf4j.LoggerFactory
+
+import javax.validation.Valid
+import javax.ws.rs.GET
+import javax.ws.rs.POST
+import javax.ws.rs.Path
+import javax.ws.rs.PathParam
+import javax.ws.rs.QueryParam
+import javax.ws.rs.Consumes
+import javax.ws.rs.Produces
+import javax.ws.rs.core.MediaType
+import java.util._
+import com.typesafe.scalalogging._
+import com.massrelevance.dropwizard.scala.params.{LongParam, IntParam, BooleanParam}
 //
 // @Path("/predict-unimplemented")
 // @Consumes(MediaType.APPLICATION_JSON)
@@ -71,16 +71,14 @@
 @Produces(Array(MediaType.APPLICATION_JSON))
 // TODO figure out how to make map of models of different types
 class MatrixFactorizationPredictionResource(model: MatrixFactorizationModel,
-    featureCache: FeatureCache[Long],
-    sparkMaster: String) extends LazyLogging {
+    featureCache: FeatureCache[Long]) extends LazyLogging {
 
   @POST
   @Timed
   def predict(
       // @QueryParam("model") modelId: IntParam,
       @QueryParam("user") userId: LongParam,
-      data: Long)
-      : Long, Double) = {
+      data: Long): (Long, Double) = {
     // val model = models.get(modelId.value)
     // val item = model.deserializeInput(data)
     val item = data

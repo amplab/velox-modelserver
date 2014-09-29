@@ -13,6 +13,7 @@ import java.io.IOException
 import java.nio.ByteBuffer
 import com.typesafe.scalalogging._
 import scala.collection.mutable
+import edu.berkeley.veloxms._
 
 class TachyonStorage[U] (
     users: ClientStore,

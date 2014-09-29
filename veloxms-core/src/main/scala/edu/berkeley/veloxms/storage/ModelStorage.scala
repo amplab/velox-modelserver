@@ -2,6 +2,7 @@ package edu.berkeley.veloxms.storage
 
 
 import scala.util.Try
+import edu.berkeley.veloxms._
 // import scala.collection.immutable.HashMap
 
 /**
