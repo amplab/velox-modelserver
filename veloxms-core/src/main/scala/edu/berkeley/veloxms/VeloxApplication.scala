@@ -63,9 +63,11 @@ object VeloxApplication extends ScalaApplication[VeloxConfiguration] with LazyLo
             case Failure(f) => throw new RuntimeException(
                 s"Couldn't initialize use model: ${f.getMessage}")
         }
+        logger.info("got tachyon stores")
 
         val modelStorage = 
-            new TachyonStorage[Array[Double]](userModel, itemModel, ratings, config.numFactors)
+            new TachyonStorage(userModel, itemModel, ratings, config.numFactors)
+            // new TachyonStorage[Array[Double]](userModel, itemModel, ratings, config.numFactors)
         val averageUser = Array.fill[Double](config.numFactors)(1.0)
         val matrixFactorizationModel =
             new MatrixFactorizationModel(config.numFactors, modelStorage, averageUser)
