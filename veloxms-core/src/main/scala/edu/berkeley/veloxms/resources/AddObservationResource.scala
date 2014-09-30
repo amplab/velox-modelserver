@@ -46,8 +46,12 @@ class MatrixFactorizationUpdateResource(model: MatrixFactorizationModel,
     }
 
     val k = model.numFeatures
+    val oldUserWeights = model.getWeightVector(obs.userId)
     val newUserWeights = OnlineUpdateUtils.updateUserWeights(
       allItemFeatures, allObservationScores, k)
+    logger.info(s"Old weight: (${oldUserWeights.mkString(",")})")
+    logger.info(s"New weight: (${newUserWeights.mkString(",")})")
+
 
     // TODO Write new observation, new user weights to Tachyon
     // TODO evaluate model quality
@@ -95,6 +99,8 @@ object OnlineUpdateUtils {
 
       }
       itemScoreProductSum.addi(currentFeatures.muli(obsScore))
+      i += 1
+
     }
 
     val regularization = DoubleMatrix.eye(k).muli(MatrixFactorizationModel.lambda*k)

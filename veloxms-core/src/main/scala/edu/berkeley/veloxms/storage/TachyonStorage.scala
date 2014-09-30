@@ -41,10 +41,8 @@ class TachyonStorage (
 
         try {
           val rawBytes = ByteBuffer.wrap(items.get(TachyonUtils.long2ByteArr(itemId)))
-          logger.info(s"FOUND raw bytes: $rawBytes")
           val kryo = KryoThreadLocal.kryoTL.get
           val array = kryo.deserialize(rawBytes).asInstanceOf[FeatureVector]
-          logger.info(s"DESERIALIZED raw bytes: $array")
           Success(array)
         } catch {
           case u: Throwable => Failure(u)

@@ -70,8 +70,8 @@ class WriteModelsResource extends LazyLogging {
     writeMapToTachyon(readModel(locs.itemsSrc), locs.itemsDst, locs.partition)
     logger.info("Writing users")
     writeMapToTachyon(readModel(locs.usersSrc), locs.usersDst, locs.partition)
-    // logger.info("Writing observations")
-    // writeMapToTachyon(readObservations(locs.obsSrc), locs.obsDst, locs.partition)
+    logger.info("Writing observations")
+    writeMapToTachyon(readObservations(locs.obsSrc), locs.obsDst, locs.partition, 3)
     logger.info("Finished prepping tachyon")
     true
   }
@@ -124,11 +124,26 @@ class WriteModelsResource extends LazyLogging {
   }
 
   def writeMapToTachyon(map: TreeMap[Array[Byte], Array[Byte]], loc: String,
-      partition: Int = 0) {
+      partition: Int = 0, splits: Int = 1) {
     val store = ClientStore.createStore(new TachyonURI(loc))
-    store.createPartition(partition)
-    map.foreach( {case (key, value) => store.put(partition, key, value) })
-    store.closePartition(partition)
+    for (pa <- 0 to splits) {
+      store.createPartition(partition + pa)
+    }
+    val splitPoint: Int = map.size / splits
+    var i = 0
+    val keys = map.keys.toList
+    while (i < map.size) {
+      val k = keys(i)
+      val v = map(k)
+      val p = partition + (i / splitPoint)
+      store.put(p, k, v)
+      i += 1
+    }
+    // map.foreach( {case (key, value) => store.put(partition, key, value) })
+
+    for (pa <- 0 to splits) {
+      store.closePartition(partition + pa)
+    }
   }
 
   def readObservations(obsLoc: String): TreeMap[Array[Byte], Array[Byte]] = {
