@@ -84,8 +84,8 @@ class MatrixFactorizationPredictionResource(model: MatrixFactorizationModel,
     // val item = model.deserializeInput(data)
     val item = data.id
     println(s"item: $item")
-    val features = model.getFeatures(item, featureCache)
     val weightVector = model.getWeightVector(userId.value)
+    val features = model.getFeatures(item, featureCache)
     var i = 0
     var score = 0.0
     while (i < model.numFeatures) {

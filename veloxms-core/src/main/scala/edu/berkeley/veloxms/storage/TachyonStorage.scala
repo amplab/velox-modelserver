@@ -1,7 +1,6 @@
 package edu.berkeley.veloxms.storage
 
 
-import org.apache.commons.lang3.SerializationUtils
 import org.apache.commons.lang3.NotImplementedException
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -12,8 +11,14 @@ import java.io.IOException
 // import java.util.HashMap
 import java.nio.ByteBuffer
 import com.typesafe.scalalogging._
-import scala.collection.mutable
+// import scala.collection.mutable
+import scala.collection.immutable.HashMap
 import edu.berkeley.veloxms._
+import java.nio.ByteBuffer
+import java.io.ByteArrayOutputStream
+import edu.berkeley.veloxms.util.{VeloxKryoRegistrar, KryoThreadLocal}
+// import scala.pickling._
+// import binary._
 
 // class TachyonStorage[U: ClassTag] (
 class TachyonStorage (
@@ -35,12 +40,12 @@ class TachyonStorage (
         // } yield result
 
         try {
-          val rawBytes = items.get(TachyonUtils.long2ByteArr(itemId))
+          val rawBytes = ByteBuffer.wrap(items.get(TachyonUtils.long2ByteArr(itemId)))
           logger.info(s"FOUND raw bytes: $rawBytes")
-          val array = SerializationUtils.deserialize(rawBytes)
+          val kryo = KryoThreadLocal.kryoTL.get
+          val array = kryo.deserialize(rawBytes).asInstanceOf[FeatureVector]
           logger.info(s"DESERIALIZED raw bytes: $array")
-          val result = array.asInstanceOf[FeatureVector]
-          Success(result)
+          Success(array)
         } catch {
           case u: Throwable => Failure(u)
         }
@@ -58,28 +63,32 @@ class TachyonStorage (
     }
 
     def getUserFactors(userId: Long): Try[WeightVector] = {
-        val result = for {
-            rawBytes <- Try(users.get(TachyonUtils.long2ByteArr(userId)))
-            array <- Try(SerializationUtils.deserialize(rawBytes))
-        } yield array
-        logger.info(s"Found user $result")
-        result match {
-            case Success(u) => Success(u.asInstanceOf[WeightVector])
-            case Failure(u) => result
-        }
+      val rawBytes = ByteBuffer.wrap(users.get(TachyonUtils.long2ByteArr(userId)))
+      val kryo = KryoThreadLocal.kryoTL.get
+      val result = kryo.deserialize(rawBytes).asInstanceOf[WeightVector]
+      Success(result)
+
+
+        //
+        // val result = for {
+        //     rawBytes <- Try(users.get(TachyonUtils.long2ByteArr(userId)))
+        //     array <- Try(rawBytes.unpickle[WeightVector])
+        // } yield array
+        // result
     }
 
     def getAllObservations(userId: Long): Try[Map[Long, Double]] = {
 
-
-        val result = for {
-            rawBytes <- Try(ratings.get(TachyonUtils.long2ByteArr(userId)))
-            array <- Try(SerializationUtils.deserialize(rawBytes))
-        } yield array
-        result match {
-            case Success(u) => Success(u.asInstanceOf[Map[Long, Double]])
-            case Failure(u) => result
-        }
+      val rawBytes = ByteBuffer.wrap(ratings.get(TachyonUtils.long2ByteArr(userId)))
+      val kryo = KryoThreadLocal.kryoTL.get
+      val result = kryo.deserialize(rawBytes).asInstanceOf[HashMap[Long, Double]]
+      Success(result)
+        //
+        // val result = for {
+        //     rawBytes <- Try(ratings.get(TachyonUtils.long2ByteArr(userId)))
+        //     array <- Try(rawBytes.unpickle[Map[Long, Double]])
+        // } yield array
+        // result
     }
 
     // def cast(value: Any): Option[A] = {
@@ -119,6 +128,41 @@ object TachyonUtils {
     def getStore(url: String): Try[ClientStore] = {
         Try(ClientStore.getStore(new TachyonURI(url)))
     }
+
+    // def serializeArray(arr: Array[Double]): Array[Byte] = {
+    //   val buffer = ByteBuffer.allocate
+    // }
+
+
+    /*
+    Message bytes are:
+    8 bytes: request ID; high-order bit is request or response boolean
+    N bytes: serialized message
+     */
+    // def serializeMessage(requestId: RequestId, msg: Any, isRequest: Boolean): ByteBuffer = {
+    //   val buffer = ByteBuffer.allocate(4096)
+    //   var header = requestId & ~(1L << 63)
+    //   if(isRequest) header |= (1L << 63)
+    //   buffer.putLong(header)
+    //   //val kryo = VeloxKryoRegistrar.getKryo()
+    //   val kryo = KryoThreadLocal.kryoTL.get
+    //   val result = kryo.serialize(msg,buffer)
+    //   //VeloxKryoRegistrar.returnKryo(kryo)
+    //   result.flip
+    //   result
+    // }
+
+    // def deserializeMessage(bytes: ByteBuffer): (Any, RequestId, Boolean) = {
+    //   val headerLong = bytes.getLong()
+    //   val isRequest = (headerLong >>> 63) == 1
+    //   val requestId = headerLong & ~(1L << 63)
+    //   // TODO: use Kryo serializer pool instead
+    //   //val kryo = VeloxKryoRegistrar.getKryo()
+    //   val kryo = KryoThreadLocal.kryoTL.get
+    //   val msg = kryo.deserialize(bytes)
+    //   //VeloxKryoRegistrar.returnKryo(kryo)
+    //   (msg, requestId, isRequest)
+    // }
 
     // def cast[A : Manifest](value: Any): Option[A] = {
     //   val erasure = manifest[A] match {

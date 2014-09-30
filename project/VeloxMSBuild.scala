@@ -61,7 +61,11 @@ object VeloxMSBuild extends Build {
       "com.massrelevance" %% "dropwizard-scala" % "0.7.1" exclude("org.slf4j", "log4j-over-slf4j"),
       // "io.dropwizard" % "dropwizard-core" % "0.7.1",
       "org.apache.commons" % "commons-lang3" % "3.3.2",
-      "org.tachyonproject" % "tachyon-parent" % "0.6.0-SNAPSHOT"
+      "org.tachyonproject" % "tachyon-parent" % "0.6.0-SNAPSHOT",
+      "com.esotericsoftware.kryo" % "kryo" % "2.23.0",
+      "com.twitter" % "chill_2.10" % "0.3.5",
+      "com.twitter" % "chill-bijection_2.10" % "0.3.5"
+
     )
   )
 

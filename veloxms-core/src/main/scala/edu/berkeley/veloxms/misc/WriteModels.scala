@@ -2,7 +2,7 @@ package edu.berkeley.veloxms.misc
 
 
 import org.apache.commons.io.IOUtils
-import org.apache.commons.lang3.SerializationUtils
+// import org.apache.commons.lang3.SerializationUtils
 import tachyon.TachyonURI
 import tachyon.Pair
 import tachyon.r.sorted.ClientStore
@@ -13,17 +13,19 @@ import scala.io.Source
 import org.apache.spark.mllib.recommendation.Rating
 import com.typesafe.scalalogging._
 import edu.berkeley.veloxms._
-import io.dropwizard.jersey.params.LongParam
+import com.massrelevance.dropwizard.scala.params.{LongParam, IntParam, BooleanParam}
 import com.codahale.metrics.annotation.Timed
 import javax.validation.Valid
-import javax.ws.rs.Consumes
-import javax.ws.rs.Produces
-import javax.ws.rs.POST
-import javax.ws.rs.Path
-import javax.ws.rs.PathParam
+import javax.ws.rs._
 import javax.ws.rs.core.MediaType
 import scala.collection.immutable.HashMap
-
+import tachyon.r.sorted.ClientStore
+import tachyon.TachyonURI
+import java.nio.ByteBuffer
+import java.io.ByteArrayOutputStream
+import edu.berkeley.veloxms.util.{VeloxKryoRegistrar, KryoThreadLocal}
+// import scala.pickling._
+// import binary._
 
 /**
  * Utility for writing existing models in plaintext on the
@@ -53,6 +55,7 @@ case class ModelLocations(
   partition: Int
 )
 
+case class TestParams(tachloc: String, part: Int, create: Boolean, key: Long)
 
 @Path("/misc/prep-tachyon")
 @Consumes(Array(MediaType.APPLICATION_JSON))
@@ -69,8 +72,36 @@ class WriteModelsResource extends LazyLogging {
     writeMapToTachyon(readModel(locs.usersSrc), locs.usersDst, locs.partition)
     logger.info("Writing observations")
     writeMapToTachyon(readObservations(locs.obsSrc), locs.obsDst, locs.partition)
+    logger.info("Finished prepping tachyon")
     true
   }
+
+  // @POST
+  // def testTachyon(@Valid params: TestParams): Boolean = {
+  //     val store = if (params.create) {
+  //       ClientStore.createStore(new TachyonURI(params.tachloc))
+  //     } else {
+  //       ClientStore.getStore(new TachyonURI(params.tachloc))
+  //     }
+  //     store.createPartition(params.part)
+  //     val key = TachyonUtils.long2ByteArr(params.key)
+  //     val arr: Array[Double] = Array(1.5, 2.5, 3.5, 4.5)
+  //     val arrPickle = arr.pickle.value
+  //
+  //
+  //     store.put(params.part, key, arrPickle)
+  //     store.closePartition(params.part)
+  //     logger.info(s"Wrote $key, $arrPickle to Tachyon partition ${params.part}")
+  //     val rawBytes = store.get(key)
+  //     logger.info(s"Found rawBytes: $rawBytes")
+  //     val result = rawBytes.unpickle[Array[Double]]
+  //     logger.info(s"Deserialized raw bytes to $result")
+  //     true
+  //
+  //
+  //
+  //
+  // }
 
   // Read MatrixFactorizationModel
   def readModel(modelLoc: String): TreeMap[Array[Byte], Array[Byte]] = {
@@ -78,7 +109,11 @@ class WriteModelsResource extends LazyLogging {
       val splits = line.split(",")
       val key = splits(0).toLong
       val factors: Array[Double] = splits.slice(1, splits.size).map(_.toDouble)
-      (TachyonUtils.long2ByteArr(key), SerializationUtils.serialize(factors))
+      // TODO Find less brittle way to allocate bytebuffer sizes
+      val buffer = ByteBuffer.allocate(factors.size*8)
+      val kryo = KryoThreadLocal.kryoTL.get
+      val result = kryo.serialize(factors,buffer).array
+      (TachyonUtils.long2ByteArr(key), result)
     })
 
     val sortedModel = TreeMap(model.toArray:_*)(ByteOrdering)
@@ -104,7 +139,10 @@ class WriteModelsResource extends LazyLogging {
       .groupBy(_.user)
       .map({ case (user, obs) => {
           val obsMap: HashMap[Long, Double] = HashMap(obs.map(r => (r.data, r.score)):_*)
-          (TachyonUtils.long2ByteArr(user), SerializationUtils.serialize(obsMap))
+          val kryo = KryoThreadLocal.kryoTL.get
+          val buffer = ByteBuffer.allocate(obsMap.size*8*8*2)
+          val serMap = kryo.serialize(obsMap, buffer).array
+          (TachyonUtils.long2ByteArr(user), serMap)
         }
       })
     val sortedObs = TreeMap(obs.toArray:_*)(ByteOrdering)

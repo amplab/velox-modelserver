@@ -10,3 +10,11 @@ curl -H "Content-Type: application/json" -d '{
 "obsSrc":"/home/ubuntu/data/ratings.dat",
 "partition":0}' http://localhost:8080/misc/prep-tachyon
 
+
+# curl -H "Content-Type: application/json" -d '{
+#   "tachloc":"tachyon://ec2-54-234-135-209.compute-1.amazonaws.com:19998/test-store",
+#   "create":true,
+#   "part":0,
+#   "key":123}' http://localhost:8080/misc/prep-tachyon
+
+
