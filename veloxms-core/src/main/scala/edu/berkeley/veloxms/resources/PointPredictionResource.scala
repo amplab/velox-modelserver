@@ -65,7 +65,7 @@ import com.massrelevance.dropwizard.scala.params.{LongParam, IntParam, BooleanPa
 // }
 
 
-case class ItemId(id: Long)
+case class PredictRequest(item: Long, user: Long)
 
 @Path("/predict/matrixfact")
 @Consumes(Array(MediaType.APPLICATION_JSON))
@@ -78,18 +78,22 @@ class MatrixFactorizationPredictionResource(model: MatrixFactorizationModel,
   @Timed
   def predict(
       // @QueryParam("model") modelId: IntParam,
-      @QueryParam("user") userId: LongParam,
-      @Valid data: ItemId): (ItemId, Double) = {
+      // @QueryParam("user") userId: LongParam,
+      @Valid data: PredictRequest): (PredictRequest, Double) = {
     // val model = models.get(modelId.value)
     // val item = model.deserializeInput(data)
-    val item = data.id
-    println(s"item: $item")
-    val weightVector = model.getWeightVector(userId.value)
+    val item = data.item
+    val user = data.user
+    // println(s"item: $item")
     val features = model.getFeatures(item, featureCache)
+    logger.info(s"Features: (${features.mkString(",")})")
+    val weightVector = model.getWeightVector(user)
+    logger.info(s"Weight Vector: (${weightVector.mkString(",")})")
     var i = 0
     var score = 0.0
     while (i < model.numFeatures) {
       score += features(i)*weightVector(i)
+      i += 1
     }
     (data, score)
   }

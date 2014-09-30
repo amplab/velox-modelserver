@@ -47,16 +47,9 @@ trait Model[T, U] extends LazyLogging {
   /**
    * Velox implemented - fetch from local Tachyon partition
    */
-  final def getWeightVector(userId: Long) : WeightVector = {
-    val result: Try[Array[Double]] = modelStorage.getUserFactors(userId)
-    result match {
-      case Success(u) => u
-      case Failure(thrown) => {
-        logger.warn("User weight failure: " + thrown)
-        averageUser
-      }
-    }
-  }
+  def getWeightVector(userId: Long) : WeightVector
+
+
 
 
 }

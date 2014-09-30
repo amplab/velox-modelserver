@@ -58,7 +58,7 @@ object VeloxKryoRegistrar {
 
 
     // Register all of chills classes
-    new AllScalaRegistrar().apply(kryo)
+    // new AllScalaRegistrar().apply(kryo)
     kryo.setClassLoader(classLoader)
     new KryoSerializer(kryo)
   }

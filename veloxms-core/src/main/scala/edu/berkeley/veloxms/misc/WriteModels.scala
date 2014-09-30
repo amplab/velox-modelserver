@@ -70,8 +70,8 @@ class WriteModelsResource extends LazyLogging {
     writeMapToTachyon(readModel(locs.itemsSrc), locs.itemsDst, locs.partition)
     logger.info("Writing users")
     writeMapToTachyon(readModel(locs.usersSrc), locs.usersDst, locs.partition)
-    logger.info("Writing observations")
-    writeMapToTachyon(readObservations(locs.obsSrc), locs.obsDst, locs.partition)
+    // logger.info("Writing observations")
+    // writeMapToTachyon(readObservations(locs.obsSrc), locs.obsDst, locs.partition)
     logger.info("Finished prepping tachyon")
     true
   }
@@ -105,14 +105,17 @@ class WriteModelsResource extends LazyLogging {
 
   // Read MatrixFactorizationModel
   def readModel(modelLoc: String): TreeMap[Array[Byte], Array[Byte]] = {
+    var i = 0
     val model = Source.fromFile(modelLoc).getLines.map( (line) => {
       val splits = line.split(",")
       val key = splits(0).toLong
+      if (i < 10) logger.info(s"key: $key")
+      i += 1
       val factors: Array[Double] = splits.slice(1, splits.size).map(_.toDouble)
       // TODO Find less brittle way to allocate bytebuffer sizes
-      val buffer = ByteBuffer.allocate(factors.size*8)
+      val buffer = ByteBuffer.allocate(factors.size*8*2)
       val kryo = KryoThreadLocal.kryoTL.get
-      val result = kryo.serialize(factors,buffer).array
+      val result = kryo.serialize(factors, buffer).array
       (TachyonUtils.long2ByteArr(key), result)
     })
 

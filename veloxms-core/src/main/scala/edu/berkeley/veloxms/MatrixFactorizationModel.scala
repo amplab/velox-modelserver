@@ -56,6 +56,17 @@ class MatrixFactorizationModel(
     }
   }
 
+  def getWeightVector(userId: Long) : WeightVector = {
+    val result: Try[Array[Double]] = modelStorage.getUserFactors(userId)
+    result match {
+      case Success(u) => u
+      case Failure(thrown) => {
+        logger.warn("User weight not found: " + thrown)
+        averageUser
+      }
+    }
+  }
+
   def retrainInSpark(sparkMaster: String, trainingDataLoc: String) {
 
 

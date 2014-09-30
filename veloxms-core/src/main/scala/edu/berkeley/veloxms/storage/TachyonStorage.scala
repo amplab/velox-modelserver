@@ -113,8 +113,13 @@ class TachyonStorage (
 object TachyonUtils {
 
     def long2ByteArr(id: Long): Array[Byte] = {
-        val key = ByteBuffer.allocate(8)
-        key.putLong(id).array()
+        // val key = ByteBuffer.allocate(8)
+        // key.putLong(id).array()
+
+      val buffer = ByteBuffer.allocate(12)
+      val kryo = KryoThreadLocal.kryoTL.get
+      val result = kryo.serialize(id, buffer).array
+      result
     }
 
     // could make this a z-curve key instead
