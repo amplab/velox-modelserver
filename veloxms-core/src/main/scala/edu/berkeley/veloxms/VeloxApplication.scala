@@ -28,8 +28,8 @@ case class VeloxConfiguration(
     @NotNull numFactors: Integer,
     sparkMaster: String,
     // whether to do preprocessing of dataset for testing purposes
-    reloadTachyon: Boolean,
-    rawDataLoc: String
+    // reloadTachyon: Boolean,
+    // rawDataLoc: String
     ) extends Configuration
 
 

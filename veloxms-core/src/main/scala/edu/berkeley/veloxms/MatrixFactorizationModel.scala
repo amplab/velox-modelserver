@@ -76,7 +76,7 @@ class MatrixFactorizationModel(
     val numIters = 20
 
     val sc = new SparkContext(sparkMaster, "RetrainVeloxModel")
-    val data = sc.textFile(trainingDataLoc)
+    val data = sc.textFile(modelStorage.ratings)
     val ratings = data.map(_.split("::") match {
       case Array(user, item, score, date) => Rating(user.toInt, item.toInt, score.toDouble)
     })
