@@ -1,7 +1,6 @@
 
 package edu.berkeley.veloxms
 
-import com.typesafe.scalalogging._
 import scala.util.Success
 import scala.util.Failure
 import scala.util.Try
@@ -15,7 +14,7 @@ import edu.berkeley.veloxms.storage._
  * @tparam U The type of per-item data being stored in the
  * KV store
  */
-trait Model[T, U] extends LazyLogging {
+trait Model[T, U] {
 
   /** The number of features in this model.
    * Used for pre-allocating arrays/matrices

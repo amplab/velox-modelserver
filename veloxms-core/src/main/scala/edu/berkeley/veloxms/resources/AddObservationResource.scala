@@ -6,7 +6,7 @@ import com.codahale.metrics.annotation.Timed
 import org.jblas.DoubleMatrix
 import org.jblas.Solve
 import edu.berkeley.veloxms._
-import com.typesafe.scalalogging._
+// import com.typesafe.scalalogging._
 import javax.validation.Valid
 import javax.ws.rs.Consumes
 import javax.ws.rs.Produces
@@ -17,6 +17,9 @@ import javax.ws.rs.PathParam
 import javax.ws.rs.core.MediaType
 import scala.util.{Try, Success, Failure}
 
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
+
 
 
 case class MatrixFactObservation (userId: UserID, itemId: Long, score: Double)
@@ -25,7 +28,9 @@ case class MatrixFactObservation (userId: UserID, itemId: Long, score: Double)
 @Consumes(Array(MediaType.APPLICATION_JSON))
 @Produces(Array(MediaType.APPLICATION_JSON))
 class MatrixFactorizationUpdateResource(model: MatrixFactorizationModel,
-  featureCache: FeatureCache[Long], sparkMaster: String) extends LazyLogging {
+  featureCache: FeatureCache[Long], sparkMaster: String) {
+
+  val logger = Logger(LoggerFactory.getLogger(MatrixFactorizationUpdateResource.class))
 
 
   @POST

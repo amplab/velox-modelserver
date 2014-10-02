@@ -1,13 +1,16 @@
 package edu.berkeley.veloxms
 
 import edu.berkeley.veloxms.storage._
-import com.typesafe.scalalogging._
+// import com.typesafe.scalalogging._
 import scala.util.Success
 import scala.util.Failure
 import scala.util.Try
 import java.nio.ByteBuffer
 import java.io.IOException
 import java.net.URLDecoder
+
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 import tachyon.TachyonURI;
 import tachyon.Pair;
@@ -44,8 +47,9 @@ class MatrixFactorizationModel(
     val numFeatures: Int,
     val modelStorage: ModelStorage[FeatureVector],
     val averageUser: WeightVector,
-    val config: VeloxConfiguration) extends Model[Long, FeatureVector]
-    with LazyLogging {
+    val config: VeloxConfiguration) extends Model[Long, FeatureVector] {
+
+  val logger = Logger(LoggerFactory.getLogger(MatrixFactorizationModel.class))
 
   /**
    * User provided implementation for the given model. Will be called

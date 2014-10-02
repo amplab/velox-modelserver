@@ -7,18 +7,18 @@ import io.dropwizard.Configuration
 // import net.nicktelford.dropwizard.scala._
 import io.dropwizard.setup.Bootstrap
 import io.dropwizard.setup.Environment
-// import org.slf4j.Logger
-// import org.slf4j.LoggerFactory
 import tachyon.TachyonURI
 import tachyon.r.sorted.ClientStore
 import scala.util.{Try, Success, Failure}
 import com.fasterxml.jackson.annotation.JsonProperty
 import org.hibernate.validator.constraints.NotEmpty
-import com.typesafe.scalalogging._
+// import com.typesafe.scalalogging._
 import com.massrelevance.dropwizard.ScalaApplication
 import com.massrelevance.dropwizard.bundles.ScalaBundle
-
 import javax.validation.constraints.NotNull
+
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 
 case class VeloxConfiguration(
@@ -33,11 +33,11 @@ case class VeloxConfiguration(
     ) extends Configuration
 
 
-object VeloxApplication extends ScalaApplication[VeloxConfiguration] with LazyLogging {
+object VeloxApplication extends ScalaApplication[VeloxConfiguration] {
 
     override def getName = "velox model server"
 
-    // val LOGGER = Logger(LoggerFactory.getLogger(VeloxApplication.class))
+    val logger = Logger(LoggerFactory.getLogger(VeloxApplication.class))
 
     override def initialize(bootstrap: Bootstrap[VeloxConfiguration]) {
         bootstrap.addBundle(new ScalaBundle)

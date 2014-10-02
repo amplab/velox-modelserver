@@ -10,7 +10,7 @@ import scala.util._
 import java.io.IOException
 // import java.util.HashMap
 import java.nio.ByteBuffer
-import com.typesafe.scalalogging._
+// import com.typesafe.scalalogging._
 // import scala.collection.mutable
 import scala.collection.immutable.HashMap
 import edu.berkeley.veloxms._
@@ -26,7 +26,9 @@ class TachyonStorage (
     items: ClientStore,
     ratings: ClientStore,
     // val numFactors: Int) extends ModelStorage[U] with LazyLogging {
-    val numFactors: Int) extends ModelStorage[FeatureVector] with LazyLogging {
+    val numFactors: Int) extends ModelStorage[FeatureVector] {
+
+    val logger = Logger(LoggerFactory.getLogger(TachyonStorage.class))
 
     def getFeatureData(itemId: Long): Try[FeatureVector] = {
         // getFactors(itemId, items, "item-model")

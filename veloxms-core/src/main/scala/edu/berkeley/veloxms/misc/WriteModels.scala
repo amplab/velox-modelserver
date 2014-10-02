@@ -11,7 +11,7 @@ import edu.berkeley.veloxms.storage.TachyonUtils
 import scala.collection.immutable.TreeMap
 import scala.io.Source
 import org.apache.spark.mllib.recommendation.Rating
-import com.typesafe.scalalogging._
+// import com.typesafe.scalalogging._
 import edu.berkeley.veloxms._
 import com.massrelevance.dropwizard.scala.params.{LongParam, IntParam, BooleanParam}
 import com.codahale.metrics.annotation.Timed
@@ -24,6 +24,9 @@ import tachyon.TachyonURI
 import java.nio.ByteBuffer
 import java.io.ByteArrayOutputStream
 import edu.berkeley.veloxms.util.{VeloxKryoRegistrar, KryoThreadLocal}
+
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 // import scala.pickling._
 // import binary._
 
@@ -60,8 +63,10 @@ case class TestParams(tachloc: String, part: Int, create: Boolean, key: Long)
 @Path("/misc/prep-tachyon")
 @Consumes(Array(MediaType.APPLICATION_JSON))
 @Produces(Array(MediaType.APPLICATION_JSON))
-class WriteModelsResource extends LazyLogging {
+class WriteModelsResource extends {
 
+
+  val logger = Logger(LoggerFactory.getLogger(WriteModelsResource.class))
 
   @POST
   @Timed
