@@ -42,7 +42,7 @@ trait Model[T, U] extends LazyLogging {
 
   // TODO: probably want to elect a leader to initiate the Spark retraining
   // once we are running a Spark cluster
-  def retrainInSpark(sparkMaster: String, trainingDataLoc: String)
+  def retrainInSpark(sparkMaster: String)
 
   /**
    * Velox implemented - fetch from local Tachyon partition

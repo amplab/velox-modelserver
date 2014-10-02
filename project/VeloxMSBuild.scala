@@ -36,7 +36,7 @@ object VeloxMSBuild extends Build {
   def sharedSettings = Defaults.defaultSettings ++ Seq(
     organization := "edu.berkeley.veloxms",
     version := "0.1",
-    scalaVersion := "2.11.2",
+    scalaVersion := "2.10.3",
     scalacOptions := Seq("-feature", "-deprecation", "-target:" + SCALAC_JVM_VERSION),
     javacOptions := Seq("-target", JAVAC_JVM_VERSION, "-source", JAVAC_JVM_VERSION),
     unmanagedJars in Compile <<= baseDirectory map {
@@ -52,7 +52,7 @@ object VeloxMSBuild extends Build {
     libraryDependencies ++= Seq(
       // "org.slf4j" % "slf4j-api" % "1.7.2",
       // "org.slf4j" % "slf4j-log4j12" % "1.7.2",
-      "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0",
+      // "com.typesafe.scala-logging" %% "scala-logging" % "3.1.0",
       // "org.scalatest" % "scalatest" %% "2.2.3-SNAP1",
       // "com.typesafe" %% "scalalogging-slf4j" % "1.0.1",
       //"com.massrelevance" %% "dropwizard-scala" % "0.7.1",
@@ -84,9 +84,9 @@ object VeloxMSBuild extends Build {
       // <version>1.2.3</version>
 
     libraryDependencies ++= Seq(
-      "org.jblas" % "jblas" % "1.2.3",
-      "org.apache.spark" % "spark-core_2.10" % "1.1.0",
-      "org.apache.spark" % "spark-mllib_2.10" % "1.1.0"
+      "org.jblas" % "jblas" % "1.2.3"
+      // "org.apache.spark" % "spark-core_2.10" % "1.1.0",
+      // "org.apache.spark" % "spark-mllib_2.10" % "1.1.0"
     )
 
     //   "com.github.scopt" %% "scopt" % "3.2.0",

@@ -88,12 +88,14 @@ class MatrixFactorizationModel(
     }
   }
 
-  def retrainInSpark(sparkMaster: String, trainingData: String) {
+  def retrainInSpark(sparkMaster: String = config.sparkMaster) {
 
     // TODO finish implementing this method
 
     val numFeatures = 50
     val numIters = 20
+    val trainingData = config.ratingsLoc
+
 
 
     // get jar location: from http://stackoverflow.com/a/6849255/814642
@@ -108,8 +110,12 @@ class MatrixFactorizationModel(
 
     val sc = new SparkContext(conf)
     // val bytesData: RDD[(String, Array[Byte])] = sc.hadoopFile[String, Array[Byte], TachyonKVPartitionInputFormat](trainingData)
+    logger.info("Created spark context")
     val bytesData: RDD[(String, Array[Byte])] =
         sc.newAPIHadoopFile[String, Array[Byte], TachyonKVPartitionInputFormat](trainingData)
+    logger.info(s"Read ${bytesData.count} partitions")
+
+    
 
       
     val debugStr = bytesData.map(_._1).collect().mkString(", ")
