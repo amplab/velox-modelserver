@@ -64,8 +64,11 @@ object VeloxMSBuild extends Build {
       "org.tachyonproject" % "tachyon-parent" % "0.6.0-SNAPSHOT",
       "com.esotericsoftware.kryo" % "kryo" % "2.23.0",
       "com.twitter" % "chill_2.10" % "0.3.5",
-      "com.twitter" % "chill-bijection_2.10" % "0.3.5"
-
+      "com.twitter" % "chill-bijection_2.10" % "0.3.5",
+      "org.apache.spark" % "spark-core_2.10" % "1.1.0",
+      "org.apache.spark" % "spark-mllib_2.10" % "1.1.0",
+      "com.google.guava" % "guava-io" % "r03",
+      "org.apache.hadoop" % "hadoop-client" % "2.5.1"
     )
   )
 

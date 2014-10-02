@@ -10,9 +10,10 @@ import edu.berkeley.veloxms._
  * the models from the application logic to access them.
  *
  * @tparam U The type of the data being stored in the KV store to
- * comput features
+ * compute features
  */
 trait ModelStorage[U] {
+
 
     /**
      * Get factor vector for provided item

@@ -129,7 +129,14 @@ object TachyonUtils {
     }
 
     def getStore(url: String): Try[ClientStore] = {
-        Try(ClientStore.getStore(new TachyonURI(url)))
+        Try(ClientStore.getStore(new TachyonURI(url))) match {
+            case f: Failure[ClientStore] => f
+            case Success(u) => if (u == null) {
+                Failure(new RuntimeException(s"Tachyon store $url not found"))
+            } else {
+                Success(u)
+            }
+        }
     }
 
     // def serializeArray(arr: Array[Double]): Array[Byte] = {

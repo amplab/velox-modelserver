@@ -26,7 +26,7 @@ case class VeloxConfiguration(
     @NotEmpty userModelLoc: String,
     @NotEmpty ratingsLoc: String,
     @NotNull numFactors: Integer,
-    sparkMaster: String,
+    sparkMaster: String
     // whether to do preprocessing of dataset for testing purposes
     // reloadTachyon: Boolean,
     // rawDataLoc: String
@@ -70,7 +70,7 @@ object VeloxApplication extends ScalaApplication[VeloxConfiguration] with LazyLo
             // new TachyonStorage[Array[Double]](userModel, itemModel, ratings, config.numFactors)
         val averageUser = Array.fill[Double](config.numFactors)(1.0)
         val matrixFactorizationModel =
-            new MatrixFactorizationModel(config.numFactors, modelStorage, averageUser)
+            new MatrixFactorizationModel(config.numFactors, modelStorage, averageUser, config)
 
         val featureCache = new FeatureCache[Long](FeatureCache.tempBudget)
 
