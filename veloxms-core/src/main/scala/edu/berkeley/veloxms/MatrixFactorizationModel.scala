@@ -9,8 +9,7 @@ import java.nio.ByteBuffer
 import java.io.IOException
 import java.net.URLDecoder
 
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
+import edu.berkeley.veloxms.util.Logging
 
 import tachyon.TachyonURI;
 import tachyon.Pair;
@@ -47,9 +46,9 @@ class MatrixFactorizationModel(
     val numFeatures: Int,
     val modelStorage: ModelStorage[FeatureVector],
     val averageUser: WeightVector,
-    val config: VeloxConfiguration) extends Model[Long, FeatureVector] {
+    val config: VeloxConfiguration) extends Model[Long, FeatureVector] with Logging {
 
-  val logger = Logger(LoggerFactory.getLogger(MatrixFactorizationModel.class))
+  // val logger = Logger(LoggerFactory.getLogger(classOf[MatrixFactorizationModel]))
 
   /**
    * User provided implementation for the given model. Will be called
@@ -60,7 +59,7 @@ class MatrixFactorizationModel(
       case Success(features) => features
       case Failure(thrown) => {
         val msg = "Error computing features: " + thrown
-        logger.warn(msg)
+        logWarning(msg)
         throw new Exception(msg)
       }
     }
@@ -86,7 +85,7 @@ class MatrixFactorizationModel(
     result match {
       case Success(u) => u
       case Failure(thrown) => {
-        logger.warn("User weight not found: " + thrown)
+        logWarning("User weight not found: " + thrown)
         averageUser
       }
     }
@@ -105,7 +104,7 @@ class MatrixFactorizationModel(
     // get jar location: from http://stackoverflow.com/a/6849255/814642
     val path = classOf[MatrixFactorizationModel].getProtectionDomain().getCodeSource().getLocation().getPath()
     val decodedPath = URLDecoder.decode(path, "UTF-8")
-    logger.info(s"Jar path: $decodedPath")
+    logInfo(s"Jar path: $decodedPath")
 
     val conf = new SparkConf()
     .setMaster(sparkMaster)
@@ -114,16 +113,16 @@ class MatrixFactorizationModel(
 
     val sc = new SparkContext(conf)
     // val bytesData: RDD[(String, Array[Byte])] = sc.hadoopFile[String, Array[Byte], TachyonKVPartitionInputFormat](trainingData)
-    logger.info("Created spark context")
+    logInfo("Created spark context")
     val bytesData: RDD[(String, Array[Byte])] =
         sc.newAPIHadoopFile[String, Array[Byte], TachyonKVPartitionInputFormat](trainingData)
-    logger.info(s"Read ${bytesData.count} partitions")
+    logInfo(s"Read ${bytesData.count} partitions")
 
     
 
       
     val debugStr = bytesData.map(_._1).collect().mkString(", ")
-    logger.info(s"Filenames: $debugStr")
+    logInfo(s"Filenames: $debugStr")
     
     // val data = sc.textFile(trainingData)
     // val sample = data.take(5)

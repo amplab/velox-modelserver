@@ -2,8 +2,7 @@ package edu.berkeley.veloxms.storage
 
 
 import org.apache.commons.lang3.NotImplementedException
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
+import edu.berkeley.veloxms.util.Logging
 import tachyon.r.sorted.ClientStore
 import tachyon.TachyonURI
 import scala.util._
@@ -26,9 +25,9 @@ class TachyonStorage (
     items: ClientStore,
     ratings: ClientStore,
     // val numFactors: Int) extends ModelStorage[U] with LazyLogging {
-    val numFactors: Int) extends ModelStorage[FeatureVector] {
+    val numFactors: Int) extends ModelStorage[FeatureVector] with Logging {
 
-    val logger = Logger(LoggerFactory.getLogger(TachyonStorage.class))
+    // val logger = Logger(LoggerFactory.getLogger(classOf[TachyonStorage]))
 
     def getFeatureData(itemId: Long): Try[FeatureVector] = {
         // getFactors(itemId, items, "item-model")

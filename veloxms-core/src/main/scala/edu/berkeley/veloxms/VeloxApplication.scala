@@ -17,9 +17,7 @@ import com.massrelevance.dropwizard.ScalaApplication
 import com.massrelevance.dropwizard.bundles.ScalaBundle
 import javax.validation.constraints.NotNull
 
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
-
+import edu.berkeley.veloxms.util.Logging
 
 case class VeloxConfiguration(
     @NotEmpty itemModelLoc: String,
@@ -33,11 +31,12 @@ case class VeloxConfiguration(
     ) extends Configuration
 
 
-object VeloxApplication extends ScalaApplication[VeloxConfiguration] {
+object VeloxApplication extends ScalaApplication[VeloxConfiguration] with Logging {
 
     override def getName = "velox model server"
 
-    val logger = Logger(LoggerFactory.getLogger(VeloxApplication.class))
+    // TODO I think this is fucked - look at Spark's Logging.scala to fix
+    // val logger = LoggerFactory.getLogger(classOf[VeloxApplication])
 
     override def initialize(bootstrap: Bootstrap[VeloxConfiguration]) {
         bootstrap.addBundle(new ScalaBundle)
@@ -63,7 +62,7 @@ object VeloxApplication extends ScalaApplication[VeloxConfiguration] {
             case Failure(f) => throw new RuntimeException(
                 s"Couldn't initialize use model: ${f.getMessage}")
         }
-        logger.info("got tachyon stores")
+        logInfo("got tachyon stores")
 
         val modelStorage = 
             new TachyonStorage(userModel, itemModel, ratings, config.numFactors)

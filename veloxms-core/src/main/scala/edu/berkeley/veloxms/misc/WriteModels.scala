@@ -25,8 +25,7 @@ import java.nio.ByteBuffer
 import java.io.ByteArrayOutputStream
 import edu.berkeley.veloxms.util.{VeloxKryoRegistrar, KryoThreadLocal}
 
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
+import edu.berkeley.veloxms.util.Logging
 // import scala.pickling._
 // import binary._
 
@@ -63,21 +62,21 @@ case class TestParams(tachloc: String, part: Int, create: Boolean, key: Long)
 @Path("/misc/prep-tachyon")
 @Consumes(Array(MediaType.APPLICATION_JSON))
 @Produces(Array(MediaType.APPLICATION_JSON))
-class WriteModelsResource extends {
+class WriteModelsResource extends Logging {
 
 
-  val logger = Logger(LoggerFactory.getLogger(WriteModelsResource.class))
+  // val logger = Logger(LoggerFactory.getLogger(classOf[WriteModelsResource]))
 
   @POST
   @Timed
   def writeAllToTachyon(@Valid locs: ModelLocations): Boolean = {
-    logger.info("Writing items")
+    logInfo("Writing items")
     writeMapToTachyon(readModel(locs.itemsSrc), locs.itemsDst, locs.partition)
-    logger.info("Writing users")
+    logInfo("Writing users")
     writeMapToTachyon(readModel(locs.usersSrc), locs.usersDst, locs.partition)
-    logger.info("Writing observations")
+    logInfo("Writing observations")
     writeMapToTachyon(readObservations(locs.obsSrc), locs.obsDst, locs.partition, 3)
-    logger.info("Finished prepping tachyon")
+    logInfo("Finished prepping tachyon")
     true
   }
 
@@ -96,11 +95,11 @@ class WriteModelsResource extends {
   //
   //     store.put(params.part, key, arrPickle)
   //     store.closePartition(params.part)
-  //     logger.info(s"Wrote $key, $arrPickle to Tachyon partition ${params.part}")
+  //     logInfo(s"Wrote $key, $arrPickle to Tachyon partition ${params.part}")
   //     val rawBytes = store.get(key)
-  //     logger.info(s"Found rawBytes: $rawBytes")
+  //     logInfo(s"Found rawBytes: $rawBytes")
   //     val result = rawBytes.unpickle[Array[Double]]
-  //     logger.info(s"Deserialized raw bytes to $result")
+  //     logInfo(s"Deserialized raw bytes to $result")
   //     true
   //
   //
@@ -114,7 +113,7 @@ class WriteModelsResource extends {
     val model = Source.fromFile(modelLoc).getLines.map( (line) => {
       val splits = line.split(",")
       val key = splits(0).toLong
-      if (i < 10) logger.info(s"key: $key")
+      if (i < 10) logInfo(s"key: $key")
       i += 1
       val factors: Array[Double] = splits.slice(1, splits.size).map(_.toDouble)
       // TODO Find less brittle way to allocate bytebuffer sizes

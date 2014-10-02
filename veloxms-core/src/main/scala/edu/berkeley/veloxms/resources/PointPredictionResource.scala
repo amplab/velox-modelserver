@@ -12,8 +12,7 @@ import com.codahale.metrics.annotation.Timed
 // import net.nicktelford.dropwizard.scala.jersey.LongParam
 // import net.nicktelford.dropwizard.scala.jersey.IntParam
 // import net.nicktelford.dropwizard.scala.jersey.BooleanParam
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
+import edu.berkeley.veloxms.util.Logging
 
 import javax.validation.Valid
 import javax.ws.rs.GET
@@ -72,9 +71,8 @@ case class PredictRequest(item: Long, user: Long)
 @Produces(Array(MediaType.APPLICATION_JSON))
 // TODO figure out how to make map of models of different types
 class MatrixFactorizationPredictionResource(model: MatrixFactorizationModel,
-    featureCache: FeatureCache[Long]) {
+    featureCache: FeatureCache[Long]) extends Logging {
 
-  val logger = Logger(LoggerFactory.getLogger(MatrixFactorizationPredictionResource.class))
 
   @POST
   @Timed
@@ -88,9 +86,9 @@ class MatrixFactorizationPredictionResource(model: MatrixFactorizationModel,
     val user = data.user
     // println(s"item: $item")
     val features = model.getFeatures(item, featureCache)
-    logger.info(s"Features: (${features.mkString(",")})")
+    logInfo(s"Features: (${features.mkString(",")})")
     val weightVector = model.getWeightVector(user)
-    logger.info(s"Weight Vector: (${weightVector.mkString(",")})")
+    logInfo(s"Weight Vector: (${weightVector.mkString(",")})")
     var i = 0
     var score = 0.0
     while (i < model.numFeatures) {

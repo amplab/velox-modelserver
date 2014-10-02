@@ -17,8 +17,7 @@ import javax.ws.rs.PathParam
 import javax.ws.rs.core.MediaType
 import scala.util.{Try, Success, Failure}
 
-import org.slf4j.Logger
-import org.slf4j.LoggerFactory
+import edu.berkeley.veloxms.util.Logging
 
 
 
@@ -28,21 +27,20 @@ case class MatrixFactObservation (userId: UserID, itemId: Long, score: Double)
 @Consumes(Array(MediaType.APPLICATION_JSON))
 @Produces(Array(MediaType.APPLICATION_JSON))
 class MatrixFactorizationUpdateResource(model: MatrixFactorizationModel,
-  featureCache: FeatureCache[Long], sparkMaster: String) {
+  featureCache: FeatureCache[Long], sparkMaster: String) extends Logging {
 
-  val logger = Logger(LoggerFactory.getLogger(MatrixFactorizationUpdateResource.class))
 
 
   @POST
   @Timed
   def observe(@Valid obs: MatrixFactObservation): Boolean = {
 
-    logger.info(s"Adding rating for user: ${obs.userId}")
+    logInfo(s"Adding rating for user: ${obs.userId}")
     val allObservationScores: Map[Long, Double] = model.modelStorage
       .getAllObservations(obs.userId) match {
         case Success(u) => u + ((obs.itemId, obs.score))
         case Failure(thrown) => {
-          logger.warn(s"No training data found for user ${obs.userId}")
+          logWarning(s"No training data found for user ${obs.userId}")
           Map((obs.itemId, obs.score))
         }
       }
@@ -55,8 +53,8 @@ class MatrixFactorizationUpdateResource(model: MatrixFactorizationModel,
     val oldUserWeights = model.getWeightVector(obs.userId)
     val newUserWeights = OnlineUpdateUtils.updateUserWeights(
       allItemFeatures, allObservationScores, k)
-    logger.info(s"Old weight: (${oldUserWeights.mkString(",")})")
-    logger.info(s"New weight: (${newUserWeights.mkString(",")})")
+    logInfo(s"Old weight: (${oldUserWeights.mkString(",")})")
+    logInfo(s"New weight: (${newUserWeights.mkString(",")})")
 
 
     // TODO Write new observation, new user weights to Tachyon
