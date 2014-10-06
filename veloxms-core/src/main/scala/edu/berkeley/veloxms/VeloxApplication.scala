@@ -19,16 +19,18 @@ import javax.validation.constraints.NotNull
 
 import edu.berkeley.veloxms.util.Logging
 
-case class VeloxConfiguration(
-    @NotEmpty itemModelLoc: String,
-    @NotEmpty userModelLoc: String,
-    @NotEmpty ratingsLoc: String,
-    @NotNull numFactors: Integer,
-    sparkMaster: String
+class VeloxConfiguration extends Configuration {
+    @NotEmpty val tachyonMaster: String = "NoTachyonMaster"
+    @NotEmpty val itemStoreName: String = "item-model"
+    @NotEmpty val userStoreName: String = "user-model"
+    @NotEmpty val ratingsStoreName: String = "movie-ratings"
+    @NotNull val numFactors: Integer = 50
+    val sparkMaster: String = "NoSparkMaster"
+    // sparkMaster: String
     // whether to do preprocessing of dataset for testing purposes
     // reloadTachyon: Boolean,
     // rawDataLoc: String
-    ) extends Configuration
+}
 
 
 object VeloxApplication extends ScalaApplication[VeloxConfiguration] with Logging {
@@ -43,21 +45,21 @@ object VeloxApplication extends ScalaApplication[VeloxConfiguration] with Loggin
         // init global state
     }
 
-    override def run(config: VeloxConfiguration, env: Environment) {
+    override def run(conf: VeloxConfiguration, env: Environment) {
         
-        val userModel = TachyonUtils.getStore(config.userModelLoc) match {
+        val userModel = TachyonUtils.getStore(conf.tachyonMaster, conf.userStoreName) match {
             case Success(s) => s
             case Failure(f) => throw new RuntimeException(
                 s"Couldn't initialize use model: ${f.getMessage}")
         }
 
-        val itemModel = TachyonUtils.getStore(config.itemModelLoc) match {
+        val itemModel = TachyonUtils.getStore(conf.tachyonMaster, conf.itemStoreName) match {
             case Success(s) => s
             case Failure(f) => throw new RuntimeException(
                 s"Couldn't initialize item model: ${f.getMessage}")
         }
 
-        val ratings = TachyonUtils.getStore(config.ratingsLoc) match {
+        val ratings = TachyonUtils.getStore(conf.tachyonMaster, conf.ratingsStoreName) match {
             case Success(s) => s
             case Failure(f) => throw new RuntimeException(
                 s"Couldn't initialize use model: ${f.getMessage}")
@@ -65,11 +67,11 @@ object VeloxApplication extends ScalaApplication[VeloxConfiguration] with Loggin
         logInfo("got tachyon stores")
 
         val modelStorage = 
-            new TachyonStorage(userModel, itemModel, ratings, config.numFactors)
-            // new TachyonStorage[Array[Double]](userModel, itemModel, ratings, config.numFactors)
-        val averageUser = Array.fill[Double](config.numFactors)(1.0)
+            new TachyonStorage(userModel, itemModel, ratings, conf.numFactors)
+            // new TachyonStorage[Array[Double]](userModel, itemModel, ratings, conf.numFactors)
+        val averageUser = Array.fill[Double](conf.numFactors)(1.0)
         val matrixFactorizationModel =
-            new MatrixFactorizationModel(config.numFactors, modelStorage, averageUser, config)
+            new MatrixFactorizationModel(conf.numFactors, modelStorage, averageUser, conf)
 
         val featureCache = new FeatureCache[Long](FeatureCache.tempBudget)
 
@@ -77,7 +79,7 @@ object VeloxApplication extends ScalaApplication[VeloxConfiguration] with Loggin
             matrixFactorizationModel, featureCache))
 
         env.jersey().register(new MatrixFactorizationUpdateResource(
-            matrixFactorizationModel, featureCache, config.sparkMaster))
+            matrixFactorizationModel, featureCache, conf.sparkMaster))
 
         env.jersey().register(new WriteModelsResource)
         // env.jersey().register(addRatings)

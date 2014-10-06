@@ -1,46 +1,30 @@
 package edu.berkeley.veloxms
 
-import edu.berkeley.veloxms.storage._
-// import com.typesafe.scalalogging._
-import scala.util.Success
-import scala.util.Failure
-import scala.util.Try
-import java.nio.ByteBuffer
 import java.io.IOException
 import java.net.URLDecoder
-
-import edu.berkeley.veloxms.util.Logging
-
-import tachyon.TachyonURI;
-import tachyon.Pair;
-import tachyon.r.sorted.ClientStore;
-import tachyon.r.sorted.Utils;
-
-import org.apache.spark._
-import org.apache.spark.rdd.RDD
-import org.apache.spark.SparkContext._
-import org.apache.spark.mllib.recommendation.ALS
-import org.apache.spark.mllib.recommendation.Rating
+import java.nio.ByteBuffer
+import scala.collection.JavaConversions._
+import scala.util.{Try,Success,Failure}
 
 import com.google.common.io.{ByteStreams, Closeables}
-
-import org.apache.hadoop.io.NullWritable
-import org.apache.hadoop.io.BytesWritable
-import org.apache.hadoop.mapreduce.InputSplit
-import org.apache.hadoop.mapreduce.lib.input.CombineFileSplit
-import org.apache.hadoop.mapreduce.RecordReader
-import org.apache.hadoop.mapreduce.TaskAttemptContext
-
-import scala.collection.JavaConversions._
-
 import org.apache.hadoop.fs.Path
-import org.apache.hadoop.mapreduce.InputSplit
-import org.apache.hadoop.mapreduce.JobContext
-import org.apache.hadoop.mapreduce.lib.input.CombineFileInputFormat
-import org.apache.hadoop.mapreduce.RecordReader
-import org.apache.hadoop.mapreduce.TaskAttemptContext
-import org.apache.hadoop.mapreduce.lib.input.CombineFileRecordReader
-import org.apache.hadoop.mapreduce.lib.input.CombineFileSplit
+import org.apache.hadoop.io.{BytesWritable,NullWritable}
+import org.apache.hadoop.mapreduce.{InputSplit,JobContext}
+import org.apache.hadoop.mapreduce.lib.input.{CombineFileInputFormat,CombineFileRecordReader,CombineFileSplit}
+import org.apache.hadoop.mapreduce.{RecordReader,TaskAttemptContext}
+import org.apache.spark._
+import org.apache.spark.mllib.recommendation.{ALS,Rating}
+import org.apache.spark.rdd.RDD
+import org.apache.spark.SparkContext._
+import tachyon.r.sorted.{ClientStore,Utils}
+import tachyon.{Pair,TachyonURI}
+
+import edu.berkeley.veloxms.storage._
+import edu.berkeley.veloxms.util.Logging
+
+
+
+
 
 class MatrixFactorizationModel(
     val numFeatures: Int,
@@ -97,7 +81,7 @@ class MatrixFactorizationModel(
 
     val numFeatures = 50
     val numIters = 20
-    val trainingData = config.ratingsLoc
+    val trainingData = s"${config.tachyonMaster}/${config.ratingsStoreName}"
 
 
 

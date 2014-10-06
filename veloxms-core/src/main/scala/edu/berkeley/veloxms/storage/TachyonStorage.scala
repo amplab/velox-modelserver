@@ -129,7 +129,8 @@ object TachyonUtils {
         key.array()
     }
 
-    def getStore(url: String): Try[ClientStore] = {
+    def getStore(tachyon: String, kvloc: String): Try[ClientStore] = {
+        val url = s"$tachyon/$kvloc"
         Try(ClientStore.getStore(new TachyonURI(url))) match {
             case f: Failure[ClientStore] => f
             case Success(u) => if (u == null) {
