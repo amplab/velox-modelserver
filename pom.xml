@@ -1,0 +1,680 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>edu.berkeley.veloxms</groupId>
+  <artifactId>velox-parent</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <packaging>pom</packaging>
+
+  <name>Velox ModelServer Parent POM</name>
+  <url>https://amplab.cs.berkeley.edu/</url>
+  <licenses>
+    <license>
+      <name>Apache 2.0 License</name>
+      <url>http://www.apache.org/licenses/LICENSE-2.0.html</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+  <developers>
+    <developer>
+      <id>crankshaw</id>
+      <name>Dan Crankshaw</name>
+      <email>dcrankshaw@jhu.edu</email>
+      <url>http://www.github.com/dcrankshaw</url>
+      <!-- <organization>Apache Software Foundation</organization> -->
+      <!-- <organizationUrl>http://spark.apache.org</organizationUrl> -->
+    </developer>
+  </developers>
+
+  <prerequisites>
+    <maven>3.0.4</maven>
+  </prerequisites>
+
+  <!-- <mailingLists> -->
+    <!--   <mailingList> -->
+      <!--     <name>Dev Mailing List</name> -->
+      <!--     <post>dev@spark.apache.org</post> -->
+      <!--     <subscribe>dev&#45;subscribe@spark.apache.org</subscribe> -->
+      <!--     <unsubscribe>dev&#45;unsubscribe@spark.apache.org</unsubscribe> -->
+      <!--   </mailingList> -->
+    <!--  -->
+    <!--   <mailingList> -->
+      <!--     <name>User Mailing List</name> -->
+      <!--     <post>user@spark.apache.org</post> -->
+      <!--     <subscribe>user&#45;subscribe@spark.apache.org</subscribe> -->
+      <!--     <unsubscribe>user&#45;unsubscribe@spark.apache.org</unsubscribe> -->
+      <!--   </mailingList> -->
+    <!--  -->
+    <!--   <mailingList> -->
+      <!--     <name>Commits Mailing List</name> -->
+      <!--     <post>commits@spark.apache.org</post> -->
+      <!--     <subscribe>commits&#45;subscribe@spark.apache.org</subscribe> -->
+      <!--     <unsubscribe>commits&#45;unsubscribe@spark.apache.org</unsubscribe> -->
+      <!--   </mailingList> -->
+    <!-- </mailingLists> -->
+
+  <modules>
+    <module>veloxms-core</module>
+    <!-- <module>veloxms&#45;writer</module> -->
+  </modules>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+    <java.version>1.7</java.version>
+    <!-- <sbt.project.name>spark</sbt.project.name> -->
+    <scala.version>2.10.4</scala.version>
+    <scala.binary.version>2.10</scala.binary.version>
+    <scala.macros.version>2.0.1</scala.macros.version>
+    <!-- <mesos.version>0.18.1</mesos.version> -->
+    <!-- <mesos.classifier>shaded&#45;protobuf</mesos.classifier> -->
+
+    <!-- <akka.group>org.spark&#45;project.akka</akka.group> -->
+    <!-- <akka.version>2.2.3&#45;shaded&#45;protobuf</akka.version> -->
+    <!-- <jetty.version>8.1.14.v20131031</jetty.version> -->
+
+    <!-- <slf4j.version>1.7.5</slf4j.version> -->
+    <!-- <log4j.version>1.2.17</log4j.version> -->
+    <hadoop.version>2.5.1</hadoop.version>
+    <!-- <protobuf.version>2.4.1</protobuf.version> -->
+    <!-- <yarn.version>${hadoop.version}</yarn.version> -->
+    <!-- <hbase.version>0.94.6</hbase.version> -->
+    <!-- <flume.version>1.4.0</flume.version> -->
+    <!-- <zookeeper.version>3.4.5</zookeeper.version> -->
+    <!-- <hive.version>0.12.0</hive.version> -->
+    <!-- <parquet.version>1.4.3</parquet.version> -->
+    <jblas.version>1.2.3</jblas.version>
+    <chill.version>0.3.6</chill.version>
+    <spark.version>1.1.0</spark.version>
+    <!-- <dropwizard.version>0.7.1</dropwizard.version> -->
+    <tachyon.version>0.6.0-SNAPSHOT</tachyon.version>
+    <!-- <codahale.metrics.version>3.0.0</codahale.metrics.version> -->
+    <!-- <avro.version>1.7.6</avro.version> -->
+    <!-- <avro.mapred.classifier></avro.mapred.classifier> -->
+    <!-- <jets3t.version>0.7.1</jets3t.version> -->
+    <!-- <aws.java.sdk.version>1.8.3</aws.java.sdk.version> -->
+    <!-- <aws.kinesis.client.version>1.1.0</aws.kinesis.client.version> -->
+    <!-- <commons.httpclient.version>4.2.6</commons.httpclient.version> -->
+
+    <PermGen>64m</PermGen>
+    <MaxPermGen>512m</MaxPermGen>
+  </properties>
+
+  <repositories>
+    <repository>
+      <id>central</id>
+      <!-- This should be at top, it makes maven try the central repo first and then others and hence faster dep resolution -->
+      <name>Maven Repository</name>
+      <url>https://repo1.maven.org/maven2</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+    <repository>
+      <id>apache-repo</id>
+      <name>Apache Repository</name>
+      <url>https://repository.apache.org/content/repositories/releases</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+    <repository>
+      <id>jboss-repo</id>
+      <name>JBoss Repository</name>
+      <url>https://repository.jboss.org/nexus/content/repositories/releases</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+    <repository>
+      <id>mqtt-repo</id>
+      <name>MQTT Repository</name>
+      <url>https://repo.eclipse.org/content/repositories/paho-releases</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+    <repository>
+      <id>cloudera-repo</id>
+      <name>Cloudera Repository</name>
+      <url>https://repository.cloudera.com/artifactory/cloudera-repos</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+    <repository>
+      <id>mapr-repo</id>
+      <name>MapR Repository</name>
+      <url>http://repository.mapr.com/maven</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+    <repository>
+      <id>spring-releases</id>
+      <name>Spring Release Repository</name>
+      <url>https://repo.spring.io/libs-release</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </repository>
+  </repositories>
+  <pluginRepositories>
+    <pluginRepository>
+      <id>central</id>
+      <url>https://repo1.maven.org/maven2</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+    </pluginRepository>
+  </pluginRepositories>
+
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>com.massrelevance</groupId>
+        <artifactId>dropwizard-scala_${scala.binary.version}</artifactId>
+        <version>0.7.1</version>
+        <exclusions>
+          <exclusion>
+            <groupId>org.slf4j</groupId>
+            <artifactId>log4j-over-slf4j</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-lang3</artifactId>
+        <version>3.3.2</version>
+      </dependency>
+      <dependency>
+        <groupId>com.twitter</groupId>
+        <artifactId>chill_${scala.binary.version}</artifactId>
+        <version>${chill.version}</version>
+        <!-- <exclusions> -->
+          <!--   <exclusion> -->
+            <!--     <groupId>org.ow2.asm</groupId> -->
+            <!--     <artifactId>asm</artifactId> -->
+            <!--   </exclusion> -->
+          <!--   <exclusion> -->
+            <!--     <groupId>org.ow2.asm</groupId> -->
+            <!--     <artifactId>asm&#45;commons</artifactId> -->
+            <!--   </exclusion> -->
+          <!-- </exclusions> -->
+      </dependency>
+      <dependency>
+        <groupId>com.twitter</groupId>
+        <artifactId>chill-bijection_${scala.binary.version}</artifactId>
+        <version>${chill.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.spark</groupId>
+        <artifactId>spark-mllib_${scala.binary.version}</artifactId>
+        <!-- <scope>provided</scope> -->
+        <version>${spark.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.apache.spark</groupId>
+        <artifactId>spark-core_${scala.binary.version}</artifactId>
+        <!-- <scope>provided</scope> -->
+        <version>${spark.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>com.google.guava</groupId>
+        <artifactId>guava-io</artifactId>
+        <version>r03</version>
+      </dependency>
+      <dependency>
+        <groupId>com.esotericsoftware.kryo</groupId>
+        <artifactId>kryo</artifactId>
+        <version>2.23.0</version>
+      </dependency>
+      <!-- <dependency> -->
+      <!--   <groupId>io.dropwizard</groupId> -->
+      <!--   <artifactId>dropwizard&#45;core</artifactId> -->
+      <!--   <version>${dropwizard.version}</version> -->
+      <!-- </dependency> -->
+      <dependency>
+        <groupId>org.apache.hadoop</groupId>
+        <artifactId>hadoop-client</artifactId>
+        <version>${hadoop.version}</version>
+        <!-- <exclusions> -->
+          <!--   <exclusion> -->
+            <!--     <groupId>asm</groupId> -->
+            <!--     <artifactId>asm</artifactId> -->
+            <!--   </exclusion> -->
+          <!--   <exclusion> -->
+            <!--     <groupId>org.ow2.asm</groupId> -->
+            <!--     <artifactId>asm</artifactId> -->
+            <!--   </exclusion> -->
+          <!--   <exclusion> -->
+            <!--     <groupId>org.jboss.netty</groupId> -->
+            <!--     <artifactId>netty</artifactId> -->
+            <!--   </exclusion> -->
+          <!--   <exclusion> -->
+            <!--     <groupId>commons&#45;logging</groupId> -->
+            <!--     <artifactId>commons&#45;logging</artifactId> -->
+            <!--   </exclusion> -->
+          <!--   <exclusion> -->
+            <!--     <groupId>org.mortbay.jetty</groupId> -->
+            <!--     <artifactId>servlet&#45;api&#45;2.5</artifactId> -->
+            <!--   </exclusion> -->
+          <!--   <exclusion> -->
+            <!--     <groupId>javax.servlet</groupId> -->
+            <!--     <artifactId>servlet&#45;api</artifactId> -->
+            <!--   </exclusion> -->
+          <!--   <exclusion> -->
+            <!--     <groupId>junit</groupId> -->
+            <!--     <artifactId>junit</artifactId> -->
+            <!--   </exclusion> -->
+          <!-- </exclusions> -->
+      </dependency>
+
+      <dependency>
+        <groupId>org.jblas</groupId>
+        <artifactId>jblas</artifactId>
+        <version>${jblas.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.scalanlp</groupId>
+        <artifactId>breeze_${scala.binary.version}</artifactId>
+        <version>0.9</version>
+        <exclusions>
+          <!-- This is included as a compile-scoped dependency by jtransforms, which is
+             a dependency of breeze. -->
+        <exclusion>
+          <groupId>junit</groupId>
+          <artifactId>junit</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.commons</groupId>
+          <artifactId>commons-math3</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+    <dependency>
+      <groupId>org.scalatest</groupId>
+      <artifactId>scalatest_${scala.binary.version}</artifactId>
+      <version>2.1.5</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.tachyonproject</groupId>
+      <artifactId>tachyon-parent</artifactId>
+      <version>${tachyon.version}</version>
+      <exclusions>
+        <exclusion>
+          <groupId>org.apache.hadoop</groupId>
+          <artifactId>hadoop-client</artifactId>
+        </exclusion>
+        <!-- <exclusion> -->
+          <!--   <groupId>org.apache.curator</groupId> -->
+          <!--   <artifactId>curator&#45;recipes</artifactId> -->
+          <!-- </exclusion> -->
+        <exclusion>
+          <groupId>org.eclipse.jetty</groupId>
+          <artifactId>jetty-jsp</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.eclipse.jetty</groupId>
+          <artifactId>jetty-webapp</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.eclipse.jetty</groupId>
+          <artifactId>jetty-server</artifactId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.eclipse.jetty</groupId>
+          <artifactId>jetty-servlet</artifactId>
+        </exclusion>
+        <!-- <exclusion> -->
+          <!--   <groupId>junit</groupId> -->
+          <!--   <artifactId>junit</artifactId> -->
+          <!-- </exclusion> -->
+        <!-- <exclusion> -->
+          <!--   <groupId>org.powermock</groupId> -->
+          <!--   <artifactId>powermock&#45;module&#45;junit4</artifactId> -->
+          <!-- </exclusion> -->
+        <!-- <exclusion> -->
+          <!--   <groupId>org.powermock</groupId> -->
+          <!--   <artifactId>powermock&#45;api&#45;mockito</artifactId> -->
+          <!-- </exclusion> -->
+        <!-- <exclusion> -->
+          <!--   <groupId>org.apache.curator</groupId> -->
+          <!--   <artifactId>curator&#45;test</artifactId> -->
+          <!-- </exclusion> -->
+      </exclusions>
+    </dependency>
+  </dependencies>
+
+</dependencyManagement>
+
+
+
+<build>
+  <pluginManagement>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+        <version>1.3.1</version>
+        <executions>
+          <execution>
+            <id>enforce-versions</id>
+            <goals>
+              <goal>enforce</goal>
+            </goals>
+            <configuration>
+              <rules>
+                <requireMavenVersion>
+                  <version>3.0.4</version>
+                </requireMavenVersion>
+                <requireJavaVersion>
+                  <version>${java.version}</version>
+                </requireJavaVersion>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <version>1.8</version>
+      </plugin>
+      <plugin>
+        <groupId>net.alchim31.maven</groupId>
+        <artifactId>scala-maven-plugin</artifactId>
+        <version>3.2.0</version>
+        <executions>
+          <execution>
+            <id>scala-compile-first</id>
+            <phase>process-resources</phase>
+            <goals>
+              <goal>compile</goal>
+            </goals>
+          </execution>
+          <!-- <execution> -->
+          <!--   <id>scala&#45;test&#45;compile&#45;first</id> -->
+          <!--   <phase>process&#45;test&#45;resources</phase> -->
+          <!--   <goals> -->
+          <!--     <goal>testCompile</goal> -->
+          <!--   </goals> -->
+          <!-- </execution> -->
+          <!-- <execution> -->
+          <!--   <id>attach&#45;scaladocs</id> -->
+          <!--   <phase>verify</phase> -->
+          <!--   <goals> -->
+          <!--     <goal>doc&#45;jar</goal> -->
+          <!--   </goals> -->
+          <!-- </execution> -->
+        </executions>
+        <configuration>
+          <scalaVersion>${scala.version}</scalaVersion>
+          <recompileMode>incremental</recompileMode>
+          <useZincServer>true</useZincServer>
+          <args>
+            <arg>-unchecked</arg>
+            <arg>-deprecation</arg>
+            <arg>-feature</arg>
+          </args>
+          <jvmArgs>
+            <jvmArg>-Xms1024m</jvmArg>
+            <jvmArg>-Xmx1024m</jvmArg>
+            <jvmArg>-XX:PermSize=${PermGen}</jvmArg>
+            <jvmArg>-XX:MaxPermSize=${MaxPermGen}</jvmArg>
+          </jvmArgs>
+          <javacArgs>
+            <javacArg>-source</javacArg>
+            <javacArg>${java.version}</javacArg>
+            <javacArg>-target</javacArg>
+            <javacArg>${java.version}</javacArg>
+          </javacArgs>
+          <!-- The following plugin is required to use quasiquotes in Scala 2.10 and is used
+                 by Spark SQL for code generation. -->
+            <!-- <compilerPlugins> -->
+              <!--   <compilerPlugin> -->
+                <!--       <groupId>org.scalamacros</groupId> -->
+                <!--       <artifactId>paradise_${scala.version}</artifactId> -->
+                <!--       <version>${scala.macros.version}</version> -->
+                <!--   </compilerPlugin> -->
+              <!-- </compilerPlugins> -->
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>3.1</version>
+          <configuration>
+            <source>${java.version}</source>
+            <target>${java.version}</target>
+            <encoding>UTF-8</encoding>
+            <maxmem>1024m</maxmem>
+            <fork>true</fork>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>2.17</version>
+          <configuration>
+            <!-- Uses scalatest instead -->
+            <skipTests>true</skipTests>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.scalatest</groupId>
+          <artifactId>scalatest-maven-plugin</artifactId>
+          <version>1.0</version>
+          <configuration>
+            <reportsDirectory>${project.build.directory}/surefire-reports</reportsDirectory>
+            <junitxml>.</junitxml>
+            <filereports>VeloxTestSuite.txt</filereports>
+            <argLine>-Xmx3g -XX:MaxPermSize=${MaxPermGen} -XX:ReservedCodeCacheSize=512m</argLine>
+            <stderr/>
+            <systemProperties>
+              <java.awt.headless>true</java.awt.headless>
+              <!-- <spark.test.home>${session.executionRootDirectory}</spark.test.home> -->
+              <!-- <spark.testing>1</spark.testing> -->
+              <!-- <spark.ui.enabled>false</spark.ui.enabled> -->
+            </systemProperties>
+          </configuration>
+          <executions>
+            <!-- <execution> -->
+            <!--   <id>test</id> -->
+            <!--   <goals> -->
+            <!--     <goal>test</goal> -->
+            <!--   </goals> -->
+            <!-- </execution> -->
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-jar-plugin</artifactId>
+          <version>2.4</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-antrun-plugin</artifactId>
+          <version>1.7</version>
+        </plugin>
+        <!-- <plugin> -->
+          <!--   <groupId>org.apache.maven.plugins</groupId> -->
+          <!--   <artifactId>maven&#45;shade&#45;plugin</artifactId> -->
+          <!--   <version>2.2</version> -->
+          <!-- </plugin> -->
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-source-plugin</artifactId>
+          <version>2.2.1</version>
+          <configuration>
+            <attach>true</attach>
+          </configuration>
+          <executions>
+            <execution>
+              <id>create-source-jar</id>
+              <goals>
+                <goal>jar-no-fork</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-clean-plugin</artifactId>
+          <version>2.5</version>
+          <configuration>
+            <filesets>
+              <fileset>
+                <directory>work</directory>
+              </fileset>
+              <fileset>
+                <directory>checkpoint</directory>
+              </fileset>
+            </filesets>
+          </configuration>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-enforcer-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>add-scala-sources</id>
+            <phase>generate-sources</phase>
+            <goals>
+              <goal>add-source</goal>
+            </goals>
+            <configuration>
+              <sources>
+                <source>src/main/scala</source>
+              </sources>
+            </configuration>
+          </execution>
+          <execution>
+            <id>add-scala-test-sources</id>
+            <phase>generate-test-sources</phase>
+            <goals>
+              <goal>add-test-source</goal>
+            </goals>
+            <configuration>
+              <sources>
+                <source>src/test/scala</source>
+              </sources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>net.alchim31.maven</groupId>
+        <artifactId>scala-maven-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-source-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.scalastyle</groupId>
+        <artifactId>scalastyle-maven-plugin</artifactId>
+        <version>0.4.0</version>
+        <configuration>
+          <verbose>false</verbose>
+          <failOnViolation>true</failOnViolation>
+          <includeTestSourceDirectory>false</includeTestSourceDirectory>
+          <failOnWarning>false</failOnWarning>
+          <sourceDirectory>${basedir}/src/main/scala</sourceDirectory>
+          <testSourceDirectory>${basedir}/src/test/scala</testSourceDirectory>
+          <configLocation>scalastyle-config.xml</configLocation>
+          <outputFile>scalastyle-output.xml</outputFile>
+          <outputEncoding>UTF-8</outputEncoding>
+        </configuration>
+        <!-- <executions> -->
+        <!--   <execution> -->
+        <!--     <phase>package</phase> -->
+        <!--     <goals> -->
+        <!--       <goal>check</goal> -->
+        <!--     </goals> -->
+        <!--   </execution> -->
+        <!-- </executions> -->
+      </plugin>
+      <!-- <plugin> -->
+        <!--   <groupId>org.apache.maven.plugins</groupId> -->
+        <!--   <artifactId>maven&#45;shade&#45;plugin</artifactId> -->
+        <!--   <version>2.3</version> -->
+        <!--   <configuration> -->
+          <!--     <relocations> -->
+            <!--       <relocation> -->
+              <!--         <pattern>org.eclipse.jetty</pattern> -->
+              <!--         <shadedPattern>edu.berkeley.veloxms.jetty</pattern> -->
+              <!--       </relocation> -->
+            <!--     </relocations> -->
+          <!--     <createDependencyReducedPom>true</createDependencyReducedPom> -->
+          <!--     <minimizeJar>true</minimizeJar> -->
+          <!--     <promoteTransitiveDependencies>true</promoteTransitiveDependencies> -->
+          <!--     <filters> -->
+            <!--       <filter> -->
+              <!--         <artifact>*:*</artifact> -->
+              <!--         <excludes> -->
+                <!--           <exclude>META&#45;INF/*.SF</exclude> -->
+                <!--           <exclude>META&#45;INF/*.DSA</exclude> -->
+                <!--         </excludes> -->
+              <!--       </filter> -->
+            <!--     </filters> -->
+          <!--   </configuration> -->
+        <!--   <executions> -->
+          <!--     <execution> -->
+            <!--       <phase>package</phase> -->
+            <!--       <goals> -->
+              <!--         <goal>shade</goal> -->
+              <!--       </goals> -->
+            <!--       <configuration> -->
+              <!--         <transformers> -->
+                <!--           <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/> -->
+                <!--           <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer"> -->
+                  <!--             <mainClass>edu.berkeley.veloxms.VeloxApplication</mainClass> -->
+                  <!--           </transformer> -->
+                <!--         </transformers> -->
+              <!--       </configuration> -->
+            <!--     </execution> -->
+          <!--   </executions> -->
+        <!-- </plugin> -->
+
+    </plugins>
+  </build>
+</project>
