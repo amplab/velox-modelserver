@@ -137,9 +137,9 @@ class WriteModelsResource extends Logging {
     var i = 0
     val keys = map.keys.toList
     while (i < map.size) {
-      val k = keys(i)
-      val v = map(k)
-      val p = partition + (i / splitPoint)
+      val k: Array[Byte] = keys(i)
+      val v: Array[Byte] = map(k)
+      val p: Int = partition + (i / splitPoint)
       store.put(p, k, v)
       i += 1
     }
