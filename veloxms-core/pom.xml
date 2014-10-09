@@ -139,8 +139,8 @@
             </relocation>
           </relocations>
           <createDependencyReducedPom>true</createDependencyReducedPom>
-          <minimizeJar>true</minimizeJar>
-          <promoteTransitiveDependencies>true</promoteTransitiveDependencies>
+          <!-- <minimizeJar>true</minimizeJar> -->
+          <!-- <promoteTransitiveDependencies>true</promoteTransitiveDependencies> -->
           <filters>
             <filter>
               <artifact>*:*</artifact>

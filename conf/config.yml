@@ -1,6 +1,6 @@
 #ec2-184-73-72-139.compute-1.amazonaws.com 
 
-tachyonMaster: tachyon://ec2-174-129-189-29.compute-1.amazonaws.com:19998
+tachyonMaster: tachyon://ec2-54-92-249-238.compute-1.amazonaws.com:19998
 itemStoreName: item-model
 userStoreName: user-model
 ratingsStoreName: movie-ratings
@@ -8,7 +8,7 @@ ratingsStoreName: movie-ratings
 # itemModelLoc: tachyon://ec2-184-73-72-139.compute-1.amazonaws.com:19998/item-model
 # userModelLoc: tachyon://ec2-184-73-72-139.compute-1.amazonaws.com:19998/user-model
 # ratingsLoc: tachyon://ec2-184-73-72-139.compute-1.amazonaws.com:19998/movie-ratings
-sparkMaster: spark://ec2-54-83-189-173.compute-1.amazonaws.com:7077
+sparkMaster: spark://ec2-54-242-32-12.compute-1.amazonaws.com:7077
 
 # matPredictionsLoc: tachyon://ec2-184-73-72-139.compute-1.amazonaws.com:19998/mat-predictions
 numFactors: 50
