@@ -58,6 +58,7 @@
 
   <modules>
     <module>veloxms-core</module>
+    <module>spark-mnist</module>
     <!-- <module>veloxms&#45;writer</module> -->
   </modules>
 
@@ -70,6 +71,7 @@
     <scala.version>2.10.4</scala.version>
     <scala.binary.version>2.10</scala.binary.version>
     <scala.macros.version>2.0.1</scala.macros.version>
+    <breeze.version>0.10</breeze.version>
     <!-- <mesos.version>0.18.1</mesos.version> -->
     <!-- <mesos.classifier>shaded&#45;protobuf</mesos.classifier> -->
 

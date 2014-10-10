@@ -1,6 +1,6 @@
 #ec2-184-73-72-139.compute-1.amazonaws.com 
 
-tachyonMaster: tachyon://ec2-54-237-153-234.compute-1.amazonaws.com:19998
+tachyonMaster: tachyon://ec2-204-236-207-142.compute-1.amazonaws.com:19998
 itemStoreName: item-model
 userStoreName: user-model
 ratingsStoreName: movie-ratings
