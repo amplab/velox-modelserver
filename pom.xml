@@ -320,11 +320,11 @@
           </exclusion>
         </exclusions>
       </dependency>
-      <!-- <dependency> -->
-      <!--   <groupId>com.google.guava</groupId> -->
-      <!--   <artifactId>guava&#45;io</artifactId> -->
-      <!--   <version>r03</version> -->
-      <!-- </dependency> -->
+      <dependency>
+        <groupId>com.google.guava</groupId>
+        <artifactId>guava-io</artifactId>
+        <version>r03</version>
+      </dependency>
       <dependency>
         <groupId>com.esotericsoftware.kryo</groupId>
         <artifactId>kryo</artifactId>

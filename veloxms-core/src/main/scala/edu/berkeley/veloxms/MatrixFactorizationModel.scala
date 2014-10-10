@@ -6,7 +6,7 @@ import java.nio.ByteBuffer
 import scala.collection.JavaConversions._
 import scala.util.{Try,Success,Failure}
 
-// import com.google.common.io.{ByteStreams, Closeables}
+import com.google.common.io.{ByteStreams, Closeables}
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.io.{BytesWritable,NullWritable}
 import org.apache.hadoop.mapreduce.{InputSplit,JobContext}
@@ -200,18 +200,17 @@ extends RecordReader[String, Array[Byte]] {
   override def getCurrentValue: Array[Byte] = value
 
   override def nextKeyValue(): Boolean = {
-    // if (!processed) {
-    //   val fileIn = fs.open(path)
-    //   val innerBuffer = ByteStreams.toByteArray(fileIn)
-    //   value = new BytesWritable(innerBuffer).getBytes
-    //   // value = new Text(innerBuffer).toString
-    //   Closeables.close(fileIn, false)
-    //   processed = true
-    //   true
-    // } else {
-    //   false
-    // }
-    false
+    if (!processed) {
+      val fileIn = fs.open(path)
+      val innerBuffer = ByteStreams.toByteArray(fileIn)
+      value = new BytesWritable(innerBuffer).getBytes
+      // value = new Text(innerBuffer).toString
+      Closeables.close(fileIn, false)
+      processed = true
+      true
+    } else {
+      false
+    }
   }
 }
 

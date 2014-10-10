@@ -46,7 +46,7 @@ object VeloxApplication extends ScalaApplication[VeloxConfiguration] with Loggin
     }
 
     override def run(conf: VeloxConfiguration, env: Environment) {
-        
+
         val userModel = TachyonUtils.getStore(conf.tachyonMaster, conf.userStoreName) match {
             case Success(s) => s
             case Failure(f) => throw new RuntimeException(
