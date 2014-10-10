@@ -9,9 +9,16 @@
 *.ear
 
 *.idea
+dependency-reduced-pom.xml
 
 target/
+logs/
+assembly/
+
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 
 data/
+
+# vim swap files
+*.sw*
