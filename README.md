@@ -1,7 +1,8 @@
-velox-modelserver
+#Velox Model Server
 =================
 
-Serving machine learning models
+## [Instructions for installing and running Velox](https://github.com/amplab/velox-modelserver/wiki/Installing-and-Running-Velox-on-ec2)
+
 
 ## Git Development Workflow
 We are going to try using gitflow as our git development workflow. You can find a description of
