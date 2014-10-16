@@ -17,6 +17,9 @@ import com.massrelevance.dropwizard.ScalaApplication
 import com.massrelevance.dropwizard.bundles.ScalaBundle
 import javax.validation.constraints.NotNull
 
+import java.util.concurrent.ConcurrentHashMap
+import scala.collection.JavaConversions._
+
 import edu.berkeley.veloxms.util.Logging
 
 class VeloxConfiguration extends Configuration {
@@ -25,7 +28,11 @@ class VeloxConfiguration extends Configuration {
     @NotEmpty val userStoreName: String = "user-model"
     @NotEmpty val ratingsStoreName: String = "movie-ratings"
     @NotNull val numFactors: Integer = 50
+    val useLocal: Boolean = false
     val sparkMaster: String = "NoSparkMaster"
+    val ratingFile: String = ""
+    val userModelFile: String = ""
+    val itemModelFile: String = ""
     // sparkMaster: String
     // whether to do preprocessing of dataset for testing purposes
     // reloadTachyon: Boolean,
@@ -46,34 +53,40 @@ object VeloxApplication extends ScalaApplication[VeloxConfiguration] with Loggin
     }
 
     override def run(conf: VeloxConfiguration, env: Environment) {
+        val modelStorage = if (conf.useLocal) {
+            logInfo("Using local storage")
+            JVMLocalStorage(
+                conf.userModelFile,
+                conf.itemModelFile,
+                conf.ratingFile,
+                conf.numFactors)
+        } else {
+            val userModel = TachyonUtils.getStore(conf.tachyonMaster, conf.userStoreName) match {
+                case Success(s) => s
+                case Failure(f) => throw new RuntimeException(
+                    s"Couldn't initialize use model: ${f.getMessage}")
+            }
 
-        val userModel = TachyonUtils.getStore(conf.tachyonMaster, conf.userStoreName) match {
-            case Success(s) => s
-            case Failure(f) => throw new RuntimeException(
-                s"Couldn't initialize use model: ${f.getMessage}")
-        }
+            val itemModel = TachyonUtils.getStore(conf.tachyonMaster, conf.itemStoreName) match {
+                case Success(s) => s
+                case Failure(f) => throw new RuntimeException(
+                    s"Couldn't initialize item model: ${f.getMessage}")
+            }
 
-        val itemModel = TachyonUtils.getStore(conf.tachyonMaster, conf.itemStoreName) match {
-            case Success(s) => s
-            case Failure(f) => throw new RuntimeException(
-                s"Couldn't initialize item model: ${f.getMessage}")
-        }
-
-        val ratings = TachyonUtils.getStore(conf.tachyonMaster, conf.ratingsStoreName) match {
-            case Success(s) => s
-            case Failure(f) => throw new RuntimeException(
-                s"Couldn't initialize use model: ${f.getMessage}")
-        }
-        logInfo("got tachyon stores")
-
-        val modelStorage = 
+            val ratings = TachyonUtils.getStore(conf.tachyonMaster, conf.ratingsStoreName) match {
+                case Success(s) => s
+                case Failure(f) => throw new RuntimeException(
+                    s"Couldn't initialize use model: ${f.getMessage}")
+            }
+            logInfo("got tachyon stores")
             new TachyonStorage(userModel, itemModel, ratings, conf.numFactors)
-            // new TachyonStorage[Array[Double]](userModel, itemModel, ratings, conf.numFactors)
+
+        }
+
         val averageUser = Array.fill[Double](conf.numFactors)(1.0)
+        val featureCache = new FeatureCache[Long](FeatureCache.tempBudget)
         val matrixFactorizationModel =
             new MatrixFactorizationModel(conf.numFactors, modelStorage, averageUser, conf)
-
-        val featureCache = new FeatureCache[Long](FeatureCache.tempBudget)
 
         env.jersey().register(new MatrixFactorizationPredictionResource(
             matrixFactorizationModel, featureCache))
@@ -81,18 +94,12 @@ object VeloxApplication extends ScalaApplication[VeloxConfiguration] with Loggin
         env.jersey().register(new MatrixFactorizationUpdateResource(
             matrixFactorizationModel, featureCache, conf.sparkMaster))
 
-        env.jersey().register(new WriteModelsResource)
-        // env.jersey().register(addRatings)
+        if (!conf.useLocal) {
+            env.jersey().register(new WriteModelsResource)
+        }
+
     }
+    
 }
-
-
-
-
-
-
-
-
-
 
 

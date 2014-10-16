@@ -21,6 +21,11 @@ trait Model[T, U] {
    */
   val numFeatures: Int
 
+  /**
+   * Interface to the storage backend. Allows model implementors
+   * to access the storage system if needed for computing features,
+   * user weights.
+   */
   val modelStorage: ModelStorage[U]
 
   /** Average user weight vector.
@@ -45,6 +50,7 @@ trait Model[T, U] {
 
   /**
    * Velox implemented - fetch from local Tachyon partition
+   *
    */
   def getWeightVector(userId: Long) : WeightVector
 
