@@ -23,10 +23,11 @@
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-core_${scala.binary.version}</artifactId>
     </dependency>
-    <!-- <dependency> -->
-    <!--   <groupId>com.google.guava</groupId> -->
-    <!--   <artifactId>guava&#45;io</artifactId> -->
-    <!-- </dependency> -->
+    <dependency>
+        <groupId>com.google.guava</groupId>
+        <artifactId>guava</artifactId>
+        <version>18.0</version>
+    </dependency>
     <dependency>
       <groupId>com.esotericsoftware.kryo</groupId>
       <artifactId>kryo</artifactId>
@@ -50,6 +51,11 @@
     <dependency>
       <groupId>org.scalatest</groupId>
       <artifactId>scalatest_${scala.binary.version}</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.datastax.cassandra</groupId>
+      <artifactId>cassandra-driver-core</artifactId>
+      <version>2.1.2</version>
     </dependency>
 
     <!-- <dependency> -->

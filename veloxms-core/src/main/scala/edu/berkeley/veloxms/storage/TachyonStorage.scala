@@ -105,6 +105,10 @@ class TachyonStorage (
     //   if(erasure.isInstance(value)) Some(value.asInstanceOf[A]) else None
     // }
 
+  /**
+   * Cleans up any necessary resources
+   */
+  override def close() {}
 }
 
 

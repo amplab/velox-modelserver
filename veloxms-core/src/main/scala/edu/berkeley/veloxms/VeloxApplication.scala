@@ -4,6 +4,8 @@ import edu.berkeley.veloxms.resources._
 import edu.berkeley.veloxms.storage._
 import edu.berkeley.veloxms.misc.WriteModelsResource
 import io.dropwizard.Configuration
+import io.dropwizard.lifecycle.Managed
+
 // import net.nicktelford.dropwizard.scala._
 import io.dropwizard.setup.Bootstrap
 import io.dropwizard.setup.Environment
@@ -82,6 +84,11 @@ object VeloxApplication extends ScalaApplication[VeloxConfiguration] with Loggin
             new TachyonStorage(userModel, itemModel, ratings, conf.numFactors)
 
         }
+        // Manage the modelStorage object
+        env.lifecycle().manage(new { } with Managed {
+          override def start() { }
+          override def stop() { modelStorage.close() }
+        })
 
         val averageUser = Array.fill[Double](conf.numFactors)(1.0)
         val featureCache = new FeatureCache[Long](FeatureCache.tempBudget)

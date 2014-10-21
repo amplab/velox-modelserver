@@ -50,6 +50,10 @@ class JVMLocalStorage (
             .getOrElse((Success(new HashMap[Long, Double])))
     }
 
+  /**
+   * Cleans up any necessary resources
+   */
+  override def close() { }
 }
 
 object JVMLocalStorage extends Logging {
@@ -63,7 +67,7 @@ object JVMLocalStorage extends Logging {
         createUserModelFromFile(userFile),
         createItemModelFromFile(itemFile),
         createObservationsFromFile(ratingsFile),
-        50)
+        numFactors)
     }
 
     // wrapper for type signatures
