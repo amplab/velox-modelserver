@@ -30,9 +30,16 @@ def command_claim(args):
 def command_rebuild(args):
     cluster = get_cluster(args)
     kwargs = dict(vars(args))
+
+    # pprint(kwargs)
+    # pprint(kwargs["clone_repo"])
+    # return
     pprint("Rebuilding velox clusters")
     assign_hosts(cluster)
+    # stopping velox will also kill tachyon right now
+
     stop_velox_processes()
+    restart_tachyon()
     rebuild_servers(**kwargs)
 
 def command_terminate(args):
@@ -45,6 +52,28 @@ def command_install_ykit(args):
     pprint("Installing Yourkit")
     assign_hosts(cluster)
     install_ykit(cluster)
+
+def command_install_tachyon(args):
+    cluster = get_cluster(args)
+    pprint("Installing Tachyon")
+    assign_hosts(cluster)
+    install_tachyon(cluster)
+
+def command_start_velox_servers(args):
+    cluster = get_cluster(args)
+    kwargs = dict(vars(args))
+    # runid = "THECRANK-%s" % (str(datetime.now()).replace(' ', '_').replace(":", '_'))
+    # pprint("Running THE CRANKSHAW")
+    stop_velox_processes()
+    restart_tachyon()
+    assign_hosts(cluster)
+    start_servers(cluster, HEAP_SIZE_GB, use_tachyon=True, **kwargs)
+    # sleep(5)
+    pprint("Velox servers started")
+    # run_velox_client_bench(cluster, **kwargs)
+    # stop_velox_processes()
+    # fetch_logs(cluster, runid, **kwargs)
+    # pprint("THE CRANKSHAW has completed!")
 
 def command_client_bench(args):
     cluster = get_cluster(args)
@@ -124,7 +153,7 @@ if __name__ == "__main__":
     ##################################
     # common cluster config options for ec2
     common_cluster_ec2 = argparse.ArgumentParser(add_help=False)
-    common_cluster_ec2.add_argument('--region', '-r', dest='region', default="us-west-2", type=str,
+    common_cluster_ec2.add_argument('--region', '-r', dest='region', default="us-east-1", type=str,
                                     help="EC2 region. [default: %(default)s]")
     # common benchmark options (base)
     common_benchmark = argparse.ArgumentParser(add_help=False)
@@ -132,18 +161,6 @@ if __name__ == "__main__":
                                   help='Run JVM with hprof cpu profiling. [default: %(default)s]')
     common_benchmark.add_argument('--profile_depth', dest='profile_depth', default=2, type=int,
                                   help='Stack depth to trace when running profiling. [default: %(default)s]')
-    common_benchmark.add_argument('--network_service', dest='network_service',
-                                  default='array', type=str, choices=['array', 'nio'],
-                                  help="Which network service to use. [default: %(default)s]")
-    common_benchmark.add_argument('--buffer_size', dest='buffer_size',
-                                  default=16384*8, type=int,
-                                  help='Size (in bytes) to make the network buffer. [default: %(default)s]')
-    common_benchmark.add_argument('--sweep_time', dest='sweep_time',
-                                  default=500, type=int,
-                                  help='Time (in ms) the ArrayNetworkService send sweep thread should wait between sweeps. [default: %(default)s]')
-    common_benchmark.add_argument('--parallelism', dest='parallelism',
-                                  default=64, type=int,
-                                  help='Number of threads per benchmark client. [default: %(default)s]')
     common_benchmark.add_argument('--read_pct', dest='read_pct',
                                   default=0.5, type=float,
                                   help='Percentage of workload operations which are reads. [default: %(default)s]')
@@ -155,8 +172,9 @@ if __name__ == "__main__":
                                   help='Number of operations to perform in the benchmark. [default: %(default)s]')
 
     common_benchmark.add_argument('--heap_size_gb', dest='heap_size',
-                                  default=230, type=int,
+                                  default=HEAP_SIZE_GB, type=int,
                                   help='Size (in GB) to make the JVM heap. [default: %(default)s]')
+
     # common benchmark options for ec2 (includes benchmark base)
     common_benchmark_ec2 = argparse.ArgumentParser(add_help=False, parents=[common_benchmark])
     common_benchmark_ec2.add_argument('--output', dest='output_dir', default="./output", type=str,
@@ -184,7 +202,8 @@ if __name__ == "__main__":
                                help='Don\'t use spot instances. [default: %(default)s]')
     parser_launch.add_argument('--spot_price', dest="spot_price", type=float, default=1.5,
                                help="Spot price in $. [default: %(default)s]")
-    parser_launch.add_argument('--instance_type', dest="instance_type", type=str, default="cr1.8xlarge",
+    parser_launch.add_argument('--instance_type', dest="instance_type", type=str,
+                               default=DEFAULT_INSTANCE_TYPE,
                                help="EC2 instance type. [default: %(default)s]")
     parser_launch.add_argument('--placement_group', dest='placement_group', default="VELOX_CLUSTER",
                                help="EC2 placement group. [default: %(default)s]")
@@ -200,57 +219,71 @@ if __name__ == "__main__":
     parser_terminate.set_defaults(func=command_terminate)
 
     # rebuild
-    parser_rebuild = subparsers.add_parser('rebuild', help='Rebuild velox cluster',
+    parser_rebuild = subparsers.add_parser('rebuild', help='Rebuild veloxms cluster',
                                            parents=[common_cluster_ec2])
     parser_rebuild.set_defaults(func=command_rebuild)
-    parser_rebuild.add_argument('--branch', '-b', dest="branch", default="master",
+    parser_rebuild.add_argument('--branch', '-b', dest="branch", default="develop",
                         help='Branch to rebuild. [default: %(default)s]')
-    parser_rebuild.add_argument('--git_remote', dest="git_remote", default="git@github.com:amplab/velox.git",
+    parser_rebuild.add_argument('--git_remote', dest="git_remote", default="git@github.com:amplab/velox-modelserver.git",
                         help='Upstream git url. [default: %(default)s]')
     parser_rebuild.add_argument('--deploy_key', dest="deploy_key", default=None,
                         help='Local path to upstream deploy key. [default: %(default)s]')
+    parser_rebuild.add_argument('--clone_repo', dest="clone_repo", action='store_true',
+                        help='Clone the Velox repo from GitHub. Only needed on fresh clusters. [default: %(default)s]')
 
     # install_ykit
     parser_install_ykit = subparsers.add_parser('install_ykit', help='Install yourkit',
                                                 parents=[common_cluster_ec2])
     parser_install_ykit.set_defaults(func=command_install_ykit)
 
+    # install_tachyon
+    parser_install_tachyon = subparsers.add_parser('install_tachyon', help='Install Tachyon on all servers',
+                                                parents=[common_cluster_ec2])
+    parser_install_tachyon.set_defaults(func=command_install_tachyon)
+
     # deploy zookeeper
-    parser_deploy_zk = subparsers.add_parser('deploy_zookeeper', help='Deploy zookeeper to all backend servers',
-                                             parents=[common_cluster_ec2])
-    parser_deploy_zk.add_argument('--zk_config', dest='zk_config', default="conf/zk_cluster.cfg.template", type=str,
-                                  help="Path to Zookeeper config file.")
-    parser_deploy_zk.set_defaults(func=command_deploy_zookeeper)
+    # parser_deploy_zk = subparsers.add_parser('deploy_zookeeper', help='Deploy zookeeper to all backend servers',
+    #                                          parents=[common_cluster_ec2])
+    # parser_deploy_zk.add_argument('--zk_config', dest='zk_config', default="conf/zk_cluster.cfg.template", type=str,
+    #                               help="Path to Zookeeper config file.")
+    # parser_deploy_zk.set_defaults(func=command_deploy_zookeeper)
 
 
     # deploy zookeeper locally
-    parser_deploy_zk_local = subparsers.add_parser('deploy_zookeeper_local', help='Deploy zookeeper to local tmp directory',
-                                             parents=[common_cluster_ec2])
-    parser_deploy_zk_local.add_argument('--zk_config', dest='zk_config', default="conf/zk_cluster.cfg.template", type=str,
-                                  help="Path to Zookeeper config file.")
-    parser_deploy_zk_local.set_defaults(func=command_deploy_zookeeper_local)
+    # parser_deploy_zk_local = subparsers.add_parser('deploy_zookeeper_local', help='Deploy zookeeper to local tmp directory',
+    #                                          parents=[common_cluster_ec2])
+    # parser_deploy_zk_local.add_argument('--zk_config', dest='zk_config', default="conf/zk_cluster.cfg.template", type=str,
+    #                               help="Path to Zookeeper config file.")
+    # parser_deploy_zk_local.set_defaults(func=command_deploy_zookeeper_local)
+
+    ##################################
+    ####### benchmark commands #######
+    ##################################
+    parser_start_velox = subparsers.add_parser('start_velox', help='Start the velox servers',
+                                                parents=[common_cluster_ec2])
+    parser_start_velox.set_defaults(func=command_start_velox_servers)
                                               
 
     ##################################
     ####### benchmark commands #######
     ##################################
-    parser_client_bench = subparsers.add_parser('client_bench', help='Run THE CRANKSHAW TEST on EC2',
-                                                parents=[common_cluster_ec2, common_benchmark_ec2, common_client_bench])
-    parser_client_bench.set_defaults(func=command_client_bench)
-
-    parser_client_bench_local = subparsers.add_parser('client_bench_local', help='Run THE CRANKSHAW TEST locally',
-                                                      parents=[common_benchmark, common_client_bench])
-    parser_client_bench_local.add_argument('--zk_config', dest='zk_config', default="conf/zk_cluster.cfg.template", type=str,
-                                  help="Path to Zookeeper config file.")
-    parser_client_bench_local.set_defaults(func=command_client_bench_local)
-
-    parser_ycsb_bench = subparsers.add_parser('ycsb_bench', help='Run YCSB on EC2',
-                                              parents=[common_cluster_ec2, common_benchmark_ec2, common_ycsb_bench])
-    parser_ycsb_bench.set_defaults(func=command_ycsb_bench)
-
-    parser_ycsb_bench_local = subparsers.add_parser('ycsb_bench_local', help='Run YCSB locally',
-                                                    parents=[common_benchmark, common_ycsb_bench])
-    parser_ycsb_bench_local.set_defaults(func=command_ycsb_bench_local)
+    # parser_client_bench = subparsers.add_parser('client_bench', help='Run THE CRANKSHAW TEST on EC2',
+    #                                             parents=[common_cluster_ec2, common_benchmark_ec2, common_client_bench])
+    # parser_client_bench.set_defaults(func=command_client_bench)
+    #
+    # parser_client_bench_local = subparsers.add_parser('client_bench_local', help='Run THE CRANKSHAW TEST locally',
+    #                                                   parents=[common_benchmark, common_client_bench])
+    # parser_client_bench_local.add_argument('--zk_config', dest='zk_config', default="conf/zk_cluster.cfg.template", type=str,
+    #                               help="Path to Zookeeper config file.")
+    # parser_client_bench_local.set_defaults(func=command_client_bench_local)
+    #
+    # parser_ycsb_bench = subparsers.add_parser('ycsb_bench', help='Run YCSB on EC2',
+    #                                           parents=[common_cluster_ec2, common_benchmark_ec2, common_ycsb_bench])
+    # parser_ycsb_bench.set_defaults(func=command_ycsb_bench)
+    #
+    # parser_ycsb_bench_local = subparsers.add_parser('ycsb_bench_local', help='Run YCSB locally',
+    #                                                 parents=[common_benchmark, common_ycsb_bench])
+    # parser_ycsb_bench_local.set_defaults(func=command_ycsb_bench_local)
 
     # parse the args, and execute the sub-command
     args = parser.parse_args()

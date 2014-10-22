@@ -19,10 +19,10 @@
       <groupId>org.apache.commons</groupId>
       <artifactId>commons-lang3</artifactId>
     </dependency>
-    <dependency>
-      <groupId>org.apache.spark</groupId>
-      <artifactId>spark-core_${scala.binary.version}</artifactId>
-    </dependency>
+    <!-- <dependency> -->
+    <!--   <groupId>org.apache.spark</groupId> -->
+    <!--   <artifactId>spark&#45;core_${scala.binary.version}</artifactId> -->
+    <!-- </dependency> -->
     <dependency>
         <groupId>com.google.guava</groupId>
         <artifactId>guava</artifactId>
@@ -31,10 +31,10 @@
       <groupId>com.esotericsoftware.kryo</groupId>
       <artifactId>kryo</artifactId>
     </dependency>
-    <dependency>
-      <groupId>org.apache.hadoop</groupId>
-      <artifactId>hadoop-client</artifactId>
-    </dependency>
+    <!-- <dependency> -->
+    <!--   <groupId>org.apache.hadoop</groupId> -->
+    <!--   <artifactId>hadoop&#45;client</artifactId> -->
+    <!-- </dependency> -->
     <dependency>
       <groupId>org.jblas</groupId>
       <artifactId>jblas</artifactId>

@@ -1,4 +1,5 @@
 *.class
+*.pyc
 
 # Mobile Tools for Java (J2ME)
 .mtj.tmp/
@@ -11,6 +12,7 @@
 *.idea
 dependency-reduced-pom.xml
 scalastyle-output.xml
+bin/cluster/hosts
 
 target/
 logs/

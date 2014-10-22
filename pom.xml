@@ -82,6 +82,7 @@
 
     <!-- <slf4j.version>1.7.5</slf4j.version> -->
     <!-- <log4j.version>1.2.17</log4j.version> -->
+    <!-- <hadoop.version>2.5.1</hadoop.version> -->
     <hadoop.version>2.5.1</hadoop.version>
     <!-- <protobuf.version>2.4.1</protobuf.version> -->
     <!-- <yarn.version>${hadoop.version}</yarn.version> -->
@@ -733,7 +734,7 @@
         <version>0.4.0</version>
         <configuration>
           <verbose>false</verbose>
-          <failOnViolation>true</failOnViolation>
+          <failOnViolation>fail</failOnViolation>
           <includeTestSourceDirectory>false</includeTestSourceDirectory>
           <failOnWarning>false</failOnWarning>
           <sourceDirectory>${basedir}/src/main/scala</sourceDirectory>

@@ -1,2 +1,0 @@
-ec2-54-80-154-23.compute-1.amazonaws.com
-ec2-54-81-155-110.compute-1.amazonaws.com
