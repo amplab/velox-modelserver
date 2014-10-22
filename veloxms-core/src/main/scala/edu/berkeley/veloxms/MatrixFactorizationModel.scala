@@ -30,7 +30,9 @@ class MatrixFactorizationModel(
     val numFeatures: Int,
     val modelStorage: ModelStorage[FeatureVector],
     val averageUser: WeightVector,
-    val config: VeloxConfiguration) extends Model[Long, FeatureVector] with Logging {
+    val conf: VeloxConfiguration) extends Model[Long, FeatureVector] with Logging {
+
+    val defaultItem: FeatureVector = Array.fill[Double](conf.numFactors)(0.0)
 
   // val logger = Logger(LoggerFactory.getLogger(classOf[MatrixFactorizationModel]))
 
@@ -53,15 +55,24 @@ class MatrixFactorizationModel(
     ByteBuffer.wrap(data).getLong
   }
 
+  // TODO(crankshaw) fix the error handling here to return default item features
+  // TODO(crankshaw) the error handling here is fucked
   def getFeatures(item: Long, cache: FeatureCache[Long]): FeatureVector = {
-    cache.getItem(item) match {
-      case Some(f) => f
+    val features: Try[FeatureVector] = cache.getItem(item) match {
+      case Some(f) => Success(f)
       case None => {
-        val f = computeFeatures(item)
-        cache.addItem(item, f)
-        f
+        Try(computeFeatures(item)).transform(
+          (f) => {
+            cache.addItem(item, f)
+            Success(f)
+          },
+          (t) => {
+            logWarning("Couldn't compute item features, using default of 0")
+            Success(defaultItem)
+        })
       }
     }
+    features.get
   }
 
   def getWeightVector(userId: Long) : WeightVector = {
@@ -75,28 +86,37 @@ class MatrixFactorizationModel(
     }
   }
 
-  def retrainInSpark(sparkMaster: String = config.sparkMaster) {
+  /**
+   * THIS DOESN'T WORK YET!!!
+   * Retrains the model in the provided Spark cluster
+   */
+  def retrainInSpark(sparkMaster: String = conf.sparkMaster) {
 
     // TODO finish implementing this method
 
     val numFeatures = 50
     val numIters = 20
-    val trainingData = s"${config.tachyonMaster}/${config.ratingsStoreName}"
+    val trainingData = s"${conf.tachyonMaster}/${conf.ratingsStoreName}"
 
 
 
     // get jar location: from http://stackoverflow.com/a/6849255/814642
-    val path = classOf[MatrixFactorizationModel].getProtectionDomain().getCodeSource().getLocation().getPath()
+    val path = classOf[MatrixFactorizationModel]
+      .getProtectionDomain()
+      .getCodeSource()
+      .getLocation()
+      .getPath()
     val decodedPath = URLDecoder.decode(path, "UTF-8")
     logInfo(s"Jar path: $decodedPath")
 
-    val conf = new SparkConf()
+    val sparkConf = new SparkConf()
     .setMaster(sparkMaster)
     .setAppName("VeloxRetrainMatrixFact")
     .setJars(List(decodedPath))
 
-    val sc = new SparkContext(conf)
-    // val bytesData: RDD[(String, Array[Byte])] = sc.hadoopFile[String, Array[Byte], TachyonKVPartitionInputFormat](trainingData)
+    val sc = new SparkContext(sparkConf)
+    // val bytesData: RDD[(String, Array[Byte])] = 
+    //    sc.hadoopFile[String, Array[Byte], TachyonKVPartitionInputFormat](trainingData)
     logInfo("Created spark context")
     val bytesData: RDD[(String, Array[Byte])] =
         sc.newAPIHadoopFile[String, Array[Byte], TachyonKVPartitionInputFormat](trainingData)

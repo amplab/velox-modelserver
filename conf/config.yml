@@ -4,6 +4,10 @@ tachyonMaster: tachyon://ec2-204-236-207-142.compute-1.amazonaws.com:19998
 itemStoreName: item-model
 userStoreName: user-model
 ratingsStoreName: movie-ratings
+useLocal: true
+ratingFile: /Users/crankshaw/code/amplab/model-serving/data/ml-100k/u.data
+userModelFile: /Users/crankshaw/code/amplab/model-serving/data/trained_50_features/all_users_clean_50.txt
+itemModelFile: /Users/crankshaw/code/amplab/model-serving/data/trained_50_features/all_products_clean_50.txt
 
 # itemModelLoc: tachyon://ec2-184-73-72-139.compute-1.amazonaws.com:19998/item-model
 # userModelLoc: tachyon://ec2-184-73-72-139.compute-1.amazonaws.com:19998/user-model
@@ -21,9 +25,9 @@ logging:
       archivedFileCount: 5
       timeZone: UTC
     - type: console
-      threshold: INFO
+      threshold: WARN
       target: stderr
-    
+
 server:
   requestLog:
     timeZone: UTC

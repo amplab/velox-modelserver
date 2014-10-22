@@ -1,40 +1,64 @@
 <?xml version="1.0" encoding="UTF-8"?>
-
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-
-  <!-- <packaging>pom</packaging> -->
 
   <parent>
     <groupId>edu.berkeley.veloxms</groupId>
     <artifactId>velox-parent</artifactId>
     <version>0.0.1-SNAPSHOT</version>
   </parent>
-  <artifactId>spark-mnist</artifactId>
-  <name>Spark MNIST</name>
+  <artifactId>veloxms-client</artifactId>
+  <name>Velox Client</name>
 
   <dependencies>
     <dependency>
-      <groupId>org.apache.spark</groupId>
-      <artifactId>spark-core_${scala.binary.version}</artifactId>
-      <version>${spark.version}</version>
-      <scope>provided</scope>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>com.esotericsoftware.kryo</groupId>
+      <artifactId>kryo</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.scalatest</groupId>
+      <artifactId>scalatest_${scala.binary.version}</artifactId>
     </dependency>
     <dependency>
       <groupId>org.scalanlp</groupId>
       <artifactId>breeze_${scala.binary.version}</artifactId>
-      <version>${breeze.version}</version>
+    </dependency>
+      <dependency>
+        <groupId>edu.berkeley.veloxms</groupId>
+        <artifactId>veloxms-core</artifactId>
+      </dependency>
+    <dependency>
+      <groupId>net.databinder.dispatch</groupId>
+      <artifactId>dispatch-core_${scala.binary.version}</artifactId>
+    </dependency>
+    <!-- <dependency> -->
+    <!--     <groupId>org.json4s</groupId> -->
+    <!--     <artifactId>json4s&#45;jackson_${scala.binary.version}</artifactId> -->
+    <!--     <version>3.2.10</version> -->
+    <!-- </dependency> -->
+    <dependency>
+      <groupId>net.databinder.dispatch</groupId>
+      <artifactId>json4s-jackson_${scala.binary.version}</artifactId>
     </dependency>
     <dependency>
       <groupId>com.github.scopt</groupId>
       <artifactId>scopt_${scala.binary.version}</artifactId>
     </dependency>
+
   </dependencies>
 
-
   <build>
+    <outputDirectory>target/scala-${scala.binary.version}/classes</outputDirectory>
+    <testOutputDirectory>target/scala-${scala.binary.version}/test-classes</testOutputDirectory>
     <plugins>
+      <plugin>
+        <groupId>org.scalatest</groupId>
+        <artifactId>scalatest-maven-plugin</artifactId>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>
@@ -69,6 +93,7 @@
               <transformers>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
+                  <mainClass>edu.berkeley.veloxms.client.VeloxWorkloadDriver</mainClass>
                 </transformer>
               </transformers>
             </configuration>
@@ -77,6 +102,4 @@
       </plugin>
     </plugins>
   </build>
-
-
 </project>

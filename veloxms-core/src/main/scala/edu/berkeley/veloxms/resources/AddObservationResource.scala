@@ -91,7 +91,8 @@ object OnlineUpdateUtils {
       // TODO error handling
       val currentFeaturesArray = allItemFeatures.get(currentItemId) match {
         case Some(f) => f
-        case None => throw new Exception(s"Missing features in online update -- item: $currentItemId")
+        case None => throw new Exception(
+          s"Missing features in online update -- item: $currentItemId")
       }
       val currentFeatures = new DoubleMatrix(currentFeaturesArray)
       val product = currentFeatures.mmul(currentFeatures.transpose())
@@ -99,7 +100,8 @@ object OnlineUpdateUtils {
 
       val obsScore = allObservationScores.get(currentItemId) match {
         case Some(o) => o
-        case None => throw new Exception(s"Missing rating in online update -- item: $currentItemId")
+        case None => throw new Exception(
+          s"Missing rating in online update -- item: $currentItemId")
 
       }
       itemScoreProductSum.addi(currentFeatures.muli(obsScore))
