@@ -1,8 +1,11 @@
 package edu.berkeley.veloxms.storage
 
 
+import io.dropwizard.lifecycle.Managed
+
 import scala.util.Try
 import edu.berkeley.veloxms._
+
 // import scala.collection.immutable.HashMap
 
 /**
@@ -10,9 +13,9 @@ import edu.berkeley.veloxms._
  * the models from the application logic to access them.
  *
  * @tparam U The type of the data being stored in the KV store to
- * compute features
+ *           compute features
  */
-trait ModelStorage[U] {
+trait ModelStorage[U] extends Managed{
 
 
     /**
@@ -42,6 +45,8 @@ trait ModelStorage[U] {
      * user's weight vector)
      */
     val numFactors: Int
+
+  override def start() { }
 }
 
 

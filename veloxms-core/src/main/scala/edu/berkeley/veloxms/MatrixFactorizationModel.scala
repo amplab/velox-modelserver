@@ -96,7 +96,9 @@ class MatrixFactorizationModel(
 
     val numFeatures = 50
     val numIters = 20
-    val trainingData = s"${conf.tachyonMaster}/${conf.ratingsStoreName}"
+
+    //Had to comment out because of storage refactoring
+    val trainingData = ""//s"${conf.tachyonMaster}/${conf.ratingsStoreName}"
 
 
 
