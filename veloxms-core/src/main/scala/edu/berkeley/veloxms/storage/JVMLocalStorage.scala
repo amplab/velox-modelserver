@@ -53,7 +53,7 @@ class JVMLocalStorage (
   /**
    * Cleans up any necessary resources
    */
-  override def close() { }
+  override def stop() { }
 }
 
 object JVMLocalStorage extends Logging {

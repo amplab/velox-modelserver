@@ -29,12 +29,18 @@ class CassandraStorage ( address: String,
 
   // Make sure all tables exist and contain the necessary columns
   // TODO: If these fail, still have to make sure to close the cluster
-  require(session.execute(s"SELECT * FROM $keyspace.$users").getColumnDefinitions.contains(Key))
-  require(session.execute(s"SELECT * FROM $keyspace.$users").getColumnDefinitions.contains(Value))
-  require(session.execute(s"SELECT * FROM $keyspace.$items").getColumnDefinitions.contains(Key))
-  require(session.execute(s"SELECT * FROM $keyspace.$items").getColumnDefinitions.contains(Value))
-  require(session.execute(s"SELECT * FROM $keyspace.$ratings").getColumnDefinitions.contains(Key))
-  require(session.execute(s"SELECT * FROM $keyspace.$ratings").getColumnDefinitions.contains(Value))
+  require {
+    val cd = session.execute(s"SELECT * FROM $keyspace.$users LIMIT 1").getColumnDefinitions
+    cd.contains(Key) && cd.contains(Value)
+  }
+  require {
+    val cd = session.execute(s"SELECT * FROM $keyspace.$items LIMIT 1").getColumnDefinitions
+    cd.contains(Key) && cd.contains(Value)
+  }
+  require {
+    val cd = session.execute(s"SELECT * FROM $keyspace.$ratings LIMIT 1").getColumnDefinitions
+    cd.contains(Key) && cd.contains(Value)
+  }
 
   def getFeatureData(itemId: Long): Try[FeatureVector] = {
     try {
@@ -75,7 +81,7 @@ class CassandraStorage ( address: String,
   /**
    * Cleans up any necessary resources
    */
-  override def close() { cluster.close() }
+  override def stop() { cluster.close() }
 }
 
 

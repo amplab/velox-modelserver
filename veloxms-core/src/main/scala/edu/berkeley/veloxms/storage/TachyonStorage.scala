@@ -127,7 +127,7 @@ class TachyonStorage (
   /**
    * Cleans up any necessary resources
    */
-  override def close() {}
+  override def stop() {}
 }
 
 

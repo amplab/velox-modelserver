@@ -53,10 +53,7 @@ class ModelStorageFactory extends Logging {
     }
 
     // Manage the modelStorage
-    env.lifecycle().manage(new { } with Managed {
-      override def start() { }
-      override def stop() { modelStorage.close() }
-    })
+    env.lifecycle().manage(modelStorage)
 
     // Return the modelStorage
     modelStorage
