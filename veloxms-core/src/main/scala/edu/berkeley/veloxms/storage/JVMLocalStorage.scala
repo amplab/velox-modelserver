@@ -50,6 +50,16 @@ class JVMLocalStorage (
             .getOrElse((Success(new HashMap[Long, Double])))
     }
 
+    def addObservation(userId: Long, itemId: Long, observation: Double) = {
+      var userEntry = ratings.get(userId)
+
+      if (userEntry == null) {
+        userEntry = new ConcurrentHashMap[Long, Double]()
+      }
+
+      userEntry.put(itemId, observation)
+    }
+
   /**
    * Cleans up any necessary resources
    */

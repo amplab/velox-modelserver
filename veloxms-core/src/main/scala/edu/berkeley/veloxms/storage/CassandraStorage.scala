@@ -78,6 +78,10 @@ class CassandraStorage ( address: String,
     }
   }
 
+  def addObservation(userId: Long, itemId: Long, observation: Double) = {
+    // do something
+  }
+
   /**
    * Cleans up any necessary resources
    */
