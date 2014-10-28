@@ -111,21 +111,7 @@ class TachyonStorage (
     val kryo = KryoThreadLocal.kryoTL.get
     var result = kryo.deserialize(rawBytes).asInstanceOf[HashMap[Long, Double]]
 
-    val cacheEntry = observationsCache.get(userId)
-    if(cacheEntry != null) {
-      for (iid <- cacheEntry.keys)  {
-        if (result.keySet.contains(iid)) { // if there is an entry, then remove it
-          result = result - iid
-        }
-
-        val cacheEntryVal: Double = cacheEntry.get(iid) match {
-          case Some(cacheEntryVal) => cacheEntryVal
-          case None => throw new RuntimeException("iid in key set not found on get")
-        }
-
-        result = result + (iid -> cacheEntryVal)
-      }
-    }
+    result = TachyonUtils.mergeObservations(result, observationsCache.get(userId))
 
     Success(result)
       //
@@ -135,6 +121,8 @@ class TachyonStorage (
       // } yield array
       // result
   }
+
+
 
   // def cast(value: Any): Option[A] = {
   //   val erasure = manifest[A] match {
@@ -203,6 +191,31 @@ object TachyonUtils {
         Success(u)
       }
     }
+  }
+
+  def mergeObservations( tachyonMap: HashMap[Long, Double],
+                         cacheEntry: Map[Long, Double]): HashMap[Long, Double] = {
+    var result = tachyonMap
+    if(cacheEntry != null) {
+      if (result == null) {
+        result = new HashMap[Long, Double]()
+      }
+
+      for (iid <- cacheEntry.keys)  {
+        if (result.keySet.contains(iid)) { // if there is an entry, then remove it
+          result = result - iid
+        }
+
+        val cacheEntryVal: Double = cacheEntry.get(iid) match {
+          case Some(cacheEntryVal) => cacheEntryVal
+          case None => throw new RuntimeException("iid in key set not found on get")
+        }
+
+        result = result + (iid -> cacheEntryVal)
+      }
+    }
+
+    result
   }
 
   // def serializeArray(arr: Array[Double]): Array[Byte] = {
