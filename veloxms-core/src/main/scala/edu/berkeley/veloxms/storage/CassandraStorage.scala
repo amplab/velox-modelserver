@@ -78,8 +78,8 @@ class CassandraStorage ( address: String,
     }
   }
 
-  def addObservation(userId: Long, itemId: Long, observation: Double) = {
-    // do something
+  def addScore(userId: Long, itemId: Long, score: Double) = {
+    throw new NotImplementedError()
   }
 
   /**

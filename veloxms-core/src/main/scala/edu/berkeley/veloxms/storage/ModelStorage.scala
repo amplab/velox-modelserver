@@ -45,9 +45,9 @@ trait ModelStorage[U] extends Managed{
      * Add an observation to the training data.
      * @param userId the unique ID of the user
      * @param itemId the unique ID of the item that observation was made on
-     * @param observation the observation made
+     * @param score the observation made
      */
-    def addObservation(userId: Long, itemId: Long, observation: Double)
+    def addScore(userId: Long, itemId: Long, score: Double)
 
     /** The number of top-level features in use (this is the dimension of the
      * user's weight vector)

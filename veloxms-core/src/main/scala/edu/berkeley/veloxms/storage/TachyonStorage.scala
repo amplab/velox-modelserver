@@ -139,15 +139,15 @@ class TachyonStorage (
   //   if(erasure.isInstance(value)) Some(value.asInstanceOf[A]) else None
   // }
 
-  def addObservation(userId: Long, itemId: Long, observation: Double) = {
+  def addScore(userId: Long, itemId: Long, score: Double) = {
     // eventually, this should write through to Tachyon
     var cacheEntry = observationsCache.get(userId)
     if(cacheEntry == null) {
       var newEntry = new HashMap[Long, Double]
-      newEntry = newEntry + (itemId -> observation)
+      newEntry = newEntry + (itemId -> score)
       observationsCache.put(userId, newEntry)
     } else {
-      cacheEntry = cacheEntry + (itemId -> observation)
+      cacheEntry = cacheEntry + (itemId -> score)
       observationsCache.remove(userId)
       observationsCache.put(userId, cacheEntry)
     }
