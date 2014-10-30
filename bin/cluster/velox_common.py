@@ -510,20 +510,16 @@ def rebuild_servers(git_remote, branch, deploy_key=None, clone_repo=False, **kwa
                  ) % (git_remote, branch, branch))
     pprint('Rebuilt to %s/%s!' % (git_remote, branch))
 
-# TODO yourkit profiling support
-def start_servers(cluster, heap_size, use_tachyon=True, **kwargs):
 
-    if use_tachyon:
-        restart_tachyon()
-        tachyon_master = cluster.servers[0].ip
-        # update yaml
-        # system("cp ../../conf/config.yml /tmp/config.yml")
-        with open("../../conf/config.yml") as template, open("/tmp/config.yml", "w") as new_conf:
-            config = yaml.load(template)
-            config["modelStorage"]["address"] = "tachyon://%s:19998" % tachyon_master
-            yaml.dump(config, new_conf, default_flow_style=False)
-        upload_file("all-hosts", "/tmp/config.yml", "/home/ubuntu/velox-modelserver/conf/config.yml")
-        pprint("updated velox config")
+def kill_veloxms_servers():
+    # kill_servers_cmd = "ps ax | grep [V]eloxApplication | sed \"s/^[\s]*//\" | sed \"s/[\s]*//\" | cut -d ' ' -f 1 | xargs kill"
+    kill_servers_cmd = "pkill -f VeloxApplication"
+    run_cmd("all-hosts", kill_servers_cmd)
+
+def restart_velox(cluster, heap_size):
+
+    kill_veloxms_servers()
+    sleep(2)
 
     velox_root = "/home/ubuntu/velox-modelserver"
     log4j_file = "/home/ubuntu/velox-modelserver/conf/log4j.properties"
@@ -550,6 +546,24 @@ def start_servers(cluster, heap_size, use_tachyon=True, **kwargs):
         pprint("Starting velox modelserver on [%s]" % server.ip)
         start_cmd_disown(server.ip, start_server_cmd)
         # run_cmd_single_bg(server.ip, start_server_cmd)
+
+# TODO yourkit profiling support
+def start_servers(cluster, heap_size, use_tachyon=True, **kwargs):
+
+    if use_tachyon:
+        restart_tachyon()
+        tachyon_master = cluster.servers[0].ip
+        # update yaml
+        # system("cp ../../conf/config.yml /tmp/config.yml")
+        with open("../../conf/config.yml") as template, open("/tmp/config.yml", "w") as new_conf:
+            config = yaml.load(template)
+            config["modelStorage"]["address"] = "tachyon://%s:19998" % tachyon_master
+            yaml.dump(config, new_conf, default_flow_style=False)
+        upload_file("all-hosts", "/tmp/config.yml", "/home/ubuntu/velox-modelserver/conf/config.yml")
+        pprint("updated velox config")
+
+    restart_velox(cluster, heap_size)
+
 
     
 
@@ -597,7 +611,7 @@ def start_servers(cluster, heap_size, use_tachyon=True, **kwargs):
 #         start_cmd_disown_nobg(server.ip, server_cmd)
 
 def kill_velox_local():
-    system("ps ax | grep Velox | grep java |  sed \"s/[ ]*//\" | cut -d ' ' -f 1 | xargs kill")
+    system('ps ax | grep Velox | grep java |  sed \"s/[ ]*//\" | cut -d ' ' -f 1 | xargs kill')
 
 def start_servers_local(num_servers, network_service, buffer_size, sweep_time, profile=False, profile_depth=2, **kwargs):
     kill_velox_local()

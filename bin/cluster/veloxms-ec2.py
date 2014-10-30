@@ -59,13 +59,19 @@ def command_install_tachyon(args):
     assign_hosts(cluster)
     install_tachyon(cluster)
 
+def command_restart_veloxms(args):
+    cluster = get_cluster(args)
+    kwargs = dict(vars(args))
+    assign_hosts(cluster)
+    restart_velox(cluster, HEAP_SIZE_GB)
+
 def command_start_velox_servers(args):
     cluster = get_cluster(args)
     kwargs = dict(vars(args))
     # runid = "THECRANK-%s" % (str(datetime.now()).replace(' ', '_').replace(":", '_'))
     # pprint("Running THE CRANKSHAW")
     stop_velox_processes()
-    restart_tachyon()
+    # restart_tachyon()
     assign_hosts(cluster)
     start_servers(cluster, HEAP_SIZE_GB, use_tachyon=True, **kwargs)
     # sleep(5)
@@ -262,6 +268,10 @@ if __name__ == "__main__":
     parser_start_velox = subparsers.add_parser('start_velox', help='Start the velox servers',
                                                 parents=[common_cluster_ec2])
     parser_start_velox.set_defaults(func=command_start_velox_servers)
+
+    parser_restart_veloxms = subparsers.add_parser('restart_veloxms', help='Restart velox servers',
+                                                parents=[common_cluster_ec2])
+    parser_restart_veloxms.set_defaults(func=command_restart_veloxms)
                                               
 
     ##################################
