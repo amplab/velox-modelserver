@@ -11,20 +11,20 @@ class TachyonStorageSpec extends FlatSpec with Matchers {
   behavior of "observation merging"
 
   it should "return tachyonMap if cacheEntry is empty"  in {
-    val result = TachyonUtils.mergeObservations(simpleMap, new HashMap[Long, Double]())
+    val result = TachyonUtils.mergeObservations(Option(simpleMap), Option(new HashMap[Long, Double]()))
 
     assert (result.equals(simpleMap))
   }
 
   it should "not fail if tachyonMap is null" in {
-    val result = TachyonUtils.mergeObservations(null, simpleMap)
+    val result = TachyonUtils.mergeObservations(Option(null), Option(simpleMap))
 
     assert (result.equals(simpleMap))
   }
 
   it should "correctly override values when there are matching keys" in {
     val cacheEntry = collection.immutable.HashMap(0L -> 2.0)
-    val result = TachyonUtils.mergeObservations(simpleMap, cacheEntry)
+    val result = TachyonUtils.mergeObservations(Option(simpleMap), Option(cacheEntry))
 
     assert (result.get(0L) == Some(2.0))
   }
