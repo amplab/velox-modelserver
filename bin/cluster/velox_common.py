@@ -1,30 +1,36 @@
 # Common helper functions
 
+import os
 from os import system
 import subprocess
 from time import sleep
 from boto import ec2
 from os.path import expanduser
+import yaml
 
-KEY_NAME = "velox"
-VELOX_INTERNAL_PORT_START = 8080
-VELOX_FRONTEND_PORT_START = 9000
+KEY_NAME = "veloxms-aws-deploy"
+VOLUME_SIZE = 50
+# VELOX_INTERNAL_PORT_START = 8080
+# VELOX_FRONTEND_PORT_START = 9000
+#
+# ZOOKEEPER_PORT = 2181
 
-ZOOKEEPER_PORT = 2181
+VELOX_BASE_DIR="/home/ubuntu/velox-modelserver"
 
-VELOX_BASE_DIR="/home/ubuntu/velox"
+HEAP_SIZE_GB = 10
+VELOX_JAR_LOCATION = "assembly/target/scala-2.10/veloxms-assembly-0.1.jar"
+VELOX_SECURITY_GROUP = "veloxms"
 
-HEAP_SIZE_GB = 240
-VELOX_JAR_LOCATION = "assembly/target/scala-2.10/velox-assembly-0.1.jar"
-VELOX_SECURITY_GROUP = "velox"
-
-DEFAULT_INSTANCE_TYPE = "cr1.8xlarge"
+DEFAULT_INSTANCE_TYPE = "r3.2xlarge"
 
 VELOX_SERVER_CLASS = "edu.berkeley.velox.server.VeloxServer"
 VELOX_CLIENT_BENCH_CLASS = "edu.berkeley.velox.benchmark.ClientBenchmark"
+SNAPSHOTs = {'us-east-1': 'snap-de003767'}
 
-AMIs = {'us-west-2': 'ami-8885e5b8',
-        'us-east-1': 'ami-b7dbe3de'}
+# AMIs = {'us-west-2': 'ami-8885e5b8',
+#         'us-east-1': 'ami-20911648'}
+
+AMIs = {'us-east-1': 'ami-10119778'}
 
 def run_cmd(hosts, cmd, user="ubuntu", time=1000):
     cmd = "pssh -i -t %d -O StrictHostKeyChecking=no -l %s -h hosts/%s.txt \"%s\"" % (time, user, hosts, cmd)
@@ -41,7 +47,6 @@ def run_cmd_single_bg(host, cmd, user="ubuntu", time = None):
     cmd = "ssh -o StrictHostKeyChecking=no %s@%s \"%s\" &" % (user, host, cmd)
     print cmd
     system(cmd)
-
 
 def start_cmd_disown(host, cmd, user="ubuntu"):
     run_cmd_single_bg(host, cmd+" & disown", user)
@@ -173,6 +178,101 @@ def get_instances(regionName, cluster_id):
 
     return hosts
 
+def get_zone(conn, cluster_id):
+    # conn = ec2.connect_to_region(regionName)
+
+    filters={'instance-state-name':'running'}
+    if cluster_id is not None:
+        filters['tag:cluster'] = cluster_id
+    reservations = conn.get_all_instances(filters=filters)
+
+    instances = []
+    for reservation in reservations:
+        instances += reservation.instances
+
+    zone = instances[0].placement
+    return zone
+
+
+def mount_instance_disks():
+    print "Mounting instance volumes..."
+    mount_cmd = ("sudo rm -rf /mnt*; "
+                 "sudo mkdir /mnt; "
+                 "sudo mkfs.ext4 -E lazy_itable_init=0,lazy_journal_init=0 /dev/xvdb 2> /dev/null; "
+                 "sudo mount -o defaults,noatime,nodiratime /dev/xvdb /mnt; "
+                 "sudo mkdir -p /mnt/tachyon-files; "
+                 "sudo chmod -R a+w /mnt*; ")
+    run_cmd("all-hosts", mount_cmd)
+
+# must have already called assign_hosts()
+def install_tachyon(cluster, generate_key=True):
+    # Need to format and mount instance volumes
+    # mount_instance_disks()
+
+    install_tachyon_cmd = ("rm -rf ~/tachyon; "
+                           "git clone https://github.com/dcrankshaw/tachyon.git; "
+                           "cd tachyon; "
+                           "git checkout velox-build; "
+                           "mvn package -DskipTests; "
+                           "mvn install:install-file "
+                           "-Dfile=core/target/tachyon-0.6.0-SNAPSHOT-jar-with-dependencies.jar "
+                           "-DgroupId=org.tachyonproject -DartifactId=tachyon-parent "
+                           "-Dversion=0.6.0-SNAPSHOT -Dpackaging=jar;")
+    # only need to run Tachyon on servers, but it should be built and installed
+    # on all hosts because it is needed to build Velox
+    print "Installing tachyon..."
+    run_cmd("all-hosts", install_tachyon_cmd)
+
+    # set slaves file in Tachyon
+    upload_file("all-hosts", "hosts/all-servers.txt", "/home/ubuntu/tachyon/conf/slaves")
+    tachyon_master = cluster.servers[0].ip
+
+    # set tachyon variables
+    # TODO automatically compute memory based on instance mem:
+    # cat /proc/meminfo | grep MemTotal | awk '{print $2}' gets instance mem in kB
+    # s3_access = os.environ['S3_ACCESS_KEY']
+    # s3_secret = os.environ['S3_SECRET_KEY']
+    s3_access = os.environ['AWS_ACCESS_KEY_ID']
+    s3_secret = os.environ['AWS_SECRET_ACCESS_KEY']
+    if (s3_access is None or s3_secret is None):
+        pprint("No S3 access key or secret key provided")
+        sys.exit(1)
+
+    tachyon_vars_cmd = ("echo export VELOX_TACHYON_MASTER=%s > ~/ec2-variables.sh; "
+                        "echo export VELOX_TACHYON_MEM=%dGB >> ~/ec2-variables.sh "
+                        "echo export S3_ACCESS_KEY=%s >> ~/ec2-variables.sh "
+                        "echo export S3_SECRET_KEY=%s >> ~/ec2-variables.sh "
+                        % (tachyon_master, 20, s3_access, s3_secret))
+    # print os.environ['S3_ACCESS_KEY']
+    # print os.environ['S3_SECRET_KEY']
+    run_cmd("all-servers", tachyon_vars_cmd)
+
+    # generate_key = False
+    if (generate_key):
+        print "Generating cluster's SSH key on master..."
+        key_setup = ("[ -f ~/.ssh/id_rsa ] || (ssh-keygen -q -t rsa -N '' -f ~/.ssh/id_rsa && cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys); ")
+        run_cmd_single(tachyon_master, key_setup)
+        # TODO there are much better ways to do this...
+        fetch_file_single(tachyon_master, "~/.ssh/id_rsa", "hosts/")
+        fetch_file_single(tachyon_master, "~/.ssh/id_rsa.pub", "hosts/")
+        fetch_file_single(tachyon_master, "~/.ssh/authorized_keys", "hosts/")
+        upload_file("all-hosts", "hosts/id_rsa", "/home/ubuntu/.ssh/id_rsa")
+        upload_file("all-hosts", "hosts/id_rsa.pub", "/home/ubuntu/.ssh/id_rsa.pub")
+        upload_file("all-hosts", "hosts/authorized_keys", "/home/ubuntu/.ssh/authorized_keys")
+
+    restart_tachyon()
+
+
+def restart_tachyon():
+    print "Starting Tachyon..."
+    start_tachyon_cmd = ("rm /home/ubuntu/tachyon/logs/*; "
+                         "/home/ubuntu/tachyon/bin/tachyon format; "
+                         "sleep 5; "
+                         "/home/ubuntu/tachyon/bin/tachyon-start.sh all SudoMount")
+
+    run_cmd("all-servers", start_tachyon_cmd)
+    # TODO how to test to make sure Tachyon was successfully started?
+
 def get_spot_request_ids(regionName):
     system("rm -f instances.txt")
     global AMIs
@@ -237,7 +337,12 @@ def terminate_cluster(cluster, placement_group="velox", **kwargs):
     #conn.delete_placement_group(placement_group)
 
 
-def provision_spot(cluster, instance_type=DEFAULT_INSTANCE_TYPE, spot_price=1.5, placement_group="velox", **kwargs):
+def provision_spot(
+        cluster,
+        instance_type=DEFAULT_INSTANCE_TYPE,
+        spot_price=1.5,
+        placement_group="veloxms",
+        **kwargs):
     global AMIs
 
     num_instances = cluster.numServers + cluster.numClients
@@ -320,7 +425,7 @@ def setup_security_group(region, group_name=VELOX_SECURITY_GROUP):
     try :
         if len(filter(lambda x: x.name == group_name, conn.get_all_security_groups())) != 0:
             conn.delete_security_group(name=group_name)
-        group = conn.create_security_group(group_name, "Velox EC2 all-open SG")
+        group = conn.create_security_group(group_name, "VeloxMS EC2 all-open SG")
         group.authorize('tcp', 0, 65535, '0.0.0.0/0')
     except Exception as e:
         pprint("Oops; couldn't create a new security group (%s). This is probably fine: " + str(e) % (group_name))
@@ -335,15 +440,15 @@ def assign_hosts(cluster):
     pprint("Assigning %d hosts to %s:% s... " % (len(hosts), cluster.regionName, cluster.clusterID))
 
     cluster.allocateHosts(hosts[:cluster.getNumHosts()])
-    frontend_servers = []
-    internal_servers = []
-    sid = 0
-    for server in cluster.servers:
-        frontend_servers.append("%s:%d" % (server.ip, VELOX_FRONTEND_PORT_START+sid))
-        internal_servers.append("%s:%d" % (server.ip, VELOX_INTERNAL_PORT_START+sid))
-        sid += 1
-    cluster.internal_cluster_str = ",".join(internal_servers)
-    cluster.frontend_cluster_str = ",".join(frontend_servers)
+    # frontend_servers = []
+    # internal_servers = []
+    # sid = 0
+    # for server in cluster.servers:
+    #     frontend_servers.append("%s:%d" % (server.ip, VELOX_FRONTEND_PORT_START+sid))
+    #     internal_servers.append("%s:%d" % (server.ip, VELOX_INTERNAL_PORT_START+sid))
+    #     sid += 1
+    # cluster.internal_cluster_str = ",".join(internal_servers)
+    # cluster.frontend_cluster_str = ",".join(frontend_servers)
 
     # Finally write the instance files for the regions and everything.
     make_instancefile("all-hosts.txt", cluster.getAllHosts())
@@ -351,6 +456,8 @@ def assign_hosts(cluster):
     make_instancefile("all-clients.txt", cluster.clients)
 
     pprint("Assigned all %d hosts!" % len(hosts))
+
+
 
 def stop_velox_processes():
     pprint("Terminating java processes...")
@@ -367,69 +474,144 @@ def install_ykit(cluster):
     # run_cmd("all-hosts", "scp ubuntu@%s:yjp-2013-build-13072-linux.tar.bz2 yjp-2013.tar.bz2" %  master)
     # run_cmd("all-hosts", "tar -xvf yjp-2013.tar.bz2")
 
-def rebuild_servers(git_remote, branch, deploy_key=None, **kwargs):
+    
+
+
+def rebuild_servers(git_remote, branch, deploy_key=None, clone_repo=False, **kwargs):
+    # run_cmd("all-hosts", ("rm -rf /home/ubuntu/velox-modelserver "
+    #                       "/home/ubuntu/.ssh/known_hosts " 
+    #                       "/home/ubuntu/.ssh/config "
+    #                       "/home/ubuntu/.ssh/veloxms-aws-deploy"))
+    # return
+    # run_cmd("all-hosts", "rm /home/ubuntu/velox-modelserver/conf/config.yaml")
     if deploy_key:
+        pprint("Adding deploy key...")
         upload_file("all-hosts", deploy_key, "/home/ubuntu/.ssh")
-        run_cmd("all-hosts", "echo 'IdentityFile /home/ubuntu/.ssh/%s' >> /home/ubuntu/.ssh/config; chmod go-r /home/ubuntu/.ssh/*" % (deploy_key.split("/")[-1]))
+        run_cmd("all-hosts", "printf 'Host github.com\n\tIdentityFile /home/ubuntu/.ssh/%s\n\tStrictHostKeyChecking no\n' > /home/ubuntu/.ssh/config; chmod go-r /home/ubuntu/.ssh/*" % (deploy_key.split("/")[-1]))
 
     pprint('Rebuilding clients and servers...')
+    if clone_repo:
+        clone_cmd = ("cd ~/; "
+                     "rm -rf /home/ubuntu/velox-modelserver; "
+                     "git clone git@github.com:dcrankshaw/velox-modelserver.git")
+        pprint("Cloning velox-modelserver repository...")
+        run_cmd('all-hosts', clone_cmd)
     run_cmd_in_velox('all-hosts',
-                     ("git remote rm vremote; "
-                      "git remote add vremote %s; "
-                      "git checkout master; "
-                      "git branch -D veloxbranch; "
-                      "git fetch vremote; "
-                      "git checkout -b veloxbranch vremote/%s; "
-                      "git reset --hard vremote/%s; "
-                      "sbt/sbt assembly; "
-                      # "cd external/ycsb; "
-                      # "./package-ycsb.sh"
-                      ) % (git_remote, branch, branch))
+                ("git remote rm vremote; "
+                 "git remote add vremote %s; "
+                 "git checkout master; "
+                 "git branch -D veloxbranch; "
+                 "git fetch vremote; "
+                 "git checkout -b veloxbranch vremote/%s; "
+                 "git reset --hard vremote/%s; "
+                 "mvn package; "
+                 # "cd external/ycsb; "
+                 # "./package-ycsb.sh"
+                 ) % (git_remote, branch, branch))
     pprint('Rebuilt to %s/%s!' % (git_remote, branch))
 
-def start_servers_with_zk(cluster, heap_size, network_service, buffer_size, sweep_time, profile=False, profile_depth=2, reset_zk=True, **kwargs):
-    HEADER = "cd /home/ubuntu/velox/; rm *.log;"
 
-    pstr = ""
-    if profile:
-        # pstr += "-agentlib:hprof=cpu=samples,interval=20,depth=%d,file=java.hprof.server.txt" % (profile_depth)
-        pstr += "-agentpath:/home/ubuntu/yourkit/bin/linux-x86-64/libyjpagent.so"
-    # kill any java processes
-    run_cmd("all-hosts", "pkill -9 java")
-    # this kills zookeeper as well so we have to restart it
-    # TODO: figure out a better way to shut down velox cluster
-    start_zookeeper_cluster(cluster, reset_zk)
+def kill_veloxms_servers():
+    # kill_servers_cmd = "ps ax | grep [V]eloxApplication | sed \"s/^[\s]*//\" | sed \"s/[\s]*//\" | cut -d ' ' -f 1 | xargs kill"
+    kill_servers_cmd = "pkill -f VeloxApplication"
+    run_cmd("all-hosts", kill_servers_cmd)
 
-    base_cmd = (HEADER + "java %(pstr)s -XX:+UseParallelGC -Xms%(heap_size)dG "
-               "-Xmx%(heap_size)dG -cp %(jar_loc)s %(server_class)s "
-               "-p %(internal_port)d -f %(frontend_port)d --network_service %(net_service)s "
-               "--buffer_size %(buf_size)d --sweep_time %(sweep_time)d "
-               "--ip_address %(ip_addr)s --num_servers %(num_servers)d "
-               "-z %(zk_servers)s 1>server.log 2>&1 & ")
-    zk_servers = ",".join(["%s:%d" % (s.ip, ZOOKEEPER_PORT) for s in cluster.servers])
+def restart_velox(cluster, heap_size):
 
-    cmd_args = {'pstr': pstr,
-                'heap_size': heap_size,
-                'jar_loc': VELOX_JAR_LOCATION,
-                'server_class': VELOX_SERVER_CLASS,
-                'net_service': network_service,
-                'buf_size': buffer_size,
-                'sweep_time': sweep_time,
-                'num_servers': cluster.numServers,
-                'zk_servers': zk_servers}
+    kill_veloxms_servers()
+    sleep(2)
 
+    velox_root = "/home/ubuntu/velox-modelserver"
+    log4j_file = "/home/ubuntu/velox-modelserver/conf/log4j.properties"
+
+    s3_access = os.environ['AWS_ACCESS_KEY_ID']
+    s3_secret = os.environ['AWS_SECRET_ACCESS_KEY']
+
+    start_server_cmd = ("java -Xms%dg -Xmx%dg -Dlog4j.configuration=file:%s "
+                        "-Dfs.s3n.awsAccessKeyId=%s "
+                        "-Dfs.s3n.awsSecretAccessKey=%s "
+                        "-cp %s/veloxms-core/target/veloxms-core-0.0.1-SNAPSHOT.jar "
+                        "edu.berkeley.veloxms.VeloxApplication server "
+                        "%s/conf/config.yml "
+                        % (heap_size, heap_size, log4j_file, s3_access, s3_secret, velox_root, velox_root))
 
     for sid in range(0, cluster.numServers):
-        cmd_args['frontend_port'] = VELOX_FRONTEND_PORT_START+sid
-        cmd_args['internal_port'] = VELOX_INTERNAL_PORT_START+sid
-        cmd_args['ip_addr'] = cluster.servers[sid].ip
-        server_cmd = base_cmd % cmd_args
         server = cluster.servers[sid]
-        pprint("Starting velox server with zookeeper on [%s]" % server.ip)
-        start_cmd_disown_nobg(server.ip, server_cmd)
+        pprint("Starting velox modelserver on [%s]" % server.ip)
+        start_cmd_disown(server.ip, start_server_cmd)
+        # run_cmd_single_bg(server.ip, start_server_cmd)
+
+    for sid in range(0, cluster.numClients):
+        server = cluster.clients[sid]
+        pprint("Starting velox modelserver on [%s]" % server.ip)
+        start_cmd_disown(server.ip, start_server_cmd)
+        # run_cmd_single_bg(server.ip, start_server_cmd)
+
+# TODO yourkit profiling support
+def start_servers(cluster, heap_size, use_tachyon=True, **kwargs):
+
+    if use_tachyon:
+        restart_tachyon()
+        tachyon_master = cluster.servers[0].ip
+        # update yaml
+        # system("cp ../../conf/config.yml /tmp/config.yml")
+        with open("../../conf/config.yml") as template, open("/tmp/config.yml", "w") as new_conf:
+            config = yaml.load(template)
+            config["modelStorage"]["address"] = "tachyon://%s:19998" % tachyon_master
+            yaml.dump(config, new_conf, default_flow_style=False)
+        upload_file("all-hosts", "/tmp/config.yml", "/home/ubuntu/velox-modelserver/conf/config.yml")
+        pprint("updated velox config")
+
+    restart_velox(cluster, heap_size)
+
+
+    
+
+
+
+# def start_servers_with_zk(cluster, heap_size, network_service, buffer_size, sweep_time, profile=False, profile_depth=2, reset_zk=True, **kwargs):
+#     HEADER = "cd /home/ubuntu/velox/; rm *.log;"
+#
+#     pstr = ""
+#     if profile:
+#         # pstr += "-agentlib:hprof=cpu=samples,interval=20,depth=%d,file=java.hprof.server.txt" % (profile_depth)
+#         pstr += "-agentpath:/home/ubuntu/yourkit/bin/linux-x86-64/libyjpagent.so"
+#     # kill any java processes
+#     run_cmd("all-hosts", "pkill -9 java")
+#     # this kills zookeeper as well so we have to restart it
+#     # TODO: figure out a better way to shut down velox cluster
+#     start_zookeeper_cluster(cluster, reset_zk)
+#
+#     base_cmd = (HEADER + "java %(pstr)s -XX:+UseParallelGC -Xms%(heap_size)dG "
+#                "-Xmx%(heap_size)dG -cp %(jar_loc)s %(server_class)s "
+#                "-p %(internal_port)d -f %(frontend_port)d --network_service %(net_service)s "
+#                "--buffer_size %(buf_size)d --sweep_time %(sweep_time)d "
+#                "--ip_address %(ip_addr)s --num_servers %(num_servers)d "
+#                "-z %(zk_servers)s 1>server.log 2>&1 & ")
+#     zk_servers = ",".join(["%s:%d" % (s.ip, ZOOKEEPER_PORT) for s in cluster.servers])
+#
+#     cmd_args = {'pstr': pstr,
+#                 'heap_size': heap_size,
+#                 'jar_loc': VELOX_JAR_LOCATION,
+#                 'server_class': VELOX_SERVER_CLASS,
+#                 'net_service': network_service,
+#                 'buf_size': buffer_size,
+#                 'sweep_time': sweep_time,
+#                 'num_servers': cluster.numServers,
+#                 'zk_servers': zk_servers}
+#
+#
+#     for sid in range(0, cluster.numServers):
+#         cmd_args['frontend_port'] = VELOX_FRONTEND_PORT_START+sid
+#         cmd_args['internal_port'] = VELOX_INTERNAL_PORT_START+sid
+#         cmd_args['ip_addr'] = cluster.servers[sid].ip
+#         server_cmd = base_cmd % cmd_args
+#         server = cluster.servers[sid]
+#         pprint("Starting velox server with zookeeper on [%s]" % server.ip)
+#         start_cmd_disown_nobg(server.ip, server_cmd)
 
 def kill_velox_local():
-    system("ps ax | grep Velox | grep java |  sed \"s/[ ]*//\" | cut -d ' ' -f 1 | xargs kill")
+    system('ps ax | grep Velox | grep java |  sed \"s/[ ]*//\" | cut -d ' ' -f 1 | xargs kill')
 
 def start_servers_local(num_servers, network_service, buffer_size, sweep_time, profile=False, profile_depth=2, **kwargs):
     kill_velox_local()
@@ -549,72 +731,72 @@ def run_velox_client_bench(cluster, network_service, buffer_size, sweep_time, pr
 
     run_cmd_in_velox("all-clients", cmd)
 
-def run_ycsb_local(num_servers, parallelism, read_pct, ops, max_time, skip_rebuild, valuesize=1, recordcount=10000, request_distribution="zipfian", workload="workloads/workloada", **kwargs):
-    clientConfigStr = ",".join(["localhost:"+str(VELOX_FRONTEND_PORT_START+id) for id in range(0, num_servers)])
-
-    ycsb_cmd = (("cd external/ycsb; "
-                 "bin/ycsb run velox "
-                 "-s "
-                 "-P %s "
-                 "-threads %d "
-                 "-p readproportion=%s "
-                 "-p updateproportion=%s "
-                 "-p fieldlength=%d "
-                 "-p fieldcount=1 "
-                 "-p recordcount=%d "
-                 "-p operationcount=%d "
-                 "-p requestdistribution=%s "
-                 "-p maxexecutiontime=%d "
-                 "-p cluster=%s") %
-                (workload, parallelism, read_pct, 1-read_pct, valuesize, recordcount, ops, request_distribution, max_time, clientConfigStr))
-
-    if not skip_rebuild:
-        pprint("Rebuilding YCSB")
-        system("cd external/ycsb; ./package-ycsb.sh")
-        pprint("YCSB rebuilt!")
-
-    pprint("Loading YCSB on single client...")
-    load_cmd = ycsb_cmd.replace(" run ", " load ")
-    print("cd external/ycsb; "+load_cmd)
-    system(load_cmd)
-    pprint("YCSB loaded!")
-
-    pprint("Running YCSB")
-    print("cd external/ycsb; "+ycsb_cmd)
-    system(ycsb_cmd)
-    pprint("YCSB complete!")
-
-def run_ycsb(cluster, parallelism, read_pct, ops, max_time, skip_rebuild, valuesize=1, recordcount=10000, request_distribution="zipfian", workload="workloads/workloada", **kwargs):
-    ycsb_cmd = (("pkill -9 java;"
-                 "cd /home/ubuntu/velox/external/ycsb; "
-                 "bin/ycsb run velox "
-                 "-s "
-                 "-P %s "
-                 "-threads %d "
-                 "-p readproportion=%s "
-                 "-p updateproportion=%s "
-                 "-p fieldlength=%d "
-                 "-p fieldcount=1 "
-                 "-p recordcount=%d "
-                 "-p operationcount=%d "
-                 "-p requestdistribution=%s "
-                 "-p maxexecutiontime=%d "
-                 "-p cluster=%s > run_out.log 2> run_err.log") %
-                (workload, parallelism, read_pct, 1-read_pct, valuesize, recordcount, ops, request_distribution, max_time, cluster.frontend_cluster_str))
-
-    if not skip_rebuild:
-        pprint("Rebuilding YCSB")
-        run_cmd("all-clients", "cd /home/ubuntu/velox/external/ycsb; ./package-ycsb.sh")
-        pprint("YCSB rebuilt!")
-
-    pprint("Loading YCSB on single client...")
-    load_cmd = ycsb_cmd.replace(" run ", " load ").replace("run_", "load_")
-    run_cmd_single(cluster.clients[0].ip, "cd /home/ubuntu/velox/external/ycsb; "+load_cmd)
-    pprint("YCSB loaded!")
-
-    pprint("Running YCSB")
-    run_cmd_in_velox("all-clients", ycsb_cmd)
-    pprint("YCSB complete!")
+# def run_ycsb_local(num_servers, parallelism, read_pct, ops, max_time, skip_rebuild, valuesize=1, recordcount=10000, request_distribution="zipfian", workload="workloads/workloada", **kwargs):
+#     clientConfigStr = ",".join(["localhost:"+str(VELOX_FRONTEND_PORT_START+id) for id in range(0, num_servers)])
+#
+#     ycsb_cmd = (("cd external/ycsb; "
+#                  "bin/ycsb run velox "
+#                  "-s "
+#                  "-P %s "
+#                  "-threads %d "
+#                  "-p readproportion=%s "
+#                  "-p updateproportion=%s "
+#                  "-p fieldlength=%d "
+#                  "-p fieldcount=1 "
+#                  "-p recordcount=%d "
+#                  "-p operationcount=%d "
+#                  "-p requestdistribution=%s "
+#                  "-p maxexecutiontime=%d "
+#                  "-p cluster=%s") %
+#                 (workload, parallelism, read_pct, 1-read_pct, valuesize, recordcount, ops, request_distribution, max_time, clientConfigStr))
+#
+#     if not skip_rebuild:
+#         pprint("Rebuilding YCSB")
+#         system("cd external/ycsb; ./package-ycsb.sh")
+#         pprint("YCSB rebuilt!")
+#
+#     pprint("Loading YCSB on single client...")
+#     load_cmd = ycsb_cmd.replace(" run ", " load ")
+#     print("cd external/ycsb; "+load_cmd)
+#     system(load_cmd)
+#     pprint("YCSB loaded!")
+#
+#     pprint("Running YCSB")
+#     print("cd external/ycsb; "+ycsb_cmd)
+#     system(ycsb_cmd)
+#     pprint("YCSB complete!")
+#
+# def run_ycsb(cluster, parallelism, read_pct, ops, max_time, skip_rebuild, valuesize=1, recordcount=10000, request_distribution="zipfian", workload="workloads/workloada", **kwargs):
+#     ycsb_cmd = (("pkill -9 java;"
+#                  "cd /home/ubuntu/velox/external/ycsb; "
+#                  "bin/ycsb run velox "
+#                  "-s "
+#                  "-P %s "
+#                  "-threads %d "
+#                  "-p readproportion=%s "
+#                  "-p updateproportion=%s "
+#                  "-p fieldlength=%d "
+#                  "-p fieldcount=1 "
+#                  "-p recordcount=%d "
+#                  "-p operationcount=%d "
+#                  "-p requestdistribution=%s "
+#                  "-p maxexecutiontime=%d "
+#                  "-p cluster=%s > run_out.log 2> run_err.log") %
+#                 (workload, parallelism, read_pct, 1-read_pct, valuesize, recordcount, ops, request_distribution, max_time, cluster.frontend_cluster_str))
+#
+#     if not skip_rebuild:
+#         pprint("Rebuilding YCSB")
+#         run_cmd("all-clients", "cd /home/ubuntu/velox/external/ycsb; ./package-ycsb.sh")
+#         pprint("YCSB rebuilt!")
+#
+#     pprint("Loading YCSB on single client...")
+#     load_cmd = ycsb_cmd.replace(" run ", " load ").replace("run_", "load_")
+#     run_cmd_single(cluster.clients[0].ip, "cd /home/ubuntu/velox/external/ycsb; "+load_cmd)
+#     pprint("YCSB loaded!")
+#
+#     pprint("Running YCSB")
+#     run_cmd_in_velox("all-clients", ycsb_cmd)
+#     pprint("YCSB complete!")
 
 def mkdir(d):
     system("mkdir -p %s" % d)
@@ -634,79 +816,79 @@ def fetch_logs(cluster, runid, output_dir, **kwargs):
         fetch_file_single_compressed(client.ip, VELOX_BASE_DIR+"/*.log", c_dir)
         fetch_file_single_compressed(client.ip, VELOX_BASE_DIR+"/external/ycsb/*.log", c_dir)
 
-# deletes zookeeper data and log. Zookeeper comes back up with clean state.
-def start_zookeeper_cluster(cluster, reset=False):
-    if reset:
-        run_cmd("all-servers", "rm -rf /tmp/zookeeper/version-2; rm -rf /tmp/zookeeper_log/version-2")
-    run_cmd("all-servers", "/home/ubuntu/zookeeper-3.4.5/bin/zkServer.sh start")
+# # deletes zookeeper data and log. Zookeeper comes back up with clean state.
+# def start_zookeeper_cluster(cluster, reset=False):
+#     if reset:
+#         run_cmd("all-servers", "rm -rf /tmp/zookeeper/version-2; rm -rf /tmp/zookeeper_log/version-2")
+#     run_cmd("all-servers", "/home/ubuntu/zookeeper-3.4.5/bin/zkServer.sh start")
 
 
-# deletes zookeeper data and log. Zookeeper comes back up with clean state.
-def start_zookeeper_cluster_local(reset=False):
-    if reset:
-        system("rm -rf /tmp/zookeeper/version-2; rm -rf /tmp/zookeeper_log/version-2")
-    system("/tmp/zookeeper-3.4.5/bin/zkServer.sh start")
+# # deletes zookeeper data and log. Zookeeper comes back up with clean state.
+# def start_zookeeper_cluster_local(reset=False):
+#     if reset:
+#         system("rm -rf /tmp/zookeeper/version-2; rm -rf /tmp/zookeeper_log/version-2")
+#     system("/tmp/zookeeper-3.4.5/bin/zkServer.sh start")
 
 
-def install_zookeeper_cluster(cluster, conf, dl=True, delete=True):
-    # mirror = "http://www.webhostingjams.com/mirror/apache/zookeeper/current/zookeeper-3.4.5.tar.gz"
-    zk_src_path = "external/zookeeper/zookeeper-3.4.5.tar.gz"
-    system("cp %s conf/zoo.cfg" % conf)
-    with open("conf/zoo.cfg", 'a') as cfg:
-        for i in range(cluster.numServers):
-            cfg.write("server.%d=%s:2888:3888\n" % (i + 1, cluster.servers[i].ip))
-
-
-
-    if delete:
-        run_cmd("all-hosts", "/home/ubuntu/zookeeper-3.4.5/bin/zkServer.sh stop; "
-                "rm -rf /home/ubuntu/zookeeper-3.4.5; "
-                "rm -rf /tmp/zookeeper; "
-                "rm -rf /tmp/zookeeper_log; "
-                "rm /home/ubuntu/zookeeper-3.4.5.tar.gz; ")
-
-    if dl:
-        upload_file("all-servers", zk_src_path, "/home/ubuntu/")
-
-        # deploy_command = (("wget -P /home/ubuntu %s; "
-        deploy_command = ("sudo apt-get install -y openjdk-7-jdk; "
-                           # make sure that data and log directories exist or ZooKeeper won't start
-                          "mkdir -p /tmp/zookeeper; "
-                          "mkdir -p /tmp/zookeeper_log; "
-                          "tar zxvf ~/zookeeper-3.4.5.tar.gz;")
-        run_cmd("all-servers", deploy_command)
-
-    upload_file("all-servers", "conf/zoo.cfg", "/home/ubuntu/zookeeper-3.4.5/conf/")
-    # set zookeeper server id - has to be in datDir directory
-    for i in range(cluster.numServers):
-        run_cmd_single(cluster.servers[i].ip,
-                       "echo %d > /tmp/zookeeper/myid" % (i + 1))
-
-    system("rm conf/zoo.cfg")
+# def install_zookeeper_cluster(cluster, conf, dl=True, delete=True):
+#     # mirror = "http://www.webhostingjams.com/mirror/apache/zookeeper/current/zookeeper-3.4.5.tar.gz"
+#     zk_src_path = "external/zookeeper/zookeeper-3.4.5.tar.gz"
+#     system("cp %s conf/zoo.cfg" % conf)
+#     with open("conf/zoo.cfg", 'a') as cfg:
+#         for i in range(cluster.numServers):
+#             cfg.write("server.%d=%s:2888:3888\n" % (i + 1, cluster.servers[i].ip))
+#
+#
+#
+#     if delete:
+#         run_cmd("all-hosts", "/home/ubuntu/zookeeper-3.4.5/bin/zkServer.sh stop; "
+#                 "rm -rf /home/ubuntu/zookeeper-3.4.5; "
+#                 "rm -rf /tmp/zookeeper; "
+#                 "rm -rf /tmp/zookeeper_log; "
+#                 "rm /home/ubuntu/zookeeper-3.4.5.tar.gz; ")
+#
+#     if dl:
+#         upload_file("all-servers", zk_src_path, "/home/ubuntu/")
+#
+#         # deploy_command = (("wget -P /home/ubuntu %s; "
+#         deploy_command = ("sudo apt-get install -y openjdk-7-jdk; "
+#                            # make sure that data and log directories exist or ZooKeeper won't start
+#                           "mkdir -p /tmp/zookeeper; "
+#                           "mkdir -p /tmp/zookeeper_log; "
+#                           "tar zxvf ~/zookeeper-3.4.5.tar.gz;")
+#         run_cmd("all-servers", deploy_command)
+#
+#     upload_file("all-servers", "conf/zoo.cfg", "/home/ubuntu/zookeeper-3.4.5/conf/")
+#     # set zookeeper server id - has to be in datDir directory
+#     for i in range(cluster.numServers):
+#         run_cmd_single(cluster.servers[i].ip,
+#                        "echo %d > /tmp/zookeeper/myid" % (i + 1))
+#
+#     system("rm conf/zoo.cfg")
         
 
 
-def install_zookeeper_cluster_local(conf, install=True, delete=True):
-    # mirror = "http://www.webhostingjams.com/mirror/apache/zookeeper/current/zookeeper-3.4.5.tar.gz"
-    zk_src_path = "external/zookeeper/zookeeper-3.4.5.tar.gz"
-    system("cp %s conf/zoo.cfg" % conf)
-
-    if delete:
-        system("/tmp/zookeeper-3.4.5/bin/zkServer.sh stop; "
-                "rm -rf /tmp/zookeeper-3.4.5; "
-                "rm -rf /tmp/zookeeper; "
-                "rm -rf /tmp/zookeeper_log; ")
-
-    if install:
-        # deploy_command = (("wget -P /home/ubuntu %s; "
-        deploy_command = (# make sure that data and log directories exist or ZooKeeper won't start
-                          "mkdir -p /tmp/zookeeper; "
-                          "mkdir -p /tmp/zookeeper_log; "
-                          "tar zxvf external/zookeeper/zookeeper-3.4.5.tar.gz -C /tmp 2> /dev/null")
-        system(deploy_command)
-
-    system("mv conf/zoo.cfg /tmp/zookeeper-3.4.5/conf/")
-    # set zookeeper server id - has to be in datDir directory
-    system("echo 1 > /tmp/zookeeper/myid")
-
+# def install_zookeeper_cluster_local(conf, install=True, delete=True):
+#     # mirror = "http://www.webhostingjams.com/mirror/apache/zookeeper/current/zookeeper-3.4.5.tar.gz"
+#     zk_src_path = "external/zookeeper/zookeeper-3.4.5.tar.gz"
+#     system("cp %s conf/zoo.cfg" % conf)
+#
+#     if delete:
+#         system("/tmp/zookeeper-3.4.5/bin/zkServer.sh stop; "
+#                 "rm -rf /tmp/zookeeper-3.4.5; "
+#                 "rm -rf /tmp/zookeeper; "
+#                 "rm -rf /tmp/zookeeper_log; ")
+#
+#     if install:
+#         # deploy_command = (("wget -P /home/ubuntu %s; "
+#         deploy_command = (# make sure that data and log directories exist or ZooKeeper won't start
+#                           "mkdir -p /tmp/zookeeper; "
+#                           "mkdir -p /tmp/zookeeper_log; "
+#                           "tar zxvf external/zookeeper/zookeeper-3.4.5.tar.gz -C /tmp 2> /dev/null")
+#         system(deploy_command)
+#
+#     system("mv conf/zoo.cfg /tmp/zookeeper-3.4.5/conf/")
+#     # set zookeeper server id - has to be in datDir directory
+#     system("echo 1 > /tmp/zookeeper/myid")
+#
 

@@ -43,7 +43,8 @@ curl -H "Content-Type: application/json" -d '{
 "itemsSrc":"/home/ubuntu/data/product_model.txt",
 "usersSrc":"/home/ubuntu/data/user_model.txt",
 "obsSrc":"/home/ubuntu/data/ratings.dat",
-"partition":0}' http://localhost:8080/misc/prep-tachyon
+"partition":0,
+"numPartitions":3}' http://localhost:8080/misc/prep-tachyon
 
 */
 
@@ -54,7 +55,8 @@ case class ModelLocations(
   itemsSrc: String,
   usersSrc: String,
   obsSrc: String,
-  partition: Int
+  partition: Int,
+  numPartitions: Int
 )
 
 case class TestParams(tachloc: String, part: Int, create: Boolean, key: Long)
@@ -71,11 +73,12 @@ class WriteModelsResource extends Logging {
   @Timed
   def writeAllToTachyon(@Valid locs: ModelLocations): Boolean = {
     logInfo("Writing items")
-    writeMapToTachyon(readModel(locs.itemsSrc), locs.itemsDst, locs.partition)
+    writeMapToTachyon(readModel(locs.itemsSrc), locs.itemsDst, locs.partition, locs.numPartitions)
     logInfo("Writing users")
-    writeMapToTachyon(readModel(locs.usersSrc), locs.usersDst, locs.partition)
+    writeMapToTachyon(readModel(locs.usersSrc), locs.usersDst, locs.partition, locs.numPartitions)
     logInfo("Writing observations")
-    writeMapToTachyon(readObservations(locs.obsSrc), locs.obsDst, locs.partition, 3)
+    writeMapToTachyon(readObservations(locs.obsSrc), locs.obsDst, locs.partition,
+      locs.numPartitions)
     logInfo("Finished prepping tachyon")
     true
   }
@@ -154,7 +157,8 @@ class WriteModelsResource extends Logging {
     val obs = Source.fromFile(obsLoc)
       .getLines
       .map( (line) => {
-        val splits = line.split("::")
+        // val splits = line.split("::")
+        val splits = line.split("\\s+")
         Observation(splits(0).toLong, splits(1).toLong, splits(2).toDouble)
       })
       .toList

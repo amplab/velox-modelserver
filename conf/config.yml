@@ -2,7 +2,7 @@
 
 modelStorage:
     storageType: tachyon
-    address: tachyon://ec2-204-236-207-142.compute-1.amazonaws.com:19998
+    address: tachyon://ec2-54-82-134-136.compute-1.amazonaws.com:19998
     items: item-model
     users: user-model
     ratings: movie-ratings
@@ -32,12 +32,12 @@ logging:
   appenders:
     - type: file
       # The file to which current statements will be logged.
-      currentLogFilename: ./logs/velox.log
-      archivedLogFilenamePattern: ./logs/velox-%d.log.gz
+      currentLogFilename: /home/ubuntu/velox-modelserver/logs/velox.log
+      archivedLogFilenamePattern: /home/ubuntu/velox-modelserver/logs/velox-%d.log.gz
       archivedFileCount: 5
       timeZone: UTC
     - type: console
-      threshold: WARN
+      threshold: INFO
       target: stderr
 
 server:
@@ -45,8 +45,8 @@ server:
     timeZone: UTC
     appenders:
       - type: file
-        currentLogFilename: ./logs/requests.log
+        currentLogFilename: /home/ubuntu/velox-modelserver/logs/requests.log
         threshold: ALL
         archive: true
-        archivedLogFilenamePattern: ./logs/requests.%d.log.gz
+        archivedLogFilenamePattern: /home/ubuntu/velox-modelserver/logs/requests.%d.log.gz
         archivedFileCount: 5
