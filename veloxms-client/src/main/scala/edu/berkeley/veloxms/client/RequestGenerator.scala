@@ -31,6 +31,10 @@ case class PredictRequest(user: Long, item: Long)
 import RequestDist._
 
 // generate
+/**
+ * Create requests for a matrix factorization model with the given number
+ * of items, users
+ */
 class MFRequestor (
     numUsers: Long = 100,
     numItems: Long = 1000,

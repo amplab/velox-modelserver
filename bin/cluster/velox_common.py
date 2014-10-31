@@ -7,6 +7,8 @@ from time import sleep
 from boto import ec2
 from os.path import expanduser
 import yaml
+import requests
+import json
 
 KEY_NAME = "veloxms-aws-deploy"
 VOLUME_SIZE = 50
@@ -17,7 +19,7 @@ VOLUME_SIZE = 50
 
 VELOX_BASE_DIR="/home/ubuntu/velox-modelserver"
 
-HEAP_SIZE_GB = 10
+HEAP_SIZE_GB = 45
 VELOX_JAR_LOCATION = "assembly/target/scala-2.10/veloxms-assembly-0.1.jar"
 VELOX_SECURITY_GROUP = "veloxms"
 
@@ -204,11 +206,7 @@ def mount_instance_disks():
                  "sudo chmod -R a+w /mnt*; ")
     run_cmd("all-hosts", mount_cmd)
 
-# must have already called assign_hosts()
-def install_tachyon(cluster, generate_key=True):
-    # Need to format and mount instance volumes
-    # mount_instance_disks()
-
+def build_tachyon_maven():
     install_tachyon_cmd = ("rm -rf ~/tachyon; "
                            "git clone https://github.com/dcrankshaw/tachyon.git; "
                            "cd tachyon; "
@@ -222,6 +220,14 @@ def install_tachyon(cluster, generate_key=True):
     # on all hosts because it is needed to build Velox
     print "Installing tachyon..."
     run_cmd("all-hosts", install_tachyon_cmd)
+
+
+# must have already called assign_hosts()
+def install_tachyon(cluster, generate_key=True):
+    # Need to format and mount instance volumes
+    # mount_instance_disks()
+
+    build_tachyon_maven()
 
     # set slaves file in Tachyon
     upload_file("all-hosts", "hosts/all-servers.txt", "/home/ubuntu/tachyon/conf/slaves")
@@ -428,7 +434,8 @@ def setup_security_group(region, group_name=VELOX_SECURITY_GROUP):
         group = conn.create_security_group(group_name, "VeloxMS EC2 all-open SG")
         group.authorize('tcp', 0, 65535, '0.0.0.0/0')
     except Exception as e:
-        pprint("Oops; couldn't create a new security group (%s). This is probably fine: " + str(e) % (group_name))
+        pprint("Oops; couldn't create a new security group (%s). This is probably fine: %s"
+                % (group_name, str(e)))
 
 
 # Assigns hosts to clusters (and specifically as servers, clients)
@@ -477,13 +484,19 @@ def install_ykit(cluster):
     
 
 
-def rebuild_servers(git_remote, branch, deploy_key=None, clone_repo=False, **kwargs):
+def rebuild_servers(git_remote, branch, deploy_key=None, clone_repo=False, build_tachyon=False, **kwargs):
     # run_cmd("all-hosts", ("rm -rf /home/ubuntu/velox-modelserver "
     #                       "/home/ubuntu/.ssh/known_hosts " 
     #                       "/home/ubuntu/.ssh/config "
     #                       "/home/ubuntu/.ssh/veloxms-aws-deploy"))
     # return
     # run_cmd("all-hosts", "rm /home/ubuntu/velox-modelserver/conf/config.yaml")
+
+    print(build_tachyon)
+    if build_tachyon:
+        build_tachyon_maven()
+
+
     if deploy_key:
         pprint("Adding deploy key...")
         upload_file("all-hosts", deploy_key, "/home/ubuntu/.ssh")
@@ -497,7 +510,8 @@ def rebuild_servers(git_remote, branch, deploy_key=None, clone_repo=False, **kwa
         pprint("Cloning velox-modelserver repository...")
         run_cmd('all-hosts', clone_cmd)
     run_cmd_in_velox('all-hosts',
-                ("git remote rm vremote; "
+                ("git stash; "
+                 "git remote rm vremote; "
                  "git remote add vremote %s; "
                  "git checkout master; "
                  "git branch -D veloxbranch; "
@@ -516,7 +530,23 @@ def kill_veloxms_servers():
     kill_servers_cmd = "pkill -f VeloxApplication"
     run_cmd("all-hosts", kill_servers_cmd)
 
-def restart_velox(cluster, heap_size):
+def run_my_command(cluster):
+    cmd = "killall java; pkill -9 java"
+    run_cmd("all-hosts", cmd)
+
+def get_metrics(cluster, file_name, **kwargs):
+    url = "http://%s:8081/metrics"
+    timing_info = {}
+    for sid in range(0, cluster.numServers):
+        server = cluster.servers[sid]
+        metrics_req = requests.get(url % server.ip)
+        timing = metrics_req.json()[u'timers']
+        timing_info[server.ip] = timing
+    with open("hosts/%s.json" % file_name, 'w') as f:
+        json.dump(timing_info, f, sort_keys=True, indent=4, separators=(',', ': '))
+
+
+def restart_velox(cluster, heap_size, rm_logs=False, **kwargs):
 
     kill_veloxms_servers()
     sleep(2)
@@ -524,45 +554,106 @@ def restart_velox(cluster, heap_size):
     velox_root = "/home/ubuntu/velox-modelserver"
     log4j_file = "/home/ubuntu/velox-modelserver/conf/log4j.properties"
 
-    s3_access = os.environ['AWS_ACCESS_KEY_ID']
-    s3_secret = os.environ['AWS_SECRET_ACCESS_KEY']
+    # s3_access = os.environ['AWS_ACCESS_KEY_ID']
+    # s3_secret = os.environ['AWS_SECRET_ACCESS_KEY']
 
-    start_server_cmd = ("java -Xms%dg -Xmx%dg -Dlog4j.configuration=file:%s "
-                        "-Dfs.s3n.awsAccessKeyId=%s "
-                        "-Dfs.s3n.awsSecretAccessKey=%s "
+    upload_file("all-hosts", "../../conf/config.yml", "/home/ubuntu/velox-modelserver/conf/config.yml")
+
+    if rm_logs:
+        print "Clearing log files"
+        run_cmd("all-servers", "rm /home/ubuntu/velox-modelserver/logs/*; ")
+
+#     pstr = ""
+#     if profile:
+#         # pstr += "-agentlib:hprof=cpu=samples,interval=20,depth=%d,file=java.hprof.server.txt" % (profile_depth)
+#         pstr += "-agentpath:/home/ubuntu/yourkit/bin/linux-x86-64/libyjpagent.so"
+    start_server_cmd = ("java -XX:+UseConcMarkSweepGC -Xms%dg -Xmx%dg -Dlog4j.configuration=file:%s "
+                        "-Ddw.modelStorage.partition=%d "
+                        # "-Dfs.s3n.awsAccessKeyId=%s "
+                        # "-Dfs.s3n.awsSecretAccessKey=%s "
                         "-cp %s/veloxms-core/target/veloxms-core-0.0.1-SNAPSHOT.jar "
                         "edu.berkeley.veloxms.VeloxApplication server "
-                        "%s/conf/config.yml "
-                        % (heap_size, heap_size, log4j_file, s3_access, s3_secret, velox_root, velox_root))
+                        "%s/conf/config.yml ")
 
     for sid in range(0, cluster.numServers):
+        this_server_cmd = start_server_cmd % (heap_size, heap_size, log4j_file, sid, velox_root, velox_root)
         server = cluster.servers[sid]
         pprint("Starting velox modelserver on [%s]" % server.ip)
-        start_cmd_disown(server.ip, start_server_cmd)
-        # run_cmd_single_bg(server.ip, start_server_cmd)
+        start_cmd_disown(server.ip, this_server_cmd)
 
-    for sid in range(0, cluster.numClients):
-        server = cluster.clients[sid]
-        pprint("Starting velox modelserver on [%s]" % server.ip)
-        start_cmd_disown(server.ip, start_server_cmd)
-        # run_cmd_single_bg(server.ip, start_server_cmd)
+    # for sid in range(0, cluster.numClients):
+    #     server = cluster.clients[sid]
+    #     pprint("Starting velox modelserver on [%s]" % server.ip)
+    #     start_cmd_disown(server.ip, start_server_cmd)
 
 # TODO yourkit profiling support
-def start_servers(cluster, heap_size, use_tachyon=True, **kwargs):
+def start_servers(cluster, heap_size, use_tachyon=False, **kwargs):
+    config_loc = "../../conf/config.yml"
 
     if use_tachyon:
         restart_tachyon()
         tachyon_master = cluster.servers[0].ip
         # update yaml
         # system("cp ../../conf/config.yml /tmp/config.yml")
-        with open("../../conf/config.yml") as template, open("/tmp/config.yml", "w") as new_conf:
+        config = {}
+        with open(config_loc, 'r') as template: #, open("/tmp/config.yml", "w") as new_conf:
             config = yaml.load(template)
+        with open(config_loc, 'w') as new_conf:
             config["modelStorage"]["address"] = "tachyon://%s:19998" % tachyon_master
             yaml.dump(config, new_conf, default_flow_style=False)
-        upload_file("all-hosts", "/tmp/config.yml", "/home/ubuntu/velox-modelserver/conf/config.yml")
+        upload_file("all-hosts", config_loc, "/home/ubuntu/velox-modelserver/conf/config.yml")
         pprint("updated velox config")
 
     restart_velox(cluster, heap_size)
+
+def run_client_bench(cluster, **kwargs):
+
+
+    base_cmd = ("pkill -9 java; "
+                "java -XX:+UseConcMarkSweepGC -Xmx%(heap_size)dg -Xms%(heap_size)dg "
+                "-Dlog4j.configuration=file:%(velox_home)s/conf/log4j.properties "
+                "-cp %(velox_home)s/veloxms-client/target/veloxms-client-0.0.1-SNAPSHOT.jar:conf/log4j.properties "
+                "edu.berkeley.veloxms.client.VeloxWorkloadDriver "
+                "--numRequests %(num_reqs)d "
+                "--veloxURLFile %(velox_home)s/conf/server_partitions.txt "
+                "--numUsers %(num_users)d "
+                "--numItems %(num_items)d "
+                "--numPartitions %(num_partitions)d "
+                "--percentObs %(percent_obs)f "
+                "--numThreads %(parallelism)d "
+                "--connTimeout %(conn_timeout)d "
+                "--throttleRequests %(throttle_reqs)d "
+                "--statusTime %(status_time)d "
+                )
+
+    cmd_args = {'heap_size': HEAP_SIZE_GB,
+                        'velox_home': '/home/ubuntu/velox-modelserver',
+                        'num_reqs': 25000,
+                        'num_users': 100000,
+                        'num_items': 50000,
+                        'num_partitions': 2,
+                        'percent_obs': 0.2,
+                        'parallelism': 10,
+                        'conn_timeout': 30000,
+                        'throttle_reqs': 1000,
+                        'status_time': 10
+                        }
+    # override defaults
+    cmd_args.update(kwargs)
+    with open("/tmp/server_partitions.txt", "w") as f:
+        lines = []
+        for sid in range(0, cluster.numServers):
+            lines.append("%d: %s\n" % (sid, cluster.servers[sid].ip))
+        f.writelines(lines)
+    upload_file("all-clients",
+                "/tmp/server_partitions.txt",
+                "/home/ubuntu/velox-modelserver/conf/server_partitions.txt")
+
+    cmd_str = base_cmd % cmd_args
+
+    run_cmd_in_velox("all-clients", cmd_str)
+    # run_cmd_single(cluster.clients[0].ip, cmd_str)
+
 
 
     
@@ -609,127 +700,127 @@ def start_servers(cluster, heap_size, use_tachyon=True, **kwargs):
 #         server = cluster.servers[sid]
 #         pprint("Starting velox server with zookeeper on [%s]" % server.ip)
 #         start_cmd_disown_nobg(server.ip, server_cmd)
-
-def kill_velox_local():
-    system('ps ax | grep Velox | grep java |  sed \"s/[ ]*//\" | cut -d ' ' -f 1 | xargs kill')
-
-def start_servers_local(num_servers, network_service, buffer_size, sweep_time, profile=False, profile_depth=2, **kwargs):
-    kill_velox_local()
-
-    serverConfigStr = ",".join(["localhost:"+str(VELOX_INTERNAL_PORT_START+id) for id in range(0, num_servers)])
-
-    base_cmd = ("java %(pstr)s -XX:+UseParallelGC -Xms28m -Xmx512m -cp %(jar_loc)s %(server_class)s "
-                "-p %(internal_port)d "
-                "-f %(frontend_port)d "
-                "--network_service %(net_service)s "
-                "--buffer_size %(buf_size)d "
-                "--ip_address %(ip_addr)s "
-                "--sweep_time %(swp_time)d "
-                "-z localhost:%(zk_port)d "
-                "--num_servers %(num_servers)d 1> /tmp/server-%(sid)d.log 2>&1 &")
-
-    cmd_args = {'jar_loc': VELOX_JAR_LOCATION,
-                'server_class': VELOX_SERVER_CLASS,
-                'net_service': network_service,
-                'buf_size': buffer_size,
-                'ip_addr': "localhost",
-                'swp_time': sweep_time,
-                'zk_port': ZOOKEEPER_PORT,
-                'num_servers': num_servers}
-
-    for sid in range(0, num_servers):
-        if profile:
-            cmd_args['pstr'] = "-agentlib:hprof=cpu=samples,interval=20,depth=%d,file=java.hprof.server-%d.txt" % (profile_depth, sid)
-        else:
-            cmd_args['pstr'] = ""
-        cmd_args['internal_port'] = VELOX_INTERNAL_PORT_START+sid
-        cmd_args['frontend_port'] = VELOX_FRONTEND_PORT_START+sid
-        cmd_args['sid'] = sid
-        server_cmd = base_cmd % cmd_args
-        print server_cmd
-        system(server_cmd)
-
-    pprint("Started servers! Logs in /tmp/server-*.log")
-
-def client_bench_local_single(num_servers, network_service, buffer_size, sweep_time, profile, profile_depth, parallelism, read_pct, ops, max_time, latency, test_index, **kwargs):
-    clientConfigStr = ",".join(["localhost:"+str(VELOX_FRONTEND_PORT_START+id) for id in range(0, num_servers)])
-    if profile:
-        pstr = "-agentlib:hprof=cpu=samples,interval=20,depth=%d,file=java.hprof.client.txt" % profile_depth
-    else:
-        pstr = ""
-    base_cmd = ("java %(pstr)s -XX:+UseParallelGC -Xms512m -Xmx2G -cp %(jar_loc)s %(server_class)s "
-              # "-m %(client_str)s --parallelism %(parallelism)d --pct_reads %(read_pct)f --ops %(num_ops)d "
-              "--parallelism %(parallelism)d --pct_reads %(read_pct)f --ops %(num_ops)d "
-              "--timeout %(timeout)d --network_service %(net_service)s --buffer_size %(buf_size)d "
-              "--sweep_time %(sweep_time)d --latency %(latency)s "
-              "--test_index %(test_index)s "
-              "-z localhost:%(zk_port)d "
-              "--num_servers %(num_servers)d "
-              "--run --load")
-
-    cmd_args = {'pstr': pstr,
-                'jar_loc': VELOX_JAR_LOCATION,
-                'server_class': VELOX_CLIENT_BENCH_CLASS,
-                # 'client_str': clientConfigStr,
-                'parallelism': parallelism,
-                'read_pct': read_pct,
-                'num_ops': ops,
-                'timeout': max_time,
-                'net_service': network_service,
-                'buf_size': buffer_size,
-                'sweep_time': sweep_time,
-                'latency': latency,
-                'test_index': test_index,
-                'zk_port': ZOOKEEPER_PORT,
-                'num_servers': num_servers}
-    runcmd = base_cmd % cmd_args
-    print runcmd
-    system(runcmd)
-
-#  -agentlib:hprof=cpu=samples,interval=20,depth=3,monitor=y
-def run_velox_client_bench(cluster, network_service, buffer_size, sweep_time, profile, profile_depth, parallelism, read_pct, ops, max_time, latency, test_index, heap_size=HEAP_SIZE_GB, **kwargs):
-    pstr = ""
-
-    if profile:
-        pstr += "-agentpath:/home/ubuntu/yourkit/bin/linux-x86-64/libyjpagent.so"
-        #hprof = "-agentlib:hprof=cpu=samples,interval=20,depth=%d,file=java.hprof.client.txt" % (profile_depth)
-
-    zk_servers = ",".join(["%s:%d" % (s.ip, ZOOKEEPER_PORT) for s in cluster.servers])
-
-    base_cmd = ("pkill -9 java; "
-                "java %(pstr)s -XX:+UseParallelGC -Xms%(heap_size)dG -Xmx%(heap_size)dG -cp %(jar_loc)s %(server_class)s "
-                "--parallelism %(parallelism)d --pct_reads %(read_pct)f --ops %(num_ops)d "
-                "--timeout %(timeout)d --network_service %(net_service)s --buffer_size %(buf_size)d "
-                "--sweep_time %(sweep_time)d --latency %(latency)s "
-                "--test_index %(test_index)s "
-                "--num_servers %(num_servers)d "
-                "-z %(zk_servers)s --run 2>&1 | tee client.log"
-                )
-
-
-    cmd_args = {'pstr': pstr,
-                'jar_loc': VELOX_JAR_LOCATION,
-                'server_class': VELOX_CLIENT_BENCH_CLASS,
-                'heap_size': heap_size,
-                # 'client_str': cluster.frontend_cluster_str
-                'parallelism': parallelism,
-                'read_pct': read_pct,
-                'num_ops': ops,
-                'timeout': max_time,
-                'net_service': network_service,
-                'buf_size': buffer_size,
-                'sweep_time': sweep_time,
-                'latency': latency,
-                'test_index': test_index,
-                'zk_servers': zk_servers,
-                'num_servers': cluster.numServers}
-
-    cmd = base_cmd % cmd_args
-
-    print "loading table"
-    run_cmd_single(cluster.clients[0].ip, "cd " + VELOX_BASE_DIR + ";" + cmd.replace("--run", "--load"))
-
-    run_cmd_in_velox("all-clients", cmd)
+#
+# def kill_velox_local():
+#     system('ps ax | grep Velox | grep java |  sed \"s/[ ]*//\" | cut -d ' ' -f 1 | xargs kill')
+#
+# def start_servers_local(num_servers, network_service, buffer_size, sweep_time, profile=False, profile_depth=2, **kwargs):
+#     kill_velox_local()
+#
+#     serverConfigStr = ",".join(["localhost:"+str(VELOX_INTERNAL_PORT_START+id) for id in range(0, num_servers)])
+#
+#     base_cmd = ("java %(pstr)s -XX:+UseParallelGC -Xms28m -Xmx512m -cp %(jar_loc)s %(server_class)s "
+#                 "-p %(internal_port)d "
+#                 "-f %(frontend_port)d "
+#                 "--network_service %(net_service)s "
+#                 "--buffer_size %(buf_size)d "
+#                 "--ip_address %(ip_addr)s "
+#                 "--sweep_time %(swp_time)d "
+#                 "-z localhost:%(zk_port)d "
+#                 "--num_servers %(num_servers)d 1> /tmp/server-%(sid)d.log 2>&1 &")
+#
+#     cmd_args = {'jar_loc': VELOX_JAR_LOCATION,
+#                 'server_class': VELOX_SERVER_CLASS,
+#                 'net_service': network_service,
+#                 'buf_size': buffer_size,
+#                 'ip_addr': "localhost",
+#                 'swp_time': sweep_time,
+#                 'zk_port': ZOOKEEPER_PORT,
+#                 'num_servers': num_servers}
+#
+#     for sid in range(0, num_servers):
+#         if profile:
+#             cmd_args['pstr'] = "-agentlib:hprof=cpu=samples,interval=20,depth=%d,file=java.hprof.server-%d.txt" % (profile_depth, sid)
+#         else:
+#             cmd_args['pstr'] = ""
+#         cmd_args['internal_port'] = VELOX_INTERNAL_PORT_START+sid
+#         cmd_args['frontend_port'] = VELOX_FRONTEND_PORT_START+sid
+#         cmd_args['sid'] = sid
+#         server_cmd = base_cmd % cmd_args
+#         print server_cmd
+#         system(server_cmd)
+#
+#     pprint("Started servers! Logs in /tmp/server-*.log")
+#
+# def client_bench_local_single(num_servers, network_service, buffer_size, sweep_time, profile, profile_depth, parallelism, read_pct, ops, max_time, latency, test_index, **kwargs):
+#     clientConfigStr = ",".join(["localhost:"+str(VELOX_FRONTEND_PORT_START+id) for id in range(0, num_servers)])
+#     if profile:
+#         pstr = "-agentlib:hprof=cpu=samples,interval=20,depth=%d,file=java.hprof.client.txt" % profile_depth
+#     else:
+#         pstr = ""
+#     base_cmd = ("java %(pstr)s -XX:+UseParallelGC -Xms512m -Xmx2G -cp %(jar_loc)s %(server_class)s "
+#               # "-m %(client_str)s --parallelism %(parallelism)d --pct_reads %(read_pct)f --ops %(num_ops)d "
+#               "--parallelism %(parallelism)d --pct_reads %(read_pct)f --ops %(num_ops)d "
+#               "--timeout %(timeout)d --network_service %(net_service)s --buffer_size %(buf_size)d "
+#               "--sweep_time %(sweep_time)d --latency %(latency)s "
+#               "--test_index %(test_index)s "
+#               "-z localhost:%(zk_port)d "
+#               "--num_servers %(num_servers)d "
+#               "--run --load")
+#
+#     cmd_args = {'pstr': pstr,
+#                 'jar_loc': VELOX_JAR_LOCATION,
+#                 'server_class': VELOX_CLIENT_BENCH_CLASS,
+#                 # 'client_str': clientConfigStr,
+#                 'parallelism': parallelism,
+#                 'read_pct': read_pct,
+#                 'num_ops': ops,
+#                 'timeout': max_time,
+#                 'net_service': network_service,
+#                 'buf_size': buffer_size,
+#                 'sweep_time': sweep_time,
+#                 'latency': latency,
+#                 'test_index': test_index,
+#                 'zk_port': ZOOKEEPER_PORT,
+#                 'num_servers': num_servers}
+#     runcmd = base_cmd % cmd_args
+#     print runcmd
+#     system(runcmd)
+#
+# #  -agentlib:hprof=cpu=samples,interval=20,depth=3,monitor=y
+# def run_velox_client_bench(cluster, network_service, buffer_size, sweep_time, profile, profile_depth, parallelism, read_pct, ops, max_time, latency, test_index, heap_size=HEAP_SIZE_GB, **kwargs):
+#     pstr = ""
+#
+#     if profile:
+#         pstr += "-agentpath:/home/ubuntu/yourkit/bin/linux-x86-64/libyjpagent.so"
+#         #hprof = "-agentlib:hprof=cpu=samples,interval=20,depth=%d,file=java.hprof.client.txt" % (profile_depth)
+#
+#     zk_servers = ",".join(["%s:%d" % (s.ip, ZOOKEEPER_PORT) for s in cluster.servers])
+#
+#     base_cmd = ("pkill -9 java; "
+#                 "java %(pstr)s -XX:+UseParallelGC -Xms%(heap_size)dG -Xmx%(heap_size)dG -cp %(jar_loc)s %(server_class)s "
+#                 "--parallelism %(parallelism)d --pct_reads %(read_pct)f --ops %(num_ops)d "
+#                 "--timeout %(timeout)d --network_service %(net_service)s --buffer_size %(buf_size)d "
+#                 "--sweep_time %(sweep_time)d --latency %(latency)s "
+#                 "--test_index %(test_index)s "
+#                 "--num_servers %(num_servers)d "
+#                 "-z %(zk_servers)s --run 2>&1 | tee client.log"
+#                 )
+#
+#
+#     cmd_args = {'pstr': pstr,
+#                 'jar_loc': VELOX_JAR_LOCATION,
+#                 'server_class': VELOX_CLIENT_BENCH_CLASS,
+#                 'heap_size': heap_size,
+#                 # 'client_str': cluster.frontend_cluster_str
+#                 'parallelism': parallelism,
+#                 'read_pct': read_pct,
+#                 'num_ops': ops,
+#                 'timeout': max_time,
+#                 'net_service': network_service,
+#                 'buf_size': buffer_size,
+#                 'sweep_time': sweep_time,
+#                 'latency': latency,
+#                 'test_index': test_index,
+#                 'zk_servers': zk_servers,
+#                 'num_servers': cluster.numServers}
+#
+#     cmd = base_cmd % cmd_args
+#
+#     print "loading table"
+#     run_cmd_single(cluster.clients[0].ip, "cd " + VELOX_BASE_DIR + ";" + cmd.replace("--run", "--load"))
+#
+#     run_cmd_in_velox("all-clients", cmd)
 
 # def run_ycsb_local(num_servers, parallelism, read_pct, ops, max_time, skip_rebuild, valuesize=1, recordcount=10000, request_distribution="zipfian", workload="workloads/workloada", **kwargs):
 #     clientConfigStr = ",".join(["localhost:"+str(VELOX_FRONTEND_PORT_START+id) for id in range(0, num_servers)])
@@ -801,20 +892,20 @@ def run_velox_client_bench(cluster, network_service, buffer_size, sweep_time, pr
 def mkdir(d):
     system("mkdir -p %s" % d)
 
-def fetch_logs(cluster, runid, output_dir, **kwargs):
-    log_dir = "%s/%s/" % (output_dir, runid)
-    mkdir(log_dir)
-    for server in cluster.servers:
-        s_dir = log_dir+"/S"+server.ip
-        mkdir(s_dir)
-        fetch_file_single_compressed(server.ip, VELOX_BASE_DIR+"/*.log", s_dir)
-        fetch_file_single_compressed(server.ip, VELOX_BASE_DIR+"/external/ycsb/*.log", s_dir)
-
-    for client in cluster.clients:
-        c_dir = log_dir+"/C"+client.ip
-        mkdir(c_dir)
-        fetch_file_single_compressed(client.ip, VELOX_BASE_DIR+"/*.log", c_dir)
-        fetch_file_single_compressed(client.ip, VELOX_BASE_DIR+"/external/ycsb/*.log", c_dir)
+# def fetch_logs(cluster, runid, output_dir, **kwargs):
+#     log_dir = "%s/%s/" % (output_dir, runid)
+#     mkdir(log_dir)
+#     for server in cluster.servers:
+#         s_dir = log_dir+"/S"+server.ip
+#         mkdir(s_dir)
+#         fetch_file_single_compressed(server.ip, VELOX_BASE_DIR+"/*.log", s_dir)
+#         fetch_file_single_compressed(server.ip, VELOX_BASE_DIR+"/external/ycsb/*.log", s_dir)
+#
+#     for client in cluster.clients:
+#         c_dir = log_dir+"/C"+client.ip
+#         mkdir(c_dir)
+#         fetch_file_single_compressed(client.ip, VELOX_BASE_DIR+"/*.log", c_dir)
+#         fetch_file_single_compressed(client.ip, VELOX_BASE_DIR+"/external/ycsb/*.log", c_dir)
 
 # # deletes zookeeper data and log. Zookeeper comes back up with clean state.
 # def start_zookeeper_cluster(cluster, reset=False):

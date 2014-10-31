@@ -38,8 +38,9 @@ def command_rebuild(args):
     assign_hosts(cluster)
     # stopping velox will also kill tachyon right now
 
-    stop_velox_processes()
-    restart_tachyon()
+    # stop_velox_processes()
+    kill_veloxms_servers()
+    # restart_tachyon()
     rebuild_servers(**kwargs)
 
 def command_terminate(args):
@@ -63,7 +64,19 @@ def command_restart_veloxms(args):
     cluster = get_cluster(args)
     kwargs = dict(vars(args))
     assign_hosts(cluster)
-    restart_velox(cluster, HEAP_SIZE_GB)
+    restart_velox(cluster, HEAP_SIZE_GB, **kwargs)
+
+def command_get_metrics(args):
+    cluster = get_cluster(args)
+    kwargs = dict(vars(args))
+    assign_hosts(cluster)
+    get_metrics(cluster, 'metrics_result', **kwargs)
+
+def command_runcmd(args):
+    cluster = get_cluster(args)
+    kwargs = dict(vars(args))
+    assign_hosts(cluster)
+    run_my_command(cluster)
 
 def command_start_velox_servers(args):
     cluster = get_cluster(args)
@@ -84,59 +97,56 @@ def command_start_velox_servers(args):
 def command_client_bench(args):
     cluster = get_cluster(args)
     kwargs = dict(vars(args))
-    runid = "THECRANK-%s" % (str(datetime.now()).replace(' ', '_').replace(":", '_'))
-    pprint("Running THE CRANKSHAW")
+    runid = "CLIENT_BENCH-%s" % (str(datetime.now()).replace(' ', '_').replace(":", '_'))
+    pprint("Running simple benchmark")
     assign_hosts(cluster)
-    start_servers_with_zk(cluster, **kwargs)
-    sleep(5)
-    run_velox_client_bench(cluster, **kwargs)
-    stop_velox_processes()
-    fetch_logs(cluster, runid, **kwargs)
-    pprint("THE CRANKSHAW has completed!")
+    run_client_bench(cluster, **kwargs)
+    # stop_velox_processes()
+    # fetch_logs(cluster, runid, **kwargs)
+    # get_metrics(cluster, "metrics_%s" % runid, **kwargs)
+    pprint("Simple benchmark has completed!")
 
-def command_client_bench_local(args):
-    kwargs = dict(vars(args))
-    command_deploy_zookeeper_local(args)
-    pprint("Running THE CRANKSHAW locally! (1 client only)")
-    start_servers_local(**kwargs)
-    sleep(5)
-    client_bench_local_single(**kwargs)
-    kill_velox_local()
-    pprint("THE CRANKSHAW has completed!")
-
-def command_ycsb_bench(args):
-    cluster = get_cluster(args)
-    kwargs = dict(vars(args))
-    runid = "YCSB-%s" % (str(datetime.now()).replace(' ', '_').replace(":", '_'))
-    pprint("Running YCSB")
-    assign_hosts(cluster)
-    start_servers(cluster, **kwargs)
-    sleep(5)
-    run_ycsb(cluster, **kwargs)
-    stop_velox_processes()
-    fetch_logs(cluster, runid, **kwargs)
-    pprint("YCSB has completed!")
-
-def command_ycsb_bench_local(args):
-    kwargs = dict(vars(args))
-    pprint("Running YCSB locally! (1 client only)")
-    start_servers_local(**kwargs)
-    sleep(5)
-    run_ycsb_local(**kwargs)
-    kill_velox_local()
-    pprint("YCSB has completed!")
-
-def command_deploy_zookeeper(args):
-    cluster = get_cluster(args)
-    pprint("Deploying Zookeeper")
-    assign_hosts(cluster)
-    install_zookeeper_cluster(cluster, args.zk_config)
-    start_zookeeper_cluster(cluster)
-
-def command_deploy_zookeeper_local(args):
-    pprint("Deploying Zookeeper locally!")
-    install_zookeeper_cluster_local(args.zk_config)
-    start_zookeeper_cluster_local()
+# def command_client_bench_local(args):
+#     kwargs = dict(vars(args))
+#     command_deploy_zookeeper_local(args)
+#     pprint("Running THE CRANKSHAW locally! (1 client only)")
+#     start_servers_local(**kwargs)
+#     kill_velox_local()
+#     pprint("THE CRANKSHAW has completed!")
+#
+# def command_ycsb_bench(args):
+#     cluster = get_cluster(args)
+#     kwargs = dict(vars(args))
+#     runid = "YCSB-%s" % (str(datetime.now()).replace(' ', '_').replace(":", '_'))
+#     pprint("Running YCSB")
+#     assign_hosts(cluster)
+#     start_servers(cluster, **kwargs)
+#     sleep(5)
+#     run_ycsb(cluster, **kwargs)
+#     stop_velox_processes()
+#     fetch_logs(cluster, runid, **kwargs)
+#     pprint("YCSB has completed!")
+#
+# def command_ycsb_bench_local(args):
+#     kwargs = dict(vars(args))
+#     pprint("Running YCSB locally! (1 client only)")
+#     start_servers_local(**kwargs)
+#     sleep(5)
+#     run_ycsb_local(**kwargs)
+#     kill_velox_local()
+#     pprint("YCSB has completed!")
+#
+# def command_deploy_zookeeper(args):
+#     cluster = get_cluster(args)
+#     pprint("Deploying Zookeeper")
+#     assign_hosts(cluster)
+#     install_zookeeper_cluster(cluster, args.zk_config)
+#     start_zookeeper_cluster(cluster)
+#
+# def command_deploy_zookeeper_local(args):
+#     pprint("Deploying Zookeeper locally!")
+#     install_zookeeper_cluster_local(args.zk_config)
+#     start_zookeeper_cluster_local()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Setup velox on EC2')
@@ -236,6 +246,8 @@ if __name__ == "__main__":
                         help='Local path to upstream deploy key. [default: %(default)s]')
     parser_rebuild.add_argument('--clone_repo', dest="clone_repo", action='store_true',
                         help='Clone the Velox repo from GitHub. Only needed on fresh clusters. [default: %(default)s]')
+    parser_rebuild.add_argument('--build_tachyon', dest="build_tachyon", action='store_true',
+                        help='Build tachyon and install to local maven repo. Only needed on fresh clusters. [default: %(default)s]')
 
     # install_ykit
     parser_install_ykit = subparsers.add_parser('install_ykit', help='Install yourkit',
@@ -272,6 +284,27 @@ if __name__ == "__main__":
     parser_restart_veloxms = subparsers.add_parser('restart_veloxms', help='Restart velox servers',
                                                 parents=[common_cluster_ec2])
     parser_restart_veloxms.set_defaults(func=command_restart_veloxms)
+
+    parser_restart_veloxms.add_argument('--rm_logs', dest="rm_logs", action='store_true',
+                        help='Clear log files. [default: %(default)s]')
+
+    parser_easy_runcmd = subparsers.add_parser('run_mycommand', help='Shortcut to just run a command on all servers',
+                                                parents=[common_cluster_ec2])
+    parser_easy_runcmd.set_defaults(func=command_runcmd)
+
+    parser_get_metrics = subparsers.add_parser('get_metrics', help='Get timing metrics info from servers',
+                                                parents=[common_cluster_ec2])
+    parser_get_metrics.set_defaults(func=command_get_metrics)
+    # parser_get_metrics.add_argument(
+
+
+    parser_run_bench = subparsers.add_parser('run_benchmark', help='Run simple client benchmark',
+                                 parents=[common_cluster_ec2])
+    parser_run_bench.set_defaults(func=command_client_bench)
+
+    # parser_run_bench.add_argument('--rm_logs', dest="rm_logs", action='store_true',
+    #                     help='Clear log files. [default: %(default)s]')
+
                                               
 
     ##################################

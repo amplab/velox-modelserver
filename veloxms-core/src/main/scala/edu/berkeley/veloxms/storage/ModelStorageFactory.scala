@@ -18,6 +18,11 @@ class ModelStorageFactory extends Logging {
   val items: String = ""
   val users: String = ""
   val ratings: String = ""
+  val totalNumUsers: Int = -1
+  val numItems: Int = -1
+  val numPartitions: Int = -1
+  val modelSize: Int = -1
+  val partition: Int = -1
 
   def build(env: Environment, numFactors: Int): ModelStorage[FeatureVector] = {
     // Build the modelStorage
@@ -29,6 +34,15 @@ class ModelStorageFactory extends Logging {
           items,
           ratings,
           numFactors)
+      }
+      case "jvmRandom" => {
+        logInfo(s"Using jvmRandom storage as partition $partition")
+        JVMLocalStorage.generateRandomData(
+            totalNumUsers,
+            numItems,
+            numPartitions, 
+            partition,
+            modelSize)
       }
       case "tachyon" => {
         logInfo("Using tachyon storage")
