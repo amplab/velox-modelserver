@@ -15,6 +15,7 @@ import scala.collection.immutable.HashMap
 import edu.berkeley.veloxms._
 import java.nio.ByteBuffer
 import java.io.ByteArrayOutputStream
+import java.util.concurrent.ConcurrentHashMap
 import edu.berkeley.veloxms.util.{VeloxKryoRegistrar, KryoThreadLocal}
 // import scala.pickling._
 // import binary._
@@ -47,6 +48,10 @@ class TachyonStorage (
   }
 
   logInfo("got tachyon stores")
+
+  val usersCache = new ConcurrentHashMap[Long, WeightVector]
+
+  val observationsCache = new ConcurrentHashMap[Long, HashMap[Long, Double]]
 
   def getFeatureData(itemId: Long): Try[FeatureVector] = {
     // getFactors(itemId, items, "item-model")
@@ -81,11 +86,13 @@ class TachyonStorage (
   }
 
   def getUserFactors(userId: Long): Try[WeightVector] = {
-    val rawBytes = ByteBuffer.wrap(users.get(TachyonUtils.long2ByteArr(userId)))
-    val kryo = KryoThreadLocal.kryoTL.get
-    val result = kryo.deserialize(rawBytes).asInstanceOf[WeightVector]
-    Success(result)
+    val result = Option(usersCache.get(userId)).getOrElse({
+      val rawBytes = ByteBuffer.wrap(users.get(TachyonUtils.long2ByteArr(userId)))
+      val kryo = KryoThreadLocal.kryoTL.get
+      kryo.deserialize(rawBytes).asInstanceOf[WeightVector]
+    })
 
+    Success(result)
 
     //
     // val result = for {
@@ -100,7 +107,8 @@ class TachyonStorage (
     val rawBytes = ByteBuffer.wrap(ratings.get(TachyonUtils.long2ByteArr(userId)))
     val kryo = KryoThreadLocal.kryoTL.get
     val result = kryo.deserialize(rawBytes).asInstanceOf[HashMap[Long, Double]]
-    Success(result)
+
+    Success(TachyonUtils.mergeObservations(Option(result), Option(observationsCache.get(userId))))
       //
       // val result = for {
       //     rawBytes <- Try(ratings.get(TachyonUtils.long2ByteArr(userId)))
@@ -108,6 +116,8 @@ class TachyonStorage (
       // } yield array
       // result
   }
+
+
 
   // def cast(value: Any): Option[A] = {
   //   val erasure = manifest[A] match {
@@ -123,6 +133,17 @@ class TachyonStorage (
   //   }
   //   if(erasure.isInstance(value)) Some(value.asInstanceOf[A]) else None
   // }
+
+  def addScore(userId: Long, itemId: Long, score: Double) = {
+    // eventually, this should write through to Tachyon
+    var cacheEntry = Option(observationsCache.get(userId)).getOrElse({
+      val newEntry = new HashMap[Long, Double]
+      observationsCache.put(userId, newEntry)
+      newEntry
+    })
+
+    cacheEntry = cacheEntry + (itemId -> score)
+  }
 
   /**
    * Cleans up any necessary resources
@@ -161,6 +182,34 @@ object TachyonUtils {
       } else {
         Success(u)
       }
+    }
+  }
+
+  def mergeObservations( tachyonMap: Option[HashMap[Long, Double]],
+                         cacheEntry: Option[HashMap[Long, Double]]): HashMap[Long, Double] = {
+    if (!cacheEntry.isDefined) {
+      tachyonMap.getOrElse({
+        new HashMap[Long, Double]
+      })
+    } else if (!tachyonMap.isDefined) {
+      cacheEntry.get
+    } else {
+      var result = tachyonMap.get
+
+      for (iid <- cacheEntry.get.keys)  {
+        if (result.keySet.contains(iid)) { // if there is an entry, then remove it
+          result = result - iid
+        }
+
+        val cacheEntryVal: Double = cacheEntry.get.get(iid) match {
+          case Some(cacheEntryVal) => cacheEntryVal
+          case None => throw new RuntimeException("iid in key set not found on get")
+        }
+
+        result = result + (iid -> cacheEntryVal)
+      }
+
+      result
     }
   }
 
@@ -216,6 +265,5 @@ object TachyonUtils {
 
 
 }
-
 
 

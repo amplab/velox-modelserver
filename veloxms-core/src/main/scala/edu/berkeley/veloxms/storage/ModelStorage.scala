@@ -36,10 +36,18 @@ trait ModelStorage[U] extends Managed{
     /**
      * Get a map of all training data associated with this user.
      * @param userId the unique ID of the user
-     * @returns A map of (itemId -> score) pairs, s.t. for each pair
+     * @return A map of (itemId -> score) pairs, s.t. for each pair
      * user userId has previously rated item itemId with rating score
      */
     def getAllObservations(userId: Long): Try[Map[Long, Double]]
+
+    /**
+     * Add an observation to the training data.
+     * @param userId the unique ID of the user
+     * @param itemId the unique ID of the item that observation was made on
+     * @param score the observation made
+     */
+    def addScore(userId: Long, itemId: Long, score: Double)
 
     /** The number of top-level features in use (this is the dimension of the
      * user's weight vector)

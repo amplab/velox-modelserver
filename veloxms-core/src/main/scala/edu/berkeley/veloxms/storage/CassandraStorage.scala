@@ -78,6 +78,10 @@ class CassandraStorage ( address: String,
     }
   }
 
+  def addScore(userId: Long, itemId: Long, score: Double) = {
+    throw new NotImplementedError()
+  }
+
   /**
    * Cleans up any necessary resources
    */

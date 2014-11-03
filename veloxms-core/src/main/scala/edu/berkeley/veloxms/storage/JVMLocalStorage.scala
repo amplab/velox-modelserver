@@ -50,6 +50,16 @@ class JVMLocalStorage (
             .getOrElse((Success(new HashMap[Long, Double])))
     }
 
+    def addScore(userId: Long, itemId: Long, score: Double) = {
+      val userEntry = Option(ratings.get(userId)).getOrElse({
+        val newMap = new ConcurrentHashMap[Long, Double]()
+        ratings.put(userId, newMap)
+        newMap
+      })
+
+      userEntry.put(itemId, score)
+    }
+
   /**
    * Cleans up any necessary resources
    */
