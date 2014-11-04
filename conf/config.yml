@@ -21,6 +21,12 @@ modelStorage:
 #    users: users
 #    ratings: ratings
 
+#modelStorage:
+#    storageType: rocks
+#    users: /tmp/users
+#    items: /tmp/items
+#    ratings: /tmp/ratings
+
 # itemModelLoc: tachyon://ec2-184-73-72-139.compute-1.amazonaws.com:19998/item-model
 # userModelLoc: tachyon://ec2-184-73-72-139.compute-1.amazonaws.com:19998/user-model
 # ratingsLoc: tachyon://ec2-184-73-72-139.compute-1.amazonaws.com:19998/movie-ratings

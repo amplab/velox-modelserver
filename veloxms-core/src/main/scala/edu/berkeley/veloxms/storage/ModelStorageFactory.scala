@@ -50,6 +50,15 @@ class ModelStorageFactory extends Logging {
           ratings,
           numFactors)
       }
+      case "rocks" => {
+        logInfo("Using RocksDB storage")
+        new RocksStorage(
+          users,
+          items,
+          ratings,
+          numFactors
+        )
+      }
     }
 
     // Manage the modelStorage
