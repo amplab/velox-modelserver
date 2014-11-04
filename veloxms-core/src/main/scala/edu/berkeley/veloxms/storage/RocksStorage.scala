@@ -86,7 +86,9 @@ class RocksStorage ( usersPath: String,
   }
 
   def stop() = {
-    // do nothing
+    users.close
+    items.close
+    ratings.close
   }
 }
 
