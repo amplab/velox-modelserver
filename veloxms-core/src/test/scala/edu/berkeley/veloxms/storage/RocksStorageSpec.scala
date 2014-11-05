@@ -21,9 +21,9 @@ class RocksStorageSpec extends FlatSpec with Matchers {
 
   val kryo = KryoThreadLocal.kryoTL.get
 
-  users.put(TachyonUtils.long2ByteArr(validUId), kryo.serialize(vector).array)
+  users.put(StorageUtils.long2ByteArr(validUId), kryo.serialize(vector).array)
 
-  ratings.put(TachyonUtils.long2ByteArr(validUId), kryo.serialize(map).array)
+  ratings.put(StorageUtils.long2ByteArr(validUId), kryo.serialize(map).array)
 
   users.close
   items.close

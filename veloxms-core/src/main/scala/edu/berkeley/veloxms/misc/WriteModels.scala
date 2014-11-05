@@ -7,7 +7,7 @@ import tachyon.TachyonURI
 import tachyon.Pair
 import tachyon.r.sorted.ClientStore
 import tachyon.r.sorted.{Utils => TUtils}
-import edu.berkeley.veloxms.storage.TachyonUtils
+import edu.berkeley.veloxms.storage.StorageUtils
 import scala.collection.immutable.TreeMap
 import scala.io.Source
 import org.apache.spark.mllib.recommendation.Rating
@@ -123,7 +123,7 @@ class WriteModelsResource extends Logging {
       val buffer = ByteBuffer.allocate(factors.size*8*2)
       val kryo = KryoThreadLocal.kryoTL.get
       val result = kryo.serialize(factors, buffer).array
-      (TachyonUtils.long2ByteArr(key), result)
+      (StorageUtils.long2ByteArr(key), result)
     })
 
     val sortedModel = TreeMap(model.toArray:_*)(ByteOrdering)
@@ -168,7 +168,7 @@ class WriteModelsResource extends Logging {
           val kryo = KryoThreadLocal.kryoTL.get
           val buffer = ByteBuffer.allocate(obsMap.size*8*8*2)
           val serMap = kryo.serialize(obsMap, buffer).array
-          (TachyonUtils.long2ByteArr(user), serMap)
+          (StorageUtils.long2ByteArr(user), serMap)
         }
       })
     val sortedObs = TreeMap(obs.toArray:_*)(ByteOrdering)

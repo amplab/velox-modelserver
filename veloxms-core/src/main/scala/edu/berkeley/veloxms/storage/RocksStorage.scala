@@ -12,6 +12,7 @@ class RocksStorage ( usersPath: String,
                      ratingsPath: String,
                      val numFactors: Int ) extends ModelStorage[FeatureVector] with Logging {
 
+  // this is a static method that loads the RocksDB C++ library
   RocksDB.loadLibrary()
   val users = RocksUtil.getOrCreateDb(usersPath) match {
     case Success(s) => s
@@ -33,7 +34,7 @@ class RocksStorage ( usersPath: String,
 
   def getFeatureData(itemId: Long): Try[FeatureVector] = {
     try {
-      val rawBytes = ByteBuffer.wrap(items.get(TachyonUtils.long2ByteArr(itemId)))
+      val rawBytes = ByteBuffer.wrap(items.get(StorageUtils.long2ByteArr(itemId)))
       val kryo = KryoThreadLocal.kryoTL.get
       val array = kryo.deserialize(rawBytes).asInstanceOf[FeatureVector]
       Success(array)
@@ -44,7 +45,7 @@ class RocksStorage ( usersPath: String,
 
   def getUserFactors(userId: Long): Try[WeightVector] = {
     try {
-      val rawBytes = ByteBuffer.wrap(users.get(TachyonUtils.long2ByteArr(userId)))
+      val rawBytes = ByteBuffer.wrap(users.get(StorageUtils.long2ByteArr(userId)))
       val kryo = KryoThreadLocal.kryoTL.get
       val array = kryo.deserialize(rawBytes).asInstanceOf[WeightVector]
       Success(array)
@@ -55,7 +56,7 @@ class RocksStorage ( usersPath: String,
 
   def getAllObservations(userId: Long): Try[Map[Long, Double]] = {
     try {
-      val rawBytes = ByteBuffer.wrap(ratings.get(TachyonUtils.long2ByteArr(userId)))
+      val rawBytes = ByteBuffer.wrap(ratings.get(StorageUtils.long2ByteArr(userId)))
       val kryo = KryoThreadLocal.kryoTL.get
       val result = kryo.deserialize(rawBytes).asInstanceOf[Map[Long, Double]]
       Success(result)
@@ -66,7 +67,7 @@ class RocksStorage ( usersPath: String,
 
   def addScore(userId: Long, itemId: Long, score: Double) = {
     try {
-      val uidBytes = TachyonUtils.long2ByteArr(userId)
+      val uidBytes = StorageUtils.long2ByteArr(userId)
       var entry = ratings.get(uidBytes) match {
         case null => new HashMap[Long, Double]()
         case a: Array[Byte] => {
