@@ -65,7 +65,7 @@ class TachyonStorage (
     // } yield result
 
     try {
-      val rawBytes = ByteBuffer.wrap(items.get(TachyonUtils.long2ByteArr(itemId)))
+      val rawBytes = ByteBuffer.wrap(items.get(StorageUtils.long2ByteArr(itemId)))
       val kryo = KryoThreadLocal.kryoTL.get
       val array = kryo.deserialize(rawBytes).asInstanceOf[FeatureVector]
       Success(array)
@@ -87,7 +87,7 @@ class TachyonStorage (
 
   def getUserFactors(userId: Long): Try[WeightVector] = {
     val result = Option(usersCache.get(userId)).getOrElse({
-      val rawBytes = ByteBuffer.wrap(users.get(TachyonUtils.long2ByteArr(userId)))
+      val rawBytes = ByteBuffer.wrap(users.get(StorageUtils.long2ByteArr(userId)))
       val kryo = KryoThreadLocal.kryoTL.get
       kryo.deserialize(rawBytes).asInstanceOf[WeightVector]
     })
@@ -104,7 +104,7 @@ class TachyonStorage (
 
   def getAllObservations(userId: Long): Try[Map[Long, Double]] = {
 
-    val rawBytes = ByteBuffer.wrap(ratings.get(TachyonUtils.long2ByteArr(userId)))
+    val rawBytes = ByteBuffer.wrap(ratings.get(StorageUtils.long2ByteArr(userId)))
     val kryo = KryoThreadLocal.kryoTL.get
     val result = kryo.deserialize(rawBytes).asInstanceOf[HashMap[Long, Double]]
 
@@ -154,24 +154,6 @@ class TachyonStorage (
 
 
 object TachyonUtils {
-
-  def long2ByteArr(id: Long): Array[Byte] = {
-    // val key = ByteBuffer.allocate(8)
-    // key.putLong(id).array()
-
-    val buffer = ByteBuffer.allocate(12)
-    val kryo = KryoThreadLocal.kryoTL.get
-    val result = kryo.serialize(id, buffer).array
-    result
-  }
-
-  // could make this a z-curve key instead
-  def twoDimensionKey(key1: Long, key2: Long): Array[Byte] = {
-    val key = ByteBuffer.allocate(16)
-    key.putLong(key1)
-    key.putLong(key2)
-    key.array()
-  }
 
   def getStore(tachyon: String, kvloc: String): Try[ClientStore] = {
     val url = s"$tachyon/$kvloc"

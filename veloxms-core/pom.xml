@@ -55,6 +55,11 @@
       <groupId>com.datastax.cassandra</groupId>
       <artifactId>cassandra-driver-core</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.rocksdb</groupId>
+      <artifactId>rocksdbjni</artifactId>
+      <version>3.6.1</version>
+    </dependency>
 
     <!-- <dependency> -->
     <!--   <groupId>io.dropwizard</groupId> -->
