@@ -1,17 +1,27 @@
 #ec2-184-73-72-139.compute-1.amazonaws.com 
 
-modelStorage:
-    storageType: tachyon
-    address: tachyon://ec2-54-82-134-136.compute-1.amazonaws.com:19998
-    items: item-model
-    users: user-model
-    ratings: movie-ratings
+# modelStorage:
+#     storageType: tachyon
+#     address: tachyon://ec2-54-82-134-136.compute-1.amazonaws.com:19998
+#     items: item-model
+#     users: user-model
+#     ratings: movie-ratings
 
 #modelStorage:
 #    storageType: local
 #    ratings: /Users/crankshaw/code/amplab/model-serving/data/ml-100k/u.data
 #    users: /Users/crankshaw/code/amplab/model-serving/data/trained_50_features/all_users_clean_50.txt
 #    items: /Users/crankshaw/code/amplab/model-serving/data/trained_50_features/all_products_clean_50.txt
+
+modelStorage:
+  storageType: jvmRandom
+  totalNumUsers: 100000
+  numItems: 50000
+  numPartitions: 2
+  modelSize: 50
+  partition: 0
+
+
 
 #modelStorage:
 #    storageType: cassandra
@@ -52,7 +62,23 @@ server:
     appenders:
       - type: file
         currentLogFilename: /home/ubuntu/velox-modelserver/logs/requests.log
-        threshold: ALL
+        threshold: INFO
         archive: true
         archivedLogFilenamePattern: /home/ubuntu/velox-modelserver/logs/requests.%d.log.gz
         archivedFileCount: 5
+  applicationConnectors:
+    - type: http
+      port: 8080
+      # headerCacheSize: 512 bytes
+      # outputBufferSize: 32KiB
+      # maxRequestHeaderSize: 8KiB
+      # maxResponseHeaderSize: 8KiB
+      # inputBufferSize: 8KiB
+      # idleTimeout: 30 seconds
+      # minBufferPoolSize: 64 bytes
+      # bufferPoolIncrement: 1KiB
+      # maxBufferPoolSize: 64KiB
+      # acceptorThreads: 1
+      # selectorThreads: 2
+      acceptQueueSize: 4096
+

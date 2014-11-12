@@ -68,6 +68,62 @@ class JVMLocalStorage (
 
 object JVMLocalStorage extends Logging {
 
+
+    def generateRandomData(
+      totalNumUsers: Int,
+      numItems: Int,
+      numPartitions: Int,
+      partition: Int,
+      modelSize: Int = 50,
+      maxScore: Int = 10
+    ): JVMLocalStorage = {
+      val rand = new Random
+      val itemMap = new ConcurrentHashMap[Long, FeatureVector]
+      var item = 0
+      while (item < numItems) {
+        itemMap.put(item, randomArray(rand, modelSize))
+        item += 1
+      }
+      logInfo("Generated item data")
+
+      // val sizeOfPart = totalNumUsers / numPartitions
+      val userMap = new ConcurrentHashMap[Long, WeightVector]
+      val obsMap = new ConcurrentHashMap[Long, ConcurrentHashMap[Long, Double]]
+      // var user = sizeOfPart * partition
+      var user = 0
+      while (user < totalNumUsers) {
+        if (user % numPartitions == partition) {
+          userMap.put(user, randomArray(rand, modelSize))
+          val userObsMap = new ConcurrentHashMap[Long, Double]
+          var j = 0
+          // generate observations for 10% of the items
+          while (j < numItems / 10) {
+            userObsMap.put(j, rand.nextDouble * maxScore)
+            j += 1
+          }
+          obsMap.put(user, userObsMap)
+          // if (user % 1000 == 0) {
+          //   logInfo(s"Generated data for $user out of max ${sizeOfPart *(partition + 1)} users")
+          //
+          // }
+        }
+        user += 1
+      }
+      logInfo("Generated user data")
+      logInfo("Done generating random data")
+      new JVMLocalStorage(userMap, itemMap, obsMap, modelSize)
+    }
+
+    private def randomArray(rand: Random, size: Int) : Array[Double] = {
+      val arr = new Array[Double](size)
+      var i = 0
+      while (i < size) {
+        arr(i) = rand.nextGaussian
+        i += 1
+      }
+      arr
+    }
+
     def apply(
         userFile: String,
         itemFile: String,

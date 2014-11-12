@@ -86,9 +86,7 @@ class MatrixFactorizationPredictionResource(model: MatrixFactorizationModel,
     val user = data.user
     // println(s"item: $item")
     val features = model.getFeatures(item, featureCache)
-    logInfo(s"Features: (${features.mkString(",")})")
     val weightVector = model.getWeightVector(user)
-    logInfo(s"Weight Vector: (${weightVector.mkString(",")})")
     var i = 0
     var score = 0.0
     while (i < model.numFeatures) {

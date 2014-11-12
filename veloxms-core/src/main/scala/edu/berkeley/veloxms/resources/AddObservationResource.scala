@@ -35,7 +35,6 @@ class MatrixFactorizationUpdateResource(model: MatrixFactorizationModel,
   @Timed
   def observe(@Valid obs: MatrixFactObservation): Boolean = {
 
-    logInfo(s"Adding rating for user: ${obs.userId}")
     val allObservationScores: Map[Long, Double] = model.modelStorage
       .getAllObservations(obs.userId) match {
         case Success(u) => u + ((obs.itemId, obs.score))
@@ -53,8 +52,8 @@ class MatrixFactorizationUpdateResource(model: MatrixFactorizationModel,
     val oldUserWeights = model.getWeightVector(obs.userId)
     val newUserWeights = OnlineUpdateUtils.updateUserWeights(
       allItemFeatures, allObservationScores, k)
-    logInfo(s"Old weight: (${oldUserWeights.mkString(",")})")
-    logInfo(s"New weight: (${newUserWeights.mkString(",")})")
+    // logInfo(s"Old weight: (${oldUserWeights.mkString(",")})")
+    // logInfo(s"New weight: (${newUserWeights.mkString(",")})")
 
 
     // TODO Write new observation, new user weights to Tachyon
