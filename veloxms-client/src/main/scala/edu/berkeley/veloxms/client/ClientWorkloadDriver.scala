@@ -200,7 +200,7 @@ object VeloxWorkloadDriver extends Logging {
       .setConnectionTimeoutInMs(params.connTimeout)
       // .setMaximumConnectionsTotal(1000)
       .addRequestFilter(new ThrottleRequestFilter(params.throttleRequests))
-      )
+    )
 
       // .setMaximumConnectionsPerHost(1000)
       // .setRequestTimeoutInMs(1000)
@@ -216,6 +216,12 @@ object VeloxWorkloadDriver extends Logging {
     // val parallelism = params.numThreads
 
 
+
+    val nanospersec = math.pow(10, 9)
+
+
+    var numPreds = 0
+    var numObs = 0
 
     
     val reqPerPartition = new Array[Int](params.numPartitions)
@@ -236,6 +242,7 @@ object VeloxWorkloadDriver extends Logging {
       reqPerPartition(partition) += 1
       val veloxHost = hosts(partition)
       val request = (veloxHost / predictPath / modelPath).POST << jsonString
+      numPreds += 1
       request
     }
 
@@ -245,136 +252,81 @@ object VeloxWorkloadDriver extends Logging {
       val veloxHost = hosts(partition)
       val jsonString = mapper.writeValueAsString(req)
       val request = (veloxHost / observePath / modelPath).POST << jsonString
+      numObs += 1
       request
     }
 
-
-    // val req = Http(createObserveRequest(ObserveRequest(22, 51, 1.3)) OK as.json4s.Json).either
-    // req().fold(
-    //   (err) => println(s"ERROR: $err"),
-    //   (good) => println(s"Request result: $good")
-    // )
-    // System.exit(0)
-
-    val numPreds = new AtomicInteger(0)
-    val numObs = new AtomicInteger(0)
-    val numFailed = new AtomicInteger(0)
-
-    val opsSent = new AtomicInteger(0)
-    val opsDone = new AtomicInteger(0)
-
-    val nanospersec = math.pow(10, 9)
-    val numops = params.numRequests
-
-    def opDone() {
-      val o = opsDone.incrementAndGet
-      if (o == numops) {
-        opsDone.synchronized {
-          opsDone.notify()
-        }
-      }
-    }
-    
     val startTime = System.nanoTime
 
-    // val responseFutures =
-    for (i <- 0 to params.numThreads) {
-      new Thread(new Runnable {
-        override def run() = {
-          while (opsSent.get() < numops) {
-            requestor.getRequest match {
-              case Left(oreq) => {
-                val f = http(createObserveRequest(oreq) OK as.json4s.Json)
-                f onComplete {
-                  case Success(jv) => {
-                    numObs.incrementAndGet()
-                    opDone
-                  }
-                  case Failure(t) => {
-                    logWarning(s"An error has occurred: ${t.getMessage()}")
-                    numFailed.incrementAndGet()
-                  }
-                }
-              }
-              case Right(preq) => {
-                val f = http(createPredictRequest(preq) OK as.json4s.Json)
-                f onComplete {
-                  case Success(jv) => {
-                    numPreds.incrementAndGet()
-                    opDone
-                  }
-                  case Failure(t) => {
-                    logWarning(s"An error has occurred: ${t.getMessage()}")
-                    numFailed.incrementAndGet()
-                  }
-                }
-              }
-            }
-            opsSent.incrementAndGet()
-          }
-          logWarning(s"Thread $i is done sending")
-        }
-      }).start()
-    }
+
+    // TODO: Figure out how to compute latency
+    // val responseFutures: IndexedSeq[Try[(Long, JValue)]] =
+    //   for (i <- 0 to params.numRequests)
+    //     yield requestor.getRequest match {
+    //       case Left(oreq) => {
+    //         val reqStart = System.nanoTime
+    //         val f = http(createObserveRequest(oreq) OK as.json4s.Json)
+    //         f onComplete {
+    //           case Success(jv) => {
+    //             val reqStop = System.nanoTime
+    //             Success((reqStop - reqStart, jv))
+    //           }
+    //           case Failure(t) => {
+    //             logWarning(s"An error has occurred: ${t.getMessage()}")
+    //             Failure(t)
+    //           }
+    //         }
+    //       }
+    //       case Right(preq) => {
+    //         val reqStart = System.nanoTime
+    //         val f = http(createPredictRequest(preq) OK as.json4s.Json)
+    //         f onComplete {
+    //           case Success(jv) => {
+    //             val reqStop = System.nanoTime
+    //             Success((reqStop - reqStart, jv))
+    //           }
+    //           case Failure(t) => {
+    //             logWarning(s"An error has occurred: ${t.getMessage()}")
+    //             Failure(t)
+    //           }
+    //         }
+    //       }
+    //     }
 
 
-      new Thread(new Runnable {
-        override def run() {
-          while(opsDone.get() < numops) {
-            Thread.sleep(params.statusTime*1000)
-            val curTime = (System.nanoTime-startTime).toDouble/nanospersec
-            val curThru = (numPreds.get()+numObs.get()).toDouble/curTime
-            logInfo(s"STATUS @ ${curTime}s: $curThru ops/sec ($opsDone ops done)")
-          }
-        }
-      }).start
 
-    val waitTimeSeconds = 200
-    opsDone.synchronized {
-      opsDone.wait(waitTimeSeconds * 1000)
-    }
+
+    val responseFutures =
+      for (i <- 0 until params.numRequests)
+        yield requestor.getRequest.fold(
+          oreq => http(createObserveRequest(oreq) OK as.json4s.Json).either,
+          preq => http(createPredictRequest(preq) OK as.json4s.Json).either
+        )
+    val responses: Future[IndexedSeq[Either[Throwable, JValue]]] = Future.sequence(responseFutures)
+
+    val (lefts, rights) = responses().partition(_.isInstanceOf[Left[_,_]])
+
+    val failures = for(e <- lefts)
+      yield for (l <- e.left)
+        yield l.toString
+
+    val successes = for(e <- rights)
+      yield for (r <- e.right)
+        yield r.toString
 
     val stopTime = System.nanoTime
     val elapsedTime = (stopTime - startTime) / nanospersec
-    val npreds = numPreds.get()
-    val nobs = numObs.get()
-    val pthruput = npreds.toDouble / elapsedTime.toDouble
-    val othruput = nobs.toDouble / elapsedTime.toDouble
-    val totthruput = (npreds + nobs).toDouble / elapsedTime.toDouble
-    logInfo(s"In $elapsedTime seconds with ${params.numThreads} threads, " +
-            s"completed $npreds predictions ($pthruput ops/sec), " +
-            s" $nobs observations ($othruput ops/sec), " +
-            s"${numFailed.get()} failures\nTOTAL THROUGHPUT: $totthruput ops/sec")
+    val pthruput = numPreds.toDouble / elapsedTime.toDouble
+    val othruput = numObs.toDouble / elapsedTime.toDouble
+    val totthruput = (successes.size).toDouble / elapsedTime.toDouble
+    logInfo(s"In $elapsedTime seconds " +
+            s"sent $numPreds predictions ($pthruput ops/sec), " +
+            s" $numObs observations ($othruput ops/sec), " +
+            s"\n${successes.size} successes and ${failures.size} failures" +
+            s"\nTOTAL SUCCESSFUL THROUGHPUT: $totthruput ops/sec")
 
     http.shutdown()
     System.exit(0)
-
-    // val responseFutures =
-    //   for (i <- 0 until params.numRequests)
-    //     yield requestor.getRequest.fold(
-    //       oreq => http(createObserveRequest(oreq) OK as.json4s.Json).either,
-    //       preq => http(createPredictRequest(preq) OK as.json4s.Json).either
-    //     )
-    // val responses: Future[IndexedSeq[Either[Throwable, JValue]]] = Future.sequence(responseFutures)
-    //
-    // val (lefts, rights) = responses().partition(_.isInstanceOf[Left[_,_]])
-    //
-    // val failures = for(e <- lefts)
-    //   yield for (l <- e.left)
-    //     yield l.toString
-    //
-    // val successes = for(e <- rights)
-    //   yield for (r <- e.right)
-    //     yield r.toString
-
-
-
-    // logInfo(s"${failures.size} requests FAILED, ${successes.size} requests SUCCEEDED")
-    // println(s"${failures.size} requests FAILED, ${successes.size} requests SUCCEEDED")
-    // println(s"Distribution of requests:")
-    // for(i <- (0 until reqPerPartition.size)) {
-    //   println(s"partition $i: ${reqPerPartition(i)}")
-    // }
 
   }
 

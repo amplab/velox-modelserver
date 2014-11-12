@@ -96,7 +96,7 @@ object JVMLocalStorage extends Logging {
           userMap.put(user, randomArray(rand, modelSize))
           val userObsMap = new ConcurrentHashMap[Long, Double]
           var j = 0
-          // generate observations for half the items
+          // generate observations for 10% of the items
           while (j < numItems / 10) {
             userObsMap.put(j, rand.nextDouble * maxScore)
             j += 1
