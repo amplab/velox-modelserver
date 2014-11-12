@@ -1,2 +1,2 @@
-0: ec2-54-211-169-246.compute-1.amazonaws.com
-1: ec2-54-80-49-174.compute-1.amazonaws.com
+0: ec2-50-19-13-175.compute-1.amazonaws.com
+1: ec2-54-147-26-235.compute-1.amazonaws.com

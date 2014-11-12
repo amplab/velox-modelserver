@@ -547,7 +547,7 @@ def restart_velox(cluster, heap_size, rm_logs=False, **kwargs):
 #     if profile:
 #         # pstr += "-agentlib:hprof=cpu=samples,interval=20,depth=%d,file=java.hprof.server.txt" % (profile_depth)
 #         pstr += "-agentpath:/home/ubuntu/yourkit/bin/linux-x86-64/libyjpagent.so"
-    start_server_cmd = ("java -XX:+(gc)s -Xms%(heap_size)dg -Xmx%(heap_size)dg "
+    start_server_cmd = ("java -XX:+%(gc)s -Xms%(heap_size)dg -Xmx%(heap_size)dg "
                         "-Dlog4j.configuration=file:%(log4j_file)s "
                         "-Ddw.modelStorage.partition=%(sid)d "
                         # "-Dfs.s3n.awsAccessKeyId=%s "
@@ -602,22 +602,20 @@ def run_client_bench(cluster, **kwargs):
                 "--numItems %(num_items)d "
                 "--numPartitions %(num_partitions)d "
                 "--percentObs %(percent_obs)f "
-                "--numThreads %(parallelism)d "
                 "--connTimeout %(conn_timeout)d "
                 "--throttleRequests %(throttle_reqs)d "
-                "--statusTime %(status_time)d "
                 )
 
     cmd_args = {'heap_size': HEAP_SIZE_GB,
                 'velox_home': '/home/ubuntu/velox-modelserver',
-                'num_reqs': 25000,
+                'num_reqs': 5000,
                 'num_users': 100000,
                 'num_items': 50000,
                 'num_partitions': 2,
-                'percent_obs': 0.00,
+                'percent_obs': 0.1,
                 'parallelism': 10,
-                'conn_timeout': 30000,
-                'throttle_reqs': 2000,
+                'conn_timeout': 10000,
+                'throttle_reqs': 800,
                 'status_time': 10,
                 'client_jar': VELOX_CLIENT_JAR,
                 'client_class': VELOX_CLIENT_BENCHMARK_CLASS,
