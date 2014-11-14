@@ -123,7 +123,7 @@ class WriteModelsResource extends Logging {
       val buffer = ByteBuffer.allocate(factors.size*8*2)
       val kryo = KryoThreadLocal.kryoTL.get
       val result = kryo.serialize(factors, buffer).array
-      (StorageUtils.long2ByteArr(key), result)
+      (StorageUtils.toByteArr(key), result)
     })
 
     val sortedModel = TreeMap(model.toArray:_*)(ByteOrdering)
@@ -168,7 +168,7 @@ class WriteModelsResource extends Logging {
           val kryo = KryoThreadLocal.kryoTL.get
           val buffer = ByteBuffer.allocate(obsMap.size*8*8*2)
           val serMap = kryo.serialize(obsMap, buffer).array
-          (StorageUtils.long2ByteArr(user), serMap)
+          (StorageUtils.toByteArr(user), serMap)
         }
       })
     val sortedObs = TreeMap(obs.toArray:_*)(ByteOrdering)

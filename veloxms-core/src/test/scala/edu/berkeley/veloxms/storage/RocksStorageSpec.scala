@@ -1,6 +1,6 @@
 package edu.berkeley.veloxms.storage
 
-import edu.berkeley.veloxms.WeightVector
+import edu.berkeley.veloxms.{FeatureVector, WeightVector}
 import edu.berkeley.veloxms.util.KryoThreadLocal
 import org.scalatest._
 import org.rocksdb.{Options, RocksDB}
@@ -21,15 +21,15 @@ class RocksStorageSpec extends FlatSpec with Matchers {
 
   val kryo = KryoThreadLocal.kryoTL.get
 
-  users.put(StorageUtils.long2ByteArr(validUId), kryo.serialize(vector).array)
+  users.put(StorageUtils.toByteArr(validUId), kryo.serialize(vector).array)
 
-  ratings.put(StorageUtils.long2ByteArr(validUId), kryo.serialize(map).array)
+  ratings.put(StorageUtils.toByteArr(validUId), kryo.serialize(map).array)
 
   users.close
   items.close
   ratings.close
 
-  val storage = new RocksStorage(usersPath, itemsPath, ratingsPath, 50)
+  val storage = new RocksStorage[Long, FeatureVector](usersPath, itemsPath, ratingsPath, 50)
 
   // these tests tests both getUserFactors and getFeatureData since they use the exact same logic
   behavior of "RocksStorage#getUserFactors"

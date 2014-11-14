@@ -12,12 +12,12 @@ import edu.berkeley.veloxms._
 import edu.berkeley.veloxms.util.KryoThreadLocal
 
 // class CassandraStorage[U: ClassTag] (
-class CassandraStorage ( address: String,
+class CassandraStorage[T, U] ( address: String,
                          keyspace: String,
                          users: String,
                          items: String,
                          ratings: String,
-                         val numFactors: Int) extends ModelStorage[FeatureVector] with Logging {
+                         val numFactors: Int) extends ModelStorage[T, U] with Logging {
 
   // Set up the Cassandra cluster and session
   private val cluster = Cluster.builder().addContactPoint(address).build()
@@ -42,12 +42,12 @@ class CassandraStorage ( address: String,
     cd.contains(Key) && cd.contains(Value)
   }
 
-  def getFeatureData(itemId: Long): Try[FeatureVector] = {
+  def getFeatureData(context: T): Try[U] = {
     try {
-      val rawBytes = session.execute(s"SELECT * FROM $keyspace.$items WHERE $Key = $itemId")
+      val rawBytes = session.execute(s"SELECT * FROM $keyspace.$items WHERE $Key = $context")
           .all().get(0).getBytes(Value)
       val kryo = KryoThreadLocal.kryoTL.get
-      val array = kryo.deserialize(rawBytes).asInstanceOf[FeatureVector]
+      val array = kryo.deserialize(rawBytes).asInstanceOf[U]
       Success(array)
     } catch {
       case u: Throwable => Failure(u)
@@ -66,19 +66,19 @@ class CassandraStorage ( address: String,
     }
   }
 
-  def getAllObservations(userId: Long): Try[Map[Long, Double]] = {
+  def getAllObservations(userId: Long): Try[Map[T, Double]] = {
     try {
       val rawBytes = session.execute(s"SELECT * FROM $keyspace.$ratings WHERE $Key = $userId")
           .all().get(0).getBytes(Value)
       val kryo = KryoThreadLocal.kryoTL.get
-      val result = kryo.deserialize(rawBytes).asInstanceOf[HashMap[Long, Double]]
+      val result = kryo.deserialize(rawBytes).asInstanceOf[HashMap[T, Double]]
       Success(result)
     } catch {
       case u: Throwable => Failure(u)
     }
   }
 
-  def addScore(userId: Long, itemId: Long, score: Double) = {
+  def addScore(userId: Long, context: T, score: Double) = {
     throw new NotImplementedError()
   }
 

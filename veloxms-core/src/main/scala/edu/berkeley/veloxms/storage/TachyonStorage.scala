@@ -21,13 +21,13 @@ import edu.berkeley.veloxms.util.{VeloxKryoRegistrar, KryoThreadLocal}
 // import binary._
 
 // class TachyonStorage[U: ClassTag] (
-class TachyonStorage (
+class TachyonStorage[T, U] (
                          tachyonMaster: String,
                          userStoreName: String,
                          itemStoreName: String,
                          ratingsStoreName: String,
                          // val numFactors: Int) extends ModelStorage[U] with LazyLogging {
-                         val numFactors: Int) extends ModelStorage[FeatureVector] with Logging {
+                         val numFactors: Int) extends ModelStorage[T, U] with Logging {
 
   val users = TachyonUtils.getStore(tachyonMaster, userStoreName) match {
     case Success(s) => s
@@ -51,9 +51,9 @@ class TachyonStorage (
 
   val usersCache = new ConcurrentHashMap[Long, WeightVector]
 
-  val observationsCache = new ConcurrentHashMap[Long, HashMap[Long, Double]]
+  val observationsCache = new ConcurrentHashMap[Long, HashMap[T, Double]]
 
-  def getFeatureData(itemId: Long): Try[FeatureVector] = {
+  def getFeatureData(context: T): Try[U] = {
     // getFactors(itemId, items, "item-model")
     // for {
     //     rawBytes <- Try(items.get(TachyonUtils.long2ByteArr(userId)))
@@ -65,9 +65,9 @@ class TachyonStorage (
     // } yield result
 
     try {
-      val rawBytes = ByteBuffer.wrap(items.get(StorageUtils.long2ByteArr(itemId)))
+      val rawBytes = ByteBuffer.wrap(items.get(StorageUtils.toByteArr(context)))
       val kryo = KryoThreadLocal.kryoTL.get
-      val array = kryo.deserialize(rawBytes).asInstanceOf[FeatureVector]
+      val array = kryo.deserialize(rawBytes).asInstanceOf[U]
       Success(array)
     } catch {
       case u: Throwable => Failure(u)
@@ -87,7 +87,7 @@ class TachyonStorage (
 
   def getUserFactors(userId: Long): Try[WeightVector] = {
     val result = Option(usersCache.get(userId)).getOrElse({
-      val rawBytes = ByteBuffer.wrap(users.get(StorageUtils.long2ByteArr(userId)))
+      val rawBytes = ByteBuffer.wrap(users.get(StorageUtils.toByteArr(userId)))
       val kryo = KryoThreadLocal.kryoTL.get
       kryo.deserialize(rawBytes).asInstanceOf[WeightVector]
     })
@@ -102,11 +102,11 @@ class TachyonStorage (
     // result
   }
 
-  def getAllObservations(userId: Long): Try[Map[Long, Double]] = {
+  def getAllObservations(userId: Long): Try[Map[T, Double]] = {
 
-    val rawBytes = ByteBuffer.wrap(ratings.get(StorageUtils.long2ByteArr(userId)))
+    val rawBytes = ByteBuffer.wrap(ratings.get(StorageUtils.toByteArr(userId)))
     val kryo = KryoThreadLocal.kryoTL.get
-    val result = kryo.deserialize(rawBytes).asInstanceOf[HashMap[Long, Double]]
+    val result = kryo.deserialize(rawBytes).asInstanceOf[HashMap[T, Double]]
 
     Success(TachyonUtils.mergeObservations(Option(result), Option(observationsCache.get(userId))))
       //
@@ -134,15 +134,15 @@ class TachyonStorage (
   //   if(erasure.isInstance(value)) Some(value.asInstanceOf[A]) else None
   // }
 
-  def addScore(userId: Long, itemId: Long, score: Double) = {
+  def addScore(userId: Long, context: T, score: Double) = {
     // eventually, this should write through to Tachyon
     var cacheEntry = Option(observationsCache.get(userId)).getOrElse({
-      val newEntry = new HashMap[Long, Double]
+      val newEntry = new HashMap[T, Double]
       observationsCache.put(userId, newEntry)
       newEntry
     })
 
-    cacheEntry = cacheEntry + (itemId -> score)
+    cacheEntry = cacheEntry + (context -> score)
   }
 
   /**
@@ -167,11 +167,11 @@ object TachyonUtils {
     }
   }
 
-  def mergeObservations( tachyonMap: Option[HashMap[Long, Double]],
-                         cacheEntry: Option[HashMap[Long, Double]]): HashMap[Long, Double] = {
+  def mergeObservations[T]( tachyonMap: Option[HashMap[T, Double]],
+                         cacheEntry: Option[HashMap[T, Double]]): HashMap[T, Double] = {
     if (!cacheEntry.isDefined) {
       tachyonMap.getOrElse({
-        new HashMap[Long, Double]
+        new HashMap[T, Double]
       })
     } else if (!tachyonMap.isDefined) {
       cacheEntry.get

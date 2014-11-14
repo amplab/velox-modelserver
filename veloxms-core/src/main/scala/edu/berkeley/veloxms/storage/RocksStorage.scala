@@ -7,10 +7,10 @@ import scala.util._
 import java.nio.ByteBuffer
 import scala.collection.immutable.HashMap
 
-class RocksStorage ( usersPath: String,
+class RocksStorage[T, U] ( usersPath: String,
                      itemsPath: String,
                      ratingsPath: String,
-                     val numFactors: Int ) extends ModelStorage[FeatureVector] with Logging {
+                     val numFactors: Int ) extends ModelStorage[T, U] with Logging {
 
   // this is a static method that loads the RocksDB C++ library
   RocksDB.loadLibrary()
@@ -32,11 +32,11 @@ class RocksStorage ( usersPath: String,
         s"Couldn't open database: ${f.getMessage}")
   }
 
-  def getFeatureData(itemId: Long): Try[FeatureVector] = {
+  def getFeatureData(context: T): Try[U] = {
     try {
-      val rawBytes = ByteBuffer.wrap(items.get(StorageUtils.long2ByteArr(itemId)))
+      val rawBytes = ByteBuffer.wrap(items.get(StorageUtils.toByteArr(context)))
       val kryo = KryoThreadLocal.kryoTL.get
-      val array = kryo.deserialize(rawBytes).asInstanceOf[FeatureVector]
+      val array = kryo.deserialize(rawBytes).asInstanceOf[U]
       Success(array)
     } catch {
       case u: Throwable => Failure(u)
@@ -45,7 +45,7 @@ class RocksStorage ( usersPath: String,
 
   def getUserFactors(userId: Long): Try[WeightVector] = {
     try {
-      val rawBytes = ByteBuffer.wrap(users.get(StorageUtils.long2ByteArr(userId)))
+      val rawBytes = ByteBuffer.wrap(users.get(StorageUtils.toByteArr(userId)))
       val kryo = KryoThreadLocal.kryoTL.get
       val array = kryo.deserialize(rawBytes).asInstanceOf[WeightVector]
       Success(array)
@@ -54,29 +54,29 @@ class RocksStorage ( usersPath: String,
     }
   }
 
-  def getAllObservations(userId: Long): Try[Map[Long, Double]] = {
+  def getAllObservations(userId: Long): Try[Map[T, Double]] = {
     try {
-      val rawBytes = ByteBuffer.wrap(ratings.get(StorageUtils.long2ByteArr(userId)))
+      val rawBytes = ByteBuffer.wrap(ratings.get(StorageUtils.toByteArr(userId)))
       val kryo = KryoThreadLocal.kryoTL.get
-      val result = kryo.deserialize(rawBytes).asInstanceOf[Map[Long, Double]]
+      val result = kryo.deserialize(rawBytes).asInstanceOf[Map[T, Double]]
       Success(result)
     } catch {
       case u: Throwable => Failure(u)
     }
   }
 
-  def addScore(userId: Long, itemId: Long, score: Double) = {
+  def addScore(userId: Long, context: T, score: Double) = {
     try {
-      val uidBytes = StorageUtils.long2ByteArr(userId)
+      val uidBytes = StorageUtils.toByteArr(userId)
       var entry = ratings.get(uidBytes) match {
-        case null => new HashMap[Long, Double]()
+        case null => new HashMap[T, Double]()
         case a: Array[Byte] => {
           val kryo = KryoThreadLocal.kryoTL.get
-          kryo.deserialize(ByteBuffer.wrap(a)).asInstanceOf[Map[Long, Double]]
+          kryo.deserialize(ByteBuffer.wrap(a)).asInstanceOf[Map[T, Double]]
         }
       }
 
-      entry = entry + (itemId -> score)
+      entry = entry + (context -> score)
       val kryo = KryoThreadLocal.kryoTL.get
       val entryBytes = kryo.serialize(entry).array
 

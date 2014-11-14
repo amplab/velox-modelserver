@@ -24,12 +24,12 @@ class ModelStorageFactory extends Logging {
   val modelSize: Int = -1
   val partition: Int = -1
 
-  def build(env: Environment, numFactors: Int): ModelStorage[FeatureVector] = {
+  def build[T, U](env: Environment, numFactors: Int): ModelStorage[T, U] = {
     // Build the modelStorage
-    val modelStorage: ModelStorage[FeatureVector] = storageType match {
+    val modelStorage: ModelStorage[T, U] = storageType match {
       case "local" => {
         logInfo("Using local storage")
-        JVMLocalStorage(
+        JVMLocalStorage[T, U](
           users,
           items,
           ratings,
@@ -42,12 +42,12 @@ class ModelStorageFactory extends Logging {
             numItems,
             numPartitions, 
             partition,
-            modelSize)
+            modelSize).asInstanceOf[ModelStorage[T, U]]
       }
       case "tachyon" => {
         logInfo("Using tachyon storage")
         env.jersey().register(new WriteModelsResource)
-        new TachyonStorage(
+        new TachyonStorage[T, U](
           address,
           users,
           items,
@@ -56,7 +56,7 @@ class ModelStorageFactory extends Logging {
       }
       case "cassandra" => {
         logInfo("Using cassandra storage")
-        new CassandraStorage(
+        new CassandraStorage[T, U](
           address,
           keyspace,
           users,
@@ -66,7 +66,7 @@ class ModelStorageFactory extends Logging {
       }
       case "rocks" => {
         logInfo("Using RocksDB storage")
-        new RocksStorage(
+        new RocksStorage[T, U](
           users,
           items,
           ratings,

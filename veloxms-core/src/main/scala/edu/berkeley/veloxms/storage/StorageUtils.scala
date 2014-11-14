@@ -5,7 +5,7 @@ import edu.berkeley.veloxms.util.KryoThreadLocal
 
 object StorageUtils {
 
-  def long2ByteArr(id: Long): Array[Byte] = {
+  def toByteArr[T](id: T): Array[Byte] = {
     // val key = ByteBuffer.allocate(8)
     // key.putLong(id).array()
 

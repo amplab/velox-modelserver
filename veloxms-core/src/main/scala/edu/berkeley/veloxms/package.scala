@@ -1,5 +1,7 @@
 package edu.berkeley
 
+import org.codehaus.jackson.map.ObjectMapper
+
 
 package object veloxms {
 
@@ -7,5 +9,5 @@ package object veloxms {
   type WeightVector = Array[Double]
   type UserID = Long
 
-
+  val jsonMapper = new ObjectMapper()
 }

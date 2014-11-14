@@ -1,6 +1,8 @@
 package edu.berkeley.veloxms.storage
 
 
+import java.nio.file.{Paths, Files}
+
 import org.apache.commons.lang3.NotImplementedException
 import edu.berkeley.veloxms.util.Logging
 import tachyon.r.sorted.ClientStore
@@ -23,18 +25,18 @@ import scala.io.Source
 /** Simple implementation of ModelStorage to avoid Tachyon
  * dependency. Should only be used for testing/debug purposes.
  */
-class JVMLocalStorage (
+class JVMLocalStorage[T, U] (
     users: ConcurrentHashMap[Long, WeightVector],
-    items: ConcurrentHashMap[Long, FeatureVector],
-    ratings: ConcurrentHashMap[Long, ConcurrentHashMap[Long, Double]],
-    val numFactors: Int) extends ModelStorage[FeatureVector] with Logging {
+    items: ConcurrentHashMap[T, U],
+    ratings: ConcurrentHashMap[Long, ConcurrentHashMap[T, Double]],
+    val numFactors: Int) extends ModelStorage[T, U] with Logging {
 
 
-    def getFeatureData(itemId: Long): Try[FeatureVector] = {
+    def getFeatureData(context: T): Try[U] = {
 
-        Option(items.get(itemId)).map(a => Success(a))
-            .getOrElse(Failure[FeatureVector](
-                new Throwable(s"$itemId not a valid item id")))
+        Option(items.get(context)).map(a => Success(a))
+            .getOrElse(Failure[U](
+                new Throwable(s"$context not a valid item id")))
     }
 
     def getUserFactors(userId: Long): Try[WeightVector] = {
@@ -44,20 +46,20 @@ class JVMLocalStorage (
                 new Throwable(s"$userId New user, no existing user model")))
     }
 
-    def getAllObservations(userId: Long): Try[Map[Long, Double]] = {
+    def getAllObservations(userId: Long): Try[Map[T, Double]] = {
 
         Option(ratings.get(userId)).map(a => Success(a.toMap))
-            .getOrElse((Success(new HashMap[Long, Double])))
+            .getOrElse((Success(new HashMap[T, Double])))
     }
 
-    def addScore(userId: Long, itemId: Long, score: Double) = {
+    def addScore(userId: Long, context: T, score: Double) = {
       val userEntry = Option(ratings.get(userId)).getOrElse({
-        val newMap = new ConcurrentHashMap[Long, Double]()
+        val newMap = new ConcurrentHashMap[T, Double]()
         ratings.put(userId, newMap)
         newMap
       })
 
-      userEntry.put(itemId, score)
+      userEntry.put(context, score)
     }
 
   /**
@@ -76,7 +78,7 @@ object JVMLocalStorage extends Logging {
       partition: Int,
       modelSize: Int = 50,
       maxScore: Int = 10
-    ): JVMLocalStorage = {
+    ): JVMLocalStorage[Long, FeatureVector] = {
       val rand = new Random
       val itemMap = new ConcurrentHashMap[Long, FeatureVector]
       var item = 0
@@ -124,66 +126,43 @@ object JVMLocalStorage extends Logging {
       arr
     }
 
-    def apply(
+    def apply[T, U](
         userFile: String,
         itemFile: String,
         ratingsFile: String,
-        numFactors: Int): JVMLocalStorage = {
-      new JVMLocalStorage(
+        numFactors: Int): JVMLocalStorage[T, U] = {
+      new JVMLocalStorage[T, U](
         createUserModelFromFile(userFile),
-        createItemModelFromFile(itemFile),
-        createObservationsFromFile(ratingsFile),
+        createItemModelFromFile[T, U](itemFile),
+        createObservationsFromFile[T](ratingsFile),
         numFactors)
     }
 
     // wrapper for type signatures
     def createUserModelFromFile(file: String): ConcurrentHashMap[Long, WeightVector] = {
       logInfo(s"Reading USER model from $file")
-      readModelFromFile(file) 
+      readModelFromFile[Long, WeightVector](file)
     }
 
-    def createItemModelFromFile(file: String): ConcurrentHashMap[Long, FeatureVector] = {
+    def createItemModelFromFile[T, U](file: String): ConcurrentHashMap[T, U] = {
       logInfo(s"Reading ITEM model from $file")
-       readModelFromFile(file) 
+      readModelFromFile[T, U](file)
     }
 
     // helper method for reading model from file
-    def readModelFromFile(file: String): ConcurrentHashMap[Long, Array[Double]] = {
+    def readModelFromFile[T, U](file: String): ConcurrentHashMap[T, U] = {
       var i = 0
-      val map = new ConcurrentHashMap[Long, Array[Double]]
-      Source.fromFile(file).getLines.foreach( (line) => {
-        val splits = line.split(",")
-        val key = splits(0).toLong
-        val factors: Array[Double] = splits.slice(1, splits.size).map(_.toDouble)
-        map.put(key, factors)
-        if (i <= 20) { logInfo(s"key: $key") }
-        i += 1
-      })
-      // map.foreach({ case (k, _) => logInfo(s"key: $k")})
-      map
+      val kryo = KryoThreadLocal.kryoTL.get
+      val rawBytes = ByteBuffer.wrap(Files.readAllBytes(Paths.get(file)))
+      kryo.deserialize(rawBytes).asInstanceOf[ConcurrentHashMap[T, U]]
     }
 
-    def createObservationsFromFile(file: String)
-        : ConcurrentHashMap[Long, ConcurrentHashMap[Long, Double]] = {
+    def createObservationsFromFile[T](file: String)
+        : ConcurrentHashMap[Long, ConcurrentHashMap[T, Double]] = {
 
 
         logInfo(s"Reading OBSERVATIONS from $file")
-        val map = new ConcurrentHashMap[Long, ConcurrentHashMap[Long, Double]]
-        val obs = Source.fromFile(file)
-            .getLines
-            .map( (line) => {
-                val splits = line.split("\\s+")
-                Observation(splits(0).toLong, splits(1).toLong, splits(2).toDouble)
-            })
-            .toList
-            .groupBy(_.user)
-            .map({ case (user, obs) => {
-                val obsMap: ConcurrentHashMap[Long, Double] =
-                    new ConcurrentHashMap(obs.map(r => (r.data, r.score)).toMap)
-                map.put(user, obsMap)
-                }
-            })
-        map
+        readModelFromFile(file)
     }
 }
 
