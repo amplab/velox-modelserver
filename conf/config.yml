@@ -1,136 +1,48 @@
-#ec2-184-73-72-139.compute-1.amazonaws.com 
-
-models:
-    matrixfact:
-#        modelType: MatrixFactorizationModel
-        modelType: NewsgroupsModel
-        numFactors: 20
-        storage:
-            items:
-                storageType: jvmRandomItems
-                totalNumUsers: 1000
-                numItems: 500
-                numPartitions: 2
-                modelSize: 50
-                partition: 0
-            users:
-                storageType: jvmRandomUsers
-                totalNumUsers: 1000
-                numItems: 500
-                numPartitions: 2
-                modelSize: 50
-                partition: 0
-            ratings:
-                storageType: jvmRandomObservations
-                totalNumUsers: 1000
-                numItems: 0
-                numPartitions: 2
-                modelSize: 50
-                partition: 0
-        #    ratings:
-        #        storageType: jvmRandomObservations
-        #        totalNumUsers: 1000
-        #        numItems: 500
-        #        numPartitions: 2
-        #        modelSize: 50
-        #        partition: 0
-
-    ## Configuring the storages using Tachyon
-    #    storage:
-    #       items:
-    #           storageType: tachyon
-    #           address: tachyon://ec2-54-82-134-136.compute-1.amazonaws.com:19998
-    #           path: item-model
-    #       users:
-    #           storageType: tachyon
-    #           address: tachyon://ec2-54-82-134-136.compute-1.amazonaws.com:19998
-    #           path: user-model
-    #       ratings:
-    #           storageType: tachyon
-    #           address: tachyon://ec2-54-82-134-136.compute-1.amazonaws.com:19998
-    #           path: movie-ratings
-
-    ## Configuring the storages using Cassandra
-    #    storage:
-    #       items:
-    #           storageType: cassandra
-    #           address: 127.0.0.1
-    #           keyspace: velox
-    #           table: items
-    #       users:
-    #           storageType: cassandra
-    #           address: 127.0.0.1
-    #           keyspace: velox
-    #           table: users
-    #       ratings:
-    #           storageType: cassandra
-    #           address: 127.0.0.1
-    #           keyspace: velox
-    #           table: ratings
-
-    ## Configuring the storages using local storage
-    #    storage:
-    #       items:
-    #           storageType: local
-    #           path: /Users/crankshaw/code/amplab/model-serving/data/trained_50_features/all_products_clean_50.txt
-    #       users:
-    #           storageType: local
-    #           path: /Users/crankshaw/code/amplab/model-serving/data/trained_50_features/all_users_clean_50.txt
-    #       ratings:
-    #           storageType: local
-    #           path: /Users/crankshaw/code/amplab/model-serving/data/ml-100k/u.data
-
-    ## Configuring the storages using rocksDB storage
-    #    storage:
-    #       items:
-    #           storageType: rocks
-    #           path: /tmp/items
-    #       users:
-    #           storageType: rocks
-    #           path: /tmp/users
-    #       ratings:
-    #           storageType: rocks
-    #           path: /tmp/ratings
-
-
-sparkMaster: local[4]#spark://ec2-54-92-229-50.compute-1.amazonaws.com:7077
-
-# matPredictionsLoc: tachyon://ec2-184-73-72-139.compute-1.amazonaws.com:19998/mat-predictions
+hostname: none
 logging:
   appenders:
-    - type: file
-      # The file to which current statements will be logged.
-      currentLogFilename: /home/ubuntu/velox-modelserver/logs/velox.log
-      archivedLogFilenamePattern: /home/ubuntu/velox-modelserver/logs/velox-%d.log.gz
-      archivedFileCount: 5
-      timeZone: UTC
-    - type: console
-      threshold: INFO
-      target: stderr
-
-server:
-  requestLog:
+  - archivedFileCount: 5
+    archivedLogFilenamePattern: /home/ubuntu/velox-modelserver/logs/velox-%d.log.gz
+    currentLogFilename: /home/ubuntu/velox-modelserver/logs/velox.log
     timeZone: UTC
-    appenders:
-      - type: file
-        currentLogFilename: /home/ubuntu/velox-modelserver/logs/requests.log
-        threshold: INFO
-        archive: true
-        archivedLogFilenamePattern: /home/ubuntu/velox-modelserver/logs/requests.%d.log.gz
-        archivedFileCount: 5
+    type: file
+  - target: stderr
+    threshold: INFO
+    type: console
+models:
+  newsgroups:
+    cacheFeatures: false
+    cachePartialSums: false
+    cachePredictions: false
+    modelLoc: /home/ubuntu/velox-modelserver/data/news-classifier-from-tomer
+    modelSize: 20
+    modelType: NewsgroupsModel
+    partitionFile: /home/ubuntu/velox-modelserver/conf/server_partitions.txt
+    storage:
+      ratings:
+        docLength: 200
+        ngramFile: /home/ubuntu/velox-modelserver/data/20_news_ngrams.txt
+        numItems: 100
+        numPartitions: 3
+        percentOfItems: 80.0
+        storageType: jvmRandomDocs
+        totalNumUsers: 1000
+      users:
+        numPartitions: 3
+        storageType: jvmRandomUsers
+        totalNumUsers: 1000
+server:
   applicationConnectors:
-    - type: http
-      port: 8080
-      # headerCacheSize: 512 bytes
-      # outputBufferSize: 32KiB
-      # maxRequestHeaderSize: 8KiB
-      # maxResponseHeaderSize: 8KiB
-      # inputBufferSize: 8KiB
-      # idleTimeout: 30 seconds
-      # minBufferPoolSize: 64 bytes
-      # bufferPoolIncrement: 1KiB
-      # maxBufferPoolSize: 64KiB
-      # acceptorThreads: 1
-      # selectorThreads: 2
-      acceptQueueSize: 4096
-
+  - acceptQueueSize: 4096
+    port: 8080
+    type: http
+  requestLog:
+    appenders:
+    - archive: true
+      archivedFileCount: 5
+      archivedLogFilenamePattern: /home/ubuntu/velox-modelserver/logs/requests.%d.log.gz
+      currentLogFilename: /home/ubuntu/velox-modelserver/logs/requests.log
+      threshold: INFO
+      type: file
+    timeZone: UTC
+sparkMaster: spark://ec2-54-92-229-50.compute-1.amazonaws.com:7077

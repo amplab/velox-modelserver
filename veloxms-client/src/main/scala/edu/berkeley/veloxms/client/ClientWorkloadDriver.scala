@@ -10,7 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger
 // import com.fasterxml.jackson.datatype.joda.JodaModule
 // import com.fasterxml.jackson.module.afterburner.AfterburnerModule
 
-import edu.berkeley.veloxms.util.Logging
+import edu.berkeley.veloxms.util.{Logging, NGramDocumentGenerator}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import org.json4s.JValue
 import scala.collection.mutable
@@ -19,17 +19,22 @@ import scala.io.Source
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 import scala.util.{Success, Failure}
+import java.nio.file.{Paths, Files}
+import java.nio.charset.StandardCharsets
+import scala.xml.pull._
+import scala.collection.mutable.ArrayBuffer
+import scala.xml.XML
 
 object ModelType extends Enumeration {
   type ModelType = Value
-  val MatrixFactor, DecisionTree = Value
+  val MatrixFactorizationModel, NewsgroupsModel = Value
 }
 
 import ModelType._
 
 import dispatch._, Defaults._
 import scopt.OptionParser
-import org.apache.log4j.{Level, Logger}
+// import org.apache.log4j.{Level, Logger}
 
 object VeloxWorkloadDriver extends Logging {
 
@@ -37,7 +42,7 @@ object VeloxWorkloadDriver extends Logging {
   case class Params(
     numUsers: Int = 100,
     numItems: Int = 100,
-    modelType: ModelType = MatrixFactor,
+    modelType: ModelType = MatrixFactorizationModel,
     veloxURLFile: String = null,
     veloxPort: Int = 8080,
     numRequests: Int = 10000,
@@ -46,8 +51,9 @@ object VeloxWorkloadDriver extends Logging {
     numThreads: Int = 10,
     connTimeout: Int = 10000,
     throttleRequests: Int = 1000,
-    statusTime: Int = 10
-
+    statusTime: Int = 10,
+    ngramFile: String = null,
+    docLength: Int = 200
   )
 
 
@@ -105,6 +111,15 @@ object VeloxWorkloadDriver extends Logging {
         .text("Time interval (s) to print out benchmark status, " +
           s"default: ${defaultParams.statusTime}")
         .action((x, c) => c.copy(statusTime = x))
+      opt[String]("ngramFile")
+        // .required()
+        .text(s"File containing all word 1,2,3-grams in 20newsgroups. Used to generate " +
+          "random documents")
+        .action((x, c) => c.copy(ngramFile = x))
+      opt[Int]("docLength")
+        .text("Number of ngrams in documents in corpus, " +
+          s"default: ${defaultParams.docLength}")
+        .action((x, c) => c.copy(docLength = x))
       // opt[Int]("modelSize")
       //   .text("The number of factors in the model, " +
       //     s"default: ${defaultParams.modelSize}")
@@ -118,7 +133,7 @@ object VeloxWorkloadDriver extends Logging {
         """.stripMargin)
     }
 
-    Logger.getRootLogger.setLevel(Level.INFO)
+    // Logger.getRootLogger.setLevel(Level.INFO)
     parser.parse(args, defaultParams).map { params =>
       // if (params.genTrain) {
       //   val requestor = new MFRequestor(
@@ -127,118 +142,83 @@ object VeloxWorkloadDriver extends Logging {
       //     percentObs = 1.0) // all requests should be observations
       //   generateTrainingData(requestor, params)
       // } else {
-      val requestor = new MFRequestor(
+      val corpus = params.modelType match {
+        case NewsgroupsModel => Some(
+          NGramDocumentGenerator.createCorpus(params.numItems,
+                                              params.docLength,
+                                              params.ngramFile))
+        case _ => None
+      }
+
+      val requestor = new Requestor(
         numUsers = params.numUsers,
         numItems = params.numItems,
         percentObs = params.percentObs)
-      sendRequests(requestor, params)
+      sendRequests(requestor, params, corpus)
     } getOrElse {
       sys.exit(1)
     }
-
   }
 
-  /**
-   * This will randomly generate base-line item models for each item and user-models for each
-   * user, as well as random (uncorrelated) training data for each user, so that the online
-   * updates will have some data to work with.
-   * The item models will not be split, but the user and training data will be partitioned
-   * by user into the number of partitions specified in params.
-   */
-  // def generateTrainingData(requestor: MFRequestor, params: Params) {
-  //   // generate item models:
-  //   
-  //   val rand = new Random
-  //
-  //   var i = 0L
-  //   val itemMap = new mutable.HashMap[Long, Array[Double]]
-  //   while (i < params.numItems) {
-  //     itemMap.put(i, randomArray(rand, params.modelSize))
-  //     ++i
-  //   }
-  //
-  //   val userMap = new mutable.HashMap[Long, Array[Double]]
-  //   while (i < params.numItems) {
-  //     userMap.put(i, randomArray(rand, params.modelSize))
-  //     ++i
-  //   }
-  //
-  //   val sizeOfPart = params.numUsers / params.numPartitions
-  //   val partitionedUserMap = userMap.groupBy {(k, v) =>
-  //     k / sizeOfPart
-  //   }
-  //   val createdNumPartitions = partitionedUserMap.size
-  //   if (createdNumPartitions != params.numPartitions) {
-  //     logWarning(s"Intended to generate ${params.numPartitions} partitions, ended up" + 
-  //       s" with $createdNumPartitions")
-  //   }
-  //
-  //   // val trainingData = new mutable.HashMap[Long
-  //
-  //
-  //
-  //
-  //
-  //
-  //
-  // }
+  def parsePlainText(textFile: String): Array[String] = {
+    val paragraphSep = "xxxxxxxxxxxxxxx"
+    val text = Source.fromFile(textFile)
+      .mkString("")
+      .split(paragraphSep)
+      .map(_.replaceAll("[^a-zA-Z0-9]", ""))
+    var totalSize = 0.0
+    text.foreach {s => totalSize += s.size }
+    println(s"Average doc size: ${totalSize / text.size.toDouble} for ${text.size} docs")
+    text
+  }
+
 
   def getHosts(hostsFile: String, port: Int): Map[Int, Req] = {
     val hosts = Source.fromFile(hostsFile)
       .getLines
       .map( line => {
         val splits = line.split(": ")
-        val part = splits(0).toInt
-        val url = splits(1)
+        val url = splits(0)
+        val part = splits(1).toInt
         (part, host(url, port).setContentType("application/json", "UTF-8"))
       }).toMap
       hosts
   }
 
-  def sendRequests(requestor: MFRequestor, params: Params) {
+  def sendRequests(requestor: Requestor,
+    params: Params,
+    corpus: Option[Array[String]] = None ) {
     val http = Http.configure(_.setAllowPoolingConnection(true)
       .setConnectionTimeoutInMs(params.connTimeout)
       // .setMaximumConnectionsTotal(1000)
       .addRequestFilter(new ThrottleRequestFilter(params.throttleRequests))
     )
 
-      // .setMaximumConnectionsPerHost(1000)
-      // .setRequestTimeoutInMs(1000)
-    // .setExecutorService(pool)
-
-// builder => {
-//     builder.setConnectionTimeoutInMs(1000)
-//     builder.setAllowPoolingConnection(true)
-//     builder.setMaximumConnectionsTotal(1000)
-//     builder.addRequestFilter(new ThrottleRequestFilter(1));
-//     builder.build()
-//     builder
-    // val parallelism = params.numThreads
-
-
-
     val nanospersec = math.pow(10, 9)
-
-
     var numPreds = 0
     var numObs = 0
-
-    
     val reqPerPartition = new Array[Int](params.numPartitions)
-
-    // val veloxHost = host(params.veloxURL, params.veloxPort)
-    //       .setContentType("application/json", "UTF-8")
     val hosts = getHosts(params.veloxURLFile, params.veloxPort)
     val observePath = "observe"
+    val retrainPath = "retrain"
     val predictPath = "predict"
-    val modelPath = "matrixfact"
+    val modelPath = params.modelType match {
+      case NewsgroupsModel => "newsgroups"
+      case _ => "matrixfact"
+    }
     //json encoding
     val mapper = createObjectMapper
 
     def createPredictRequest(req: PredictRequest): Req = {
-      val jsonString = mapper.writeValueAsString(req)
+      val jsonString = params.modelType match {
+        case NewsgroupsModel => {
+          val newsReq = NewsPredictRequest(req.uid, (corpus.get)(req.context.toInt))
+          mapper.writeValueAsString(newsReq)
+        }
+        case _ => mapper.writeValueAsString(req)
+      }
       // val jsonString = mapper.writeValueAsString(PredictRequest(1, 4))
-      val partition = (req.user % params.numPartitions).toInt
+      val partition = (req.uid % params.numPartitions).toInt
       reqPerPartition(partition) += 1
       val veloxHost = hosts(partition)
       val request = (veloxHost / predictPath / modelPath).POST << jsonString
@@ -247,10 +227,16 @@ object VeloxWorkloadDriver extends Logging {
     }
 
     def createObserveRequest(req: ObserveRequest): Req = {
-      val partition = (req.userId % params.numPartitions).toInt
+      val partition = (req.uid % params.numPartitions).toInt
       reqPerPartition(partition) += 1
       val veloxHost = hosts(partition)
-      val jsonString = mapper.writeValueAsString(req)
+      val jsonString = params.modelType match {
+        case NewsgroupsModel => {
+          val newsReq = NewsObserveRequest(req.uid, (corpus.get)(req.context.toInt), req.score)
+          mapper.writeValueAsString(newsReq)
+        }
+        case _ => mapper.writeValueAsString(req)
+      }
       val request = (veloxHost / observePath / modelPath).POST << jsonString
       numObs += 1
       request
@@ -319,11 +305,20 @@ object VeloxWorkloadDriver extends Logging {
     val pthruput = numPreds.toDouble / elapsedTime.toDouble
     val othruput = numObs.toDouble / elapsedTime.toDouble
     val totthruput = (successes.size).toDouble / elapsedTime.toDouble
-    logInfo(s"In $elapsedTime seconds " +
-            s"sent $numPreds predictions ($pthruput ops/sec), " +
-            s" $numObs observations ($othruput ops/sec), " +
-            s"\n${successes.size} successes and ${failures.size} failures" +
-            s"\nTOTAL SUCCESSFUL THROUGHPUT: $totthruput ops/sec")
+
+    val outstr = (s"duration: ${elapsedTime}\n" +
+                  s"num_pred: ${numPreds}\n" +
+                  s"num_obs: ${numObs}\n" +
+                  s"pred_thru: ${pthruput}\n" +
+                  s"obs_thru: ${othruput}\n" +
+                  s"total_thru: ${totthruput}\n" +
+                  s"successes: ${successes.size}\n" +
+                  s"failures: ${failures.size}\n")
+    Files.write(Paths.get("/home/ubuntu/velox-modelserver/client_output.txt"),
+      outstr.getBytes(StandardCharsets.UTF_8))
+
+    logWarning(outstr)
+    println(outstr)
 
     http.shutdown()
     System.exit(0)
@@ -341,11 +336,49 @@ object VeloxWorkloadDriver extends Logging {
     // mapper.setSubtypeResolver(new DiscoverableSubtypeResolver)
   }
 
+
+  // def parseWikiXML(xmlFile: String): mutable.HashMap[Int, String] = {
+  //
+  //   val corpus = new mutable.HashMap[Int, String]
+  //   val xml = new XMLEventReader(Source.fromFile(xmlFile))
+  //   var insidePage = false
+  //   var buf = mutable.ArrayBuffer[String]()
+  //   var index: Int = 0
+  //   for (event <- xml) {
+  //     event match {
+  //       case EvElemStart(_, "page", _, _) => {
+  //         insidePage = true
+  //         val tag = "<page>"
+  //         buf += tag
+  //       }
+  //       case EvElemEnd(_, "page") => {
+  //         val tag = "</page>"
+  //         buf += tag
+  //         insidePage = false
+  //         val s = buf.mkString
+  //         corpus.put(index, s)
+  //         index += 1
+  //         buf.clear
+  //       }
+  //       case e @ EvElemStart(_, tag, _, _) => {
+  //         if (insidePage) {
+  //           buf += ("<" + tag + ">")
+  //         }
+  //       }
+  //       case e @ EvElemEnd(_, tag) => {
+  //         if (insidePage) {
+  //           buf += ("</" + tag + ">")
+  //         }
+  //       }
+  //       case EvText(t) => {
+  //         if (insidePage) {
+  //           buf += (t)
+  //         }
+  //       }
+  //       case _ => // ignore
+  //     }
+  //   }
+  // }
+
 }
-
-
-
-
-
-
 

@@ -6,9 +6,11 @@ import edu.berkeley.veloxms.storage._
 import edu.berkeley.veloxms.util.Logging
 import org.codehaus.jackson.JsonNode
 import org.jblas.{Solve, DoubleMatrix}
+import breeze.linalg._
 
 import scala.reflect._
 import scala.util.{Failure, Success, Try}
+
 
 
 /**
@@ -20,7 +22,21 @@ import scala.util.{Failure, Success, Try}
  * KV store
  */
 abstract class Model[T:ClassTag, U] extends Logging {
-  private val featureCache: FeatureCache[T] = new FeatureCache[T](FeatureCache.tempBudget)
+
+  val cacheResults: Boolean
+
+  val cacheFeatures: Boolean
+
+  val cachePredictions: Boolean
+
+  val featureCache: FeatureCache[T, Array[Double]] =
+      new FeatureCache[T, Array[Double]](cacheFeatures)
+
+  val predictionCache: FeatureCache[(Long, T), Double] =
+      new FeatureCache[(Long, T), Double](cachePredictions)
+
+  private val partialResults = new PartialResultsCache()
+
 
   /** The number of features in this model.
    * Used for pre-allocating arrays/matrices
@@ -64,7 +80,7 @@ abstract class Model[T:ClassTag, U] extends Logging {
     result match {
       case Some(u) => u
       case None => {
-        logWarning("User weight not found")
+        logWarning(s"User weight not found, userID: $userId")
         averageUser
       }
     }
@@ -92,13 +108,20 @@ abstract class Model[T:ClassTag, U] extends Logging {
 
   def predict(uid: Long, context: JsonNode): Double = {
     val item: T = jsonMapper.readValue(context, classTag[T].runtimeClass.asInstanceOf[Class[T]])
-    val features = getFeatures(item)
-    val weightVector = getWeightVector(uid)
-    var i = 0
-    var score = 0.0
-    while (i < numFeatures) {
-      score += features(i)*weightVector(i)
-      i += 1
+    val score = predictionCache.getItem((uid, item)) match {
+      case Some(p) => p
+      case None => {
+        val features = getFeatures(item)
+        val weightVector = getWeightVector(uid)
+        var i = 0
+        var accumScore = 0.0
+        while (i < numFeatures) {
+          accumScore += features(i)*weightVector(i)
+          i += 1
+        }
+        predictionCache.addItem((uid, item), accumScore)
+        accumScore
+      }
     }
     score
   }
@@ -106,66 +129,166 @@ abstract class Model[T:ClassTag, U] extends Logging {
   def addObservation(uid: Long, context: JsonNode, score: Double) {
     (this, uid).synchronized {
       val item: T = jsonMapper.readValue(context, classTag[T].runtimeClass.asInstanceOf[Class[T]])
-      val allObservationScores = observationStorage.get(uid).getOrElse(Map()) + (item -> score)
-      observationStorage.put(uid -> allObservationScores)
-
-
-
-      val allItemFeatures: Map[T, FeatureVector] = allObservationScores.map {
-        case (itemId, _) => (itemId, getFeatures(itemId))
-      }
-
-      val oldUserWeights = getWeightVector(uid)
-      val newUserWeights = updateUserWeights(
-        allItemFeatures, allObservationScores, numFeatures)
-      logInfo(s"Old weight: (${oldUserWeights.mkString(",")})")
-      logInfo(s"New weight: (${newUserWeights.mkString(",")})")
-
-      userStorage.put(uid -> newUserWeights)
+      val newWeights = addObservationInternal(uid, item, score, true)
     }
   }
 
-  private def updateUserWeights(allItemFeatures: Map[T, FeatureVector],
-                        allObservationScores: Map[T, Double], k: Int): WeightVector = {
+  private def addObservationInternal(
+      uid: Long,
+      context: T,
+      score: Double,
+      newData: Boolean = true): WeightVector = {
+
+    val k = numFeatures
+    val precomputed = Option(partialResults.get(uid))
+    val partialFeaturesSum = precomputed.map(_._1).getOrElse(DenseMatrix.zeros[Double](k, k))
+    val partialScoresSum = precomputed.map(_._2).getOrElse(DenseVector.zeros[Double](k))
 
 
-    val itemFeaturesSum = DoubleMatrix.zeros(k, k)
-    val itemScoreProductSum = DoubleMatrix.zeros(k)
+
+    val allScores: Map[T, Double] = if (newData) {
+      val scores = observationStorage.get(uid).getOrElse(Map()) + (context -> score)
+      observationStorage.put(uid -> scores)
+      scores
+    } else {
+      observationStorage.get(uid).getOrElse(Map())
+    }
+    val newScores: Map[T, Double] = if (precomputed == None) {
+      allScores
+    } else if (newData) {
+      Map(context -> score)
+    } else {
+      Map()
+    }
+    val newItems: Map[T, FeatureVector] = newScores.map {
+      case (context, _) => (context, getFeatures(context))
+    }
+    val (newWeights, newPartialResult) = UpdateMethods.updateWithBreeze(
+      partialFeaturesSum, partialScoresSum, newItems, newScores, k)
+
+    if (cacheResults) {
+      partialResults.put(uid, newPartialResult)
+    }
+    newWeights
+  }
+
+
+  def precomputePartialSums(users: Range) {
+    for (uid <- users) {
+      // val fakeSums = (DenseMatrix.rand[Double](numFeatures, numFeatures),
+      //   DenseVector.rand[Double](numFeatures))
+      // partialResults.put(uid, fakeSums)
+      addObservationInternal(uid, null.asInstanceOf[T], 0.0, false)
+    }
+  }
+
+
+
+}
+
+
+
+
+object UpdateMethods {
+
+  val lambda = 1.0
+
+
+  /**
+   * Use breeze for matrix ops, does no caching or anything smart.
+   */
+  def updateWithBreeze[T:ClassTag](
+      partialFeaturesSum: DenseMatrix[Double],
+      partialScoresSum: DenseVector[Double],
+      newItems: Map[T, FeatureVector],
+      newScores: Map[T, Double],
+      k: Int): (WeightVector, (DenseMatrix[Double], DenseVector[Double])) = {
+
+
 
     var i = 0
 
-    val observedItems = allItemFeatures.keys.toList
+    val observedItems = newItems.keys.toList
 
     while (i < observedItems.size) {
-      val currentItemId = observedItems(i)
+      val currentItem = observedItems(i)
       // TODO error handling
-      val currentFeaturesArray = allItemFeatures.get(currentItemId) match {
+      val currentFeaturesArray = newItems.get(currentItem) match {
         case Some(f) => f
         case None => throw new Exception(
-          s"Missing features in online update -- item: $currentItemId")
+          s"Missing features in online update -- item: $currentItem")
       }
-      val currentFeatures = new DoubleMatrix(currentFeaturesArray)
-      val product = currentFeatures.mmul(currentFeatures.transpose())
-      itemFeaturesSum.addi(product)
+      // column vector
+      val currentFeatures = new DenseVector(currentFeaturesArray)
+      val product = currentFeatures * currentFeatures.t
+      partialFeaturesSum += product
 
-      val obsScore = allObservationScores.get(currentItemId) match {
+      val obsScore = newScores.get(currentItem) match {
         case Some(o) => o
         case None => throw new Exception(
-          s"Missing rating in online update -- item: $currentItemId")
-
+          s"Missing rating in online update -- item: $currentItem")
       }
-      itemScoreProductSum.addi(currentFeatures.mul(obsScore))
-      i += 1
 
+      partialScoresSum += currentFeatures * obsScore
+      i += 1
     }
 
-    // TODO: There should be no dependency on MatrixFactorizationModel here
-    val regularization = DoubleMatrix.eye(k).muli(MatrixFactorizationModel.lambda*k)
-    itemFeaturesSum.addi(regularization)
-    val newUserWeights = Solve.solve(itemFeaturesSum, itemScoreProductSum)
-    newUserWeights.toArray()
+
+    val partialResult = (partialFeaturesSum.copy, partialScoresSum.copy)
+
+    val regularization = DenseMatrix.eye[Double](k) * (lambda*k)
+    partialFeaturesSum += regularization
+    val newUserWeights = partialFeaturesSum \ partialScoresSum
+    (newUserWeights.toArray, partialResult)
 
   }
+
+
+  /**
+   * The original implementation. Uses jblas for matrix ops, does no
+   * caching or anything smart.
+   */
+  // def updateJBLASNaive[T:ClassTag](allItemFeatures: Map[T, FeatureVector],
+  //                       allObservationScores: Map[T, Double], k: Int): WeightVector = {
+  //
+  //
+  //   val itemFeaturesSum = DoubleMatrix.zeros(k, k)
+  //   val itemScoreProductSum = DoubleMatrix.zeros(k)
+  //
+  //   var i = 0
+  //
+  //   val observedItems = allItemFeatures.keys.toList
+  //
+  //   while (i < observedItems.size) {
+  //     val currentItemId = observedItems(i)
+  //     // TODO error handling
+  //     val currentFeaturesArray = allItemFeatures.get(currentItemId) match {
+  //       case Some(f) => f
+  //       case None => throw new Exception(
+  //         s"Missing features in online update -- item: $currentItemId")
+  //     }
+  //     val currentFeatures = new DoubleMatrix(currentFeaturesArray)
+  //     val product = currentFeatures.mmul(currentFeatures.transpose())
+  //     itemFeaturesSum.addi(product)
+  //
+  //     val obsScore = allObservationScores.get(currentItemId) match {
+  //       case Some(o) => o
+  //       case None => throw new Exception(
+  //         s"Missing rating in online update -- item: $currentItemId")
+  //
+  //     }
+  //     itemScoreProductSum.addi(currentFeatures.mul(obsScore))
+  //     i += 1
+  //
+  //   }
+  //
+  //   // TODO: There should be no dependency on MatrixFactorizationModel here
+  //   val regularization = DoubleMatrix.eye(k).muli(lambda*k)
+  //   itemFeaturesSum.addi(regularization)
+  //   val newUserWeights = Solve.solve(itemFeaturesSum, itemScoreProductSum)
+  //   newUserWeights.toArray()
+  //
+  // }
 
 }
 
