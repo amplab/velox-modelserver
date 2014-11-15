@@ -25,8 +25,11 @@ object RequestDist extends Enumeration {
 
 // TOOD change userId to user, itemId to item when I change it in
 // AddObservationResource.scala
-case class ObserveRequest(userId: Long, itemId: Long, score: Double)
-case class PredictRequest(user: Long, item: Long)
+case class ObserveRequest(uid: Long, context: Long, score: Double)
+case class PredictRequest(uid: Long, context: Long)
+
+case class NewsObserveRequest(uid: Long, context: String, score: Double)
+case class NewsPredictRequest(uid: Long, context: String)
 
 import RequestDist._
 
@@ -35,7 +38,7 @@ import RequestDist._
  * Create requests for a matrix factorization model with the given number
  * of items, users
  */
-class MFRequestor (
+class Requestor (
     numUsers: Long = 100,
     numItems: Long = 1000,
     /* The percentage of requests that are adding observations */

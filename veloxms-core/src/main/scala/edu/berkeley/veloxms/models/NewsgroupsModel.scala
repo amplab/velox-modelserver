@@ -18,12 +18,13 @@ class NewsgroupsModel(
     val numFeatures: Int,
     val userStorage: ModelStorage[Long, WeightVector],
     val observationStorage: ModelStorage[Long, Map[String, Double]],
-    val averageUser: WeightVector) extends Model[String, FeatureVector] with Logging {
+    val averageUser: WeightVector,
+    val modelLoc: String) extends Model[String, FeatureVector] with Logging {
 
     val defaultItem: FeatureVector = Array.fill[Double](numFeatures)(0.0)
 
   private var model: Transformer[String, FeatureVector] = {
-    val fis = new FileInputStream("./data/news-classifier.tmp")
+    val fis = new FileInputStream(modelLoc)
     val ois = new ObjectInputStream(fis)
     val loadedPredictionPipeline = ois.readObject().asInstanceOf[Transformer[String, Vector]]
     ois.close()
