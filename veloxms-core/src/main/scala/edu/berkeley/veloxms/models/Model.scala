@@ -105,14 +105,9 @@ abstract class Model[T:ClassTag, U] extends Logging {
 
   def addObservation(uid: Long, context: JsonNode, score: Double) {
     val item: T = jsonMapper.readValue(context, classTag[T].runtimeClass.asInstanceOf[Class[T]])
+    modelStorage.addScore(uid, item, score)
     val allObservationScores: Map[T, Double] = modelStorage
-        .getAllObservations(uid) match {
-      case Success(u) => u + ((item, score))
-      case Failure(thrown) => {
-        logWarning(s"No training data found for user $uid")
-        Map((item, score))
-      }
-    }
+        .getAllObservations(uid).get
 
     val allItemFeatures: Map[T, FeatureVector] = allObservationScores.map {
       case(itemId, _) => (itemId, getFeatures(itemId))

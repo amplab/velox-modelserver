@@ -18,11 +18,15 @@ models:
 #     users: user-model
 #     ratings: movie-ratings
 
-        #modelStorage:
-        #    storageType: tachyon
-        #    address: tachyon://ec2-54-82-134-136.compute-1.amazonaws.com:19998
-        #    items: item-model
-        #    users: user-model
+    #    modelStorages:
+        #    items:
+            #    storageType: tachyon
+            #    address: tachyon://ec2-54-82-134-136.compute-1.amazonaws.com:19998
+            #    table: item-model
+        #    users:
+            #    storageType: tachyon
+            #    address: tachyon://ec2-54-82-134-136.compute-1.amazonaws.com:19998
+            #    table: user-model
         #    ratings: movie-ratings
 
 #modelStorage:

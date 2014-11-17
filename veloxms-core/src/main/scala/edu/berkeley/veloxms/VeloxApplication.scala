@@ -31,9 +31,6 @@ object VeloxApplication extends ScalaApplication[VeloxConfiguration] with Loggin
 
   override def getName = "velox model server"
 
-  // TODO I think this is fucked - look at Spark's Logging.scala to fix
-  // val logger = LoggerFactory.getLogger(classOf[VeloxApplication])
-
   override def initialize(bootstrap: Bootstrap[VeloxConfiguration]) {
     bootstrap.addBundle(new ScalaBundle)
     // init global state
@@ -42,9 +39,9 @@ object VeloxApplication extends ScalaApplication[VeloxConfiguration] with Loggin
   override def run(conf: VeloxConfiguration, env: Environment) {
     conf.modelFactories.foreach { case (name, modelFactory) => {
       val model = modelFactory.build(env)
-      val predictServlet = new PointPredictionServlet(model)
-      val observeServlet = new AddObservationServlet(model, conf.sparkMaster)
-      val retrainServlet = new RetrainServlet(model, conf.sparkMaster)
+      val predictServlet = new PointPredictionServlet(model, env.metrics().timer(name + "/predict/"))
+      val observeServlet = new AddObservationServlet(model, conf.sparkMaster, env.metrics().timer(name + "/observe/"))
+      val retrainServlet = new RetrainServlet(model, conf.sparkMaster, env.metrics().timer(name + "/retrain/"))
       env.getApplicationContext.addServlet(new ServletHolder(predictServlet), "/predict/" + name)
       env.getApplicationContext.addServlet(new ServletHolder(observeServlet), "/observe/" + name)
       env.getApplicationContext.addServlet(new ServletHolder(retrainServlet), "/retrain/" + name)
