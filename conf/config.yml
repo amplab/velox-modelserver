@@ -4,56 +4,87 @@ models:
     matrixfact:
         modelType: MatrixFactorizationModel
         numFactors: 50
-        modelStorage:
-          storageType: jvmRandom
-          totalNumUsers: 1000
-          numItems: 500
-          numPartitions: 2
-          modelSize: 50
-          partition: 0
-# modelStorage:
-#     storageType: tachyon
-#     address: tachyon://ec2-54-82-134-136.compute-1.amazonaws.com:19998
-#     items: item-model
-#     users: user-model
-#     ratings: movie-ratings
+        storage:
+            items:
+                storageType: jvmRandomItems
+                totalNumUsers: 1000
+                numItems: 500
+                numPartitions: 2
+                modelSize: 50
+                partition: 0
+            users:
+                storageType: jvmRandomUsers
+                totalNumUsers: 1000
+                numItems: 500
+                numPartitions: 2
+                modelSize: 50
+                partition: 0
+            ratings:
+                storageType: jvmRandomObservations
+                totalNumUsers: 1000
+                numItems: 500
+                numPartitions: 2
+                modelSize: 50
+                partition: 0
 
-    #    modelStorages:
-        #    items:
-            #    storageType: tachyon
-            #    address: tachyon://ec2-54-82-134-136.compute-1.amazonaws.com:19998
-            #    table: item-model
-        #    users:
-            #    storageType: tachyon
-            #    address: tachyon://ec2-54-82-134-136.compute-1.amazonaws.com:19998
-            #    table: user-model
-        #    ratings: movie-ratings
+    ## Configuring the storages using Tachyon
+    #    storage:
+    #       items:
+    #           storageType: tachyon
+    #           address: tachyon://ec2-54-82-134-136.compute-1.amazonaws.com:19998
+    #           path: item-model
+    #       users:
+    #           storageType: tachyon
+    #           address: tachyon://ec2-54-82-134-136.compute-1.amazonaws.com:19998
+    #           path: user-model
+    #       ratings:
+    #           storageType: tachyon
+    #           address: tachyon://ec2-54-82-134-136.compute-1.amazonaws.com:19998
+    #           path: movie-ratings
 
-#modelStorage:
-#    storageType: local
-#    ratings: /Users/crankshaw/code/amplab/model-serving/data/ml-100k/u.data
-#    users: /Users/crankshaw/code/amplab/model-serving/data/trained_50_features/all_users_clean_50.txt
-#    items: /Users/crankshaw/code/amplab/model-serving/data/trained_50_features/all_products_clean_50.txt
+    ## Configuring the storages using Cassandra
+    #    storage:
+    #       items:
+    #           storageType: cassandra
+    #           address: 127.0.0.1
+    #           keyspace: velox
+    #           table: items
+    #       users:
+    #           storageType: cassandra
+    #           address: 127.0.0.1
+    #           keyspace: velox
+    #           table: users
+    #       ratings:
+    #           storageType: cassandra
+    #           address: 127.0.0.1
+    #           keyspace: velox
+    #           table: ratings
+
+    ## Configuring the storages using local storage
+    #    storage:
+    #       items:
+    #           storageType: local
+    #           path: /Users/crankshaw/code/amplab/model-serving/data/trained_50_features/all_products_clean_50.txt
+    #       users:
+    #           storageType: local
+    #           path: /Users/crankshaw/code/amplab/model-serving/data/trained_50_features/all_users_clean_50.txt
+    #       ratings:
+    #           storageType: local
+    #           path: /Users/crankshaw/code/amplab/model-serving/data/ml-100k/u.data
+
+    ## Configuring the storages using rocksDB storage
+    #    storage:
+    #       items:
+    #           storageType: rocks
+    #           path: /tmp/items
+    #       users:
+    #           storageType: rocks
+    #           path: /tmp/users
+    #       ratings:
+    #           storageType: rocks
+    #           path: /tmp/ratings
 
 
-
-#modelStorage:
-#    storageType: cassandra
-#    address: 127.0.0.1
-#    keyspace: velox
-#    items: items
-#    users: users
-#    ratings: ratings
-
-#modelStorage:
-#    storageType: rocks
-#    users: /tmp/users
-#    items: /tmp/items
-#    ratings: /tmp/ratings
-
-# itemModelLoc: tachyon://ec2-184-73-72-139.compute-1.amazonaws.com:19998/item-model
-# userModelLoc: tachyon://ec2-184-73-72-139.compute-1.amazonaws.com:19998/user-model
-# ratingsLoc: tachyon://ec2-184-73-72-139.compute-1.amazonaws.com:19998/movie-ratings
 sparkMaster: spark://ec2-54-92-229-50.compute-1.amazonaws.com:7077
 
 # matPredictionsLoc: tachyon://ec2-184-73-72-139.compute-1.amazonaws.com:19998/mat-predictions

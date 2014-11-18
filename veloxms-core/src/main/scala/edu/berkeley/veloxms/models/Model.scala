@@ -33,11 +33,12 @@ abstract class Model[T:ClassTag, U] extends Logging {
   val defaultItem: FeatureVector
 
   /**
-   * Interface to the storage backend. Allows model implementors
+   * Interface to the storage backend. Allows model implementers
    * to access the storage system if needed for computing features,
    * user weights.
    */
-  val modelStorage: ModelStorage[T, U]
+  val userStorage: ModelStorage[Long, WeightVector]
+  val observationStorage: ModelStorage[Long, Map[T, Double]]
 
   /** Average user weight vector.
    * Used for warmstart for new users
@@ -59,11 +60,11 @@ abstract class Model[T:ClassTag, U] extends Logging {
    *
    */
   private def getWeightVector(userId: Long) : WeightVector = {
-    val result: Try[Array[Double]] = modelStorage.getUserFactors(userId)
+    val result: Option[Array[Double]] = userStorage.get(userId)
     result match {
-      case Success(u) => u
-      case Failure(thrown) => {
-        logWarning("User weight not found: " + thrown)
+      case Some(u) => u
+      case None => {
+        logWarning("User weight not found")
         averageUser
       }
     }
@@ -104,20 +105,25 @@ abstract class Model[T:ClassTag, U] extends Logging {
   }
 
   def addObservation(uid: Long, context: JsonNode, score: Double) {
-    val item: T = jsonMapper.readValue(context, classTag[T].runtimeClass.asInstanceOf[Class[T]])
-    modelStorage.addScore(uid, item, score)
-    val allObservationScores: Map[T, Double] = modelStorage
-        .getAllObservations(uid).get
+    (this, uid).synchronized {
+      val item: T = jsonMapper.readValue(context, classTag[T].runtimeClass.asInstanceOf[Class[T]])
+      val allObservationScores = observationStorage.get(uid).getOrElse(Map()) + (item -> score)
+      observationStorage.put(uid -> allObservationScores)
 
-    val allItemFeatures: Map[T, FeatureVector] = allObservationScores.map {
-      case(itemId, _) => (itemId, getFeatures(itemId))
+
+
+      val allItemFeatures: Map[T, FeatureVector] = allObservationScores.map {
+        case (itemId, _) => (itemId, getFeatures(itemId))
+      }
+
+      val oldUserWeights = getWeightVector(uid)
+      val newUserWeights = updateUserWeights(
+        allItemFeatures, allObservationScores, numFeatures)
+      logInfo(s"Old weight: (${oldUserWeights.mkString(",")})")
+      logInfo(s"New weight: (${newUserWeights.mkString(",")})")
+
+      userStorage.put(uid -> newUserWeights)
     }
-
-    val oldUserWeights = getWeightVector(uid)
-    val newUserWeights = updateUserWeights(
-      allItemFeatures, allObservationScores, numFeatures)
-    logInfo(s"Old weight: (${oldUserWeights.mkString(",")})")
-    logInfo(s"New weight: (${newUserWeights.mkString(",")})")
   }
 
   private def updateUserWeights(allItemFeatures: Map[T, FeatureVector],

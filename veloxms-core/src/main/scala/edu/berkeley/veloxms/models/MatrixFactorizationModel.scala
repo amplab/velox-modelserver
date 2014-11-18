@@ -17,7 +17,9 @@ import edu.berkeley.veloxms.storage._
 
 class MatrixFactorizationModel(
     val numFeatures: Int,
-    val modelStorage: ModelStorage[Long, FeatureVector],
+    itemStorage: ModelStorage[Long, FeatureVector],
+    val userStorage: ModelStorage[Long, WeightVector],
+    val observationStorage: ModelStorage[Long, Map[Long, Double]],
     val averageUser: WeightVector) extends Model[Long, FeatureVector] {
 
     val defaultItem: FeatureVector = Array.fill[Double](numFeatures)(0.0)
@@ -29,10 +31,10 @@ class MatrixFactorizationModel(
    * by Velox on feature cache miss.
    */
   def computeFeatures(data: Long): FeatureVector = {
-    modelStorage.getFeatureData(data) match {
-      case Success(features) => features
-      case Failure(thrown) => {
-        val msg = "Error computing features: " + thrown
+    itemStorage.get(data) match {
+      case Some(features) => features
+      case None => {
+        val msg = "Error computing features"
         logWarning(msg)
         throw new Exception(msg)
       }

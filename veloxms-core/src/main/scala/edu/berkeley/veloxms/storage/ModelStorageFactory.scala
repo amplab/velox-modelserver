@@ -15,63 +15,62 @@ class ModelStorageFactory extends Logging {
 
   val address: String = ""
   val keyspace: String = ""
-  val items: String = ""
-  val users: String = ""
-  val ratings: String = ""
+  val table: String = ""
+  val path: String = ""
   val totalNumUsers: Int = -1
   val numItems: Int = -1
   val numPartitions: Int = -1
   val modelSize: Int = -1
   val partition: Int = -1
 
-  def build[T, U](env: Environment, numFactors: Int): ModelStorage[T, U] = {
+  def build[T, U](env: Environment): ModelStorage[T, U] = {
     // Build the modelStorage
     val modelStorage: ModelStorage[T, U] = storageType match {
       case "local" => {
         logInfo("Using local storage")
-        JVMLocalStorage[T, U](
-          users,
-          items,
-          ratings,
-          numFactors)
+        JVMLocalStorage[T, U](path)
       }
-      case "jvmRandom" => {
+      case "jvmRandomUsers" => {
         logInfo(s"Using jvmRandom storage as partition $partition")
-        JVMLocalStorage.generateRandomData(
+        JVMLocalStorage.generateRandomUserData(
             totalNumUsers,
-            numItems,
-            numPartitions, 
+            numPartitions,
             partition,
             modelSize).asInstanceOf[ModelStorage[T, U]]
       }
+      case "jvmRandomItems" => {
+        logInfo(s"Using jvmRandom storage as partition $partition")
+        JVMLocalStorage.generateRandomItemData(
+          numItems,
+          modelSize).asInstanceOf[ModelStorage[T, U]]
+      }
+      case "jvmRandomObservations" => {
+        logInfo(s"Using jvmRandom storage as partition $partition")
+        JVMLocalStorage.generateRandomObservationData(
+          totalNumUsers,
+          numItems,
+          numPartitions,
+          partition,
+          modelSize).asInstanceOf[ModelStorage[T, U]]
+      }
+
       case "tachyon" => {
         logInfo("Using tachyon storage")
         env.jersey().register(new WriteModelsResource)
         new TachyonStorage[T, U](
           address,
-          users,
-          items,
-          ratings,
-          numFactors)
+          path)
       }
       case "cassandra" => {
         logInfo("Using cassandra storage")
         new CassandraStorage[T, U](
           address,
           keyspace,
-          users,
-          items,
-          ratings,
-          numFactors)
+          table)
       }
       case "rocks" => {
         logInfo("Using RocksDB storage")
-        new RocksStorage[T, U](
-          users,
-          items,
-          ratings,
-          numFactors
-        )
+        new RocksStorage[T, U](path)
       }
     }
 

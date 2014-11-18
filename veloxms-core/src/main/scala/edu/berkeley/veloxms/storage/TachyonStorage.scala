@@ -23,132 +23,33 @@ import edu.berkeley.veloxms.util.{VeloxKryoRegistrar, KryoThreadLocal}
 // class TachyonStorage[U: ClassTag] (
 class TachyonStorage[T, U] (
                          tachyonMaster: String,
-                         userStoreName: String,
-                         itemStoreName: String,
-                         ratingsStoreName: String,
-                         // val numFactors: Int) extends ModelStorage[U] with LazyLogging {
-                         val numFactors: Int) extends ModelStorage[T, U] with Logging {
+                         storeName: String) extends ModelStorage[T, U] with Logging {
 
-  val users = TachyonUtils.getStore(tachyonMaster, userStoreName) match {
+  val store = TachyonUtils.getStore(tachyonMaster, storeName) match {
     case Success(s) => s
     case Failure(f) => throw new RuntimeException(
       s"Couldn't initialize use model: ${f.getMessage}")
   }
 
-  val items = TachyonUtils.getStore(tachyonMaster, itemStoreName) match {
-    case Success(s) => s
-    case Failure(f) => throw new RuntimeException(
-      s"Couldn't initialize item model: ${f.getMessage}")
-  }
-
-  val ratings = TachyonUtils.getStore(tachyonMaster, ratingsStoreName) match {
-    case Success(s) => s
-    case Failure(f) => throw new RuntimeException(
-      s"Couldn't initialize use model: ${f.getMessage}")
-  }
+  val storeCache = new ConcurrentHashMap[T, U]
 
   logInfo("got tachyon stores")
-
-  val usersCache = new ConcurrentHashMap[Long, WeightVector]
-
-  val observationsCache = new ConcurrentHashMap[Long, HashMap[T, Double]]
-
-  def getFeatureData(context: T): Try[U] = {
-    // getFactors(itemId, items, "item-model")
-    // for {
-    //     rawBytes <- Try(items.get(TachyonUtils.long2ByteArr(userId)))
-    //     array <- Try(SerializationUtils.deserialize(rawBytes))
-    //     result <- Try(array match
-    //         case Failure(u) => array
-    //         case Success(u) => u.asInstanceOf[U]
-    //     )
-    // } yield result
-
-    try {
-      val rawBytes = ByteBuffer.wrap(items.get(StorageUtils.toByteArr(context)))
-      val kryo = KryoThreadLocal.kryoTL.get
-      val array = kryo.deserialize(rawBytes).asInstanceOf[U]
-      Success(array)
-    } catch {
-      case u: Throwable => Failure(u)
-    }
-    //
-    // val (raw, result) = for {
-    //     rawBytes <- Try(items.get(TachyonUtils.long2ByteArr(itemId)))
-    //     array <- Try(SerializationUtils.deserialize(rawBytes))
-    // } yield (rawBytes, array)
-    // logger.info(s"Found item $raw")
-    // result match {
-    //     case Success(u) => Success(u.asInstanceOf[U])
-    //     case Failure(u) => result
-    // }
-    //
-  }
-
-  def getUserFactors(userId: Long): Try[WeightVector] = {
-    val result = Option(usersCache.get(userId)).getOrElse({
-      val rawBytes = ByteBuffer.wrap(users.get(StorageUtils.toByteArr(userId)))
-      val kryo = KryoThreadLocal.kryoTL.get
-      kryo.deserialize(rawBytes).asInstanceOf[WeightVector]
-    })
-
-    Success(result)
-
-    //
-    // val result = for {
-    //     rawBytes <- Try(users.get(TachyonUtils.long2ByteArr(userId)))
-    //     array <- Try(rawBytes.unpickle[WeightVector])
-    // } yield array
-    // result
-  }
-
-  def getAllObservations(userId: Long): Try[Map[T, Double]] = {
-
-    val rawBytes = ByteBuffer.wrap(ratings.get(StorageUtils.toByteArr(userId)))
-    val kryo = KryoThreadLocal.kryoTL.get
-    val result = kryo.deserialize(rawBytes).asInstanceOf[HashMap[T, Double]]
-
-    Success(TachyonUtils.mergeObservations(Option(result), Option(observationsCache.get(userId))))
-      //
-      // val result = for {
-      //     rawBytes <- Try(ratings.get(TachyonUtils.long2ByteArr(userId)))
-      //     array <- Try(rawBytes.unpickle[Map[Long, Double]])
-      // } yield array
-      // result
-  }
-
-
-
-  // def cast(value: Any): Option[A] = {
-  //   val erasure = manifest[A] match {
-  //     case Manifest.Byte => classOf[java.lang.Byte]
-  //     case Manifest.Short => classOf[java.lang.Short]
-  //     case Manifest.Char => classOf[java.lang.Character]
-  //     case Manifest.Long => classOf[java.lang.Long]
-  //     case Manifest.Float => classOf[java.lang.Float]
-  //     case Manifest.Double => classOf[java.lang.Double]
-  //     case Manifest.Boolean => classOf[java.lang.Boolean]
-  //     case Manifest.Int => classOf[java.lang.Integer]
-  //     case m => m.erasure
-  //   }
-  //   if(erasure.isInstance(value)) Some(value.asInstanceOf[A]) else None
-  // }
-
-  def addScore(userId: Long, context: T, score: Double) = {
-    // eventually, this should write through to Tachyon
-    var cacheEntry = Option(observationsCache.get(userId)).getOrElse({
-      val newEntry = new HashMap[T, Double]
-      observationsCache.put(userId, newEntry)
-      newEntry
-    })
-
-    cacheEntry = cacheEntry + (context -> score)
-  }
 
   /**
    * Cleans up any necessary resources
    */
   override def stop() {}
+
+  override def put(kv: (T, U)): Unit = ???
+
+  override def get(key: T): Option[U] = {
+    val result = Option(storeCache.get(key)).getOrElse({
+      val rawBytes = ByteBuffer.wrap(store.get(StorageUtils.toByteArr(key)))
+      val kryo = KryoThreadLocal.kryoTL.get
+      kryo.deserialize(rawBytes).asInstanceOf[U]
+    })
+    Some(result)
+  }
 }
 
 

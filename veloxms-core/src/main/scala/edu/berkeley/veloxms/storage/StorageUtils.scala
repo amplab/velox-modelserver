@@ -9,9 +9,9 @@ object StorageUtils {
     // val key = ByteBuffer.allocate(8)
     // key.putLong(id).array()
 
-    val buffer = ByteBuffer.allocate(12)
+    //val buffer = ByteBuffer.allocate(12)
     val kryo = KryoThreadLocal.kryoTL.get
-    val result = kryo.serialize(id, buffer).array
+    val result = kryo.serialize(id).array
     result
   }
 

@@ -7,7 +7,7 @@ import edu.berkeley.veloxms.storage._
 import edu.berkeley.veloxms.util.Logging
 
 
-class PipelinesModel[T: ClassTag](
+abstract class PipelinesModel[T: ClassTag](
     val numFeatures: Int,
     val model: (T) => (FeatureVector),
     val modelStorage: ModelStorage[T, FeatureVector],

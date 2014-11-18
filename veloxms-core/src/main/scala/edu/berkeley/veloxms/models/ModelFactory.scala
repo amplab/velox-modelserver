@@ -18,16 +18,22 @@ class ModelFactory extends Logging {
 
 
   @NotNull
-  @(JsonProperty)("modelStorage")
-  val modelStorageFactory: ModelStorageFactory = new ModelStorageFactory
+  @(JsonProperty)("storage")
+  val modelStorageFactories: Map[String, ModelStorageFactory] = Map()
 
   def build(env: Environment): Model[_, _] = {
     modelType match {
       case "MatrixFactorizationModel" => {
-        // Build and manage the modelStorage
-        val storage = modelStorageFactory.build[Long, FeatureVector](env, numFactors)
+        require(modelStorageFactories.contains("users"))
+        require(modelStorageFactories.contains("items"))
+        require(modelStorageFactories.contains("ratings"))
+
+        // Build and manage the modelStorages
+        val itemStore = modelStorageFactories.get("items").get.build[Long, FeatureVector](env)
+        val userStore = modelStorageFactories.get("users").get.build[Long, WeightVector](env)
+        val observationStore = modelStorageFactories.get("ratings").get.build[Long, Map[Long, Double]](env)
         val averageUser = Array.fill[Double](numFactors)(1.0)
-        new MatrixFactorizationModel(numFactors, storage, averageUser)
+        new MatrixFactorizationModel(numFactors, itemStore, userStore, observationStore, averageUser)
       }
       case _ => {
         throw new IllegalArgumentException(s"Unknown model type: $modelType")
