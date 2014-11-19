@@ -13,9 +13,9 @@ import edu.berkeley.veloxms._
 import edu.berkeley.veloxms.util.KryoThreadLocal
 
 // class CassandraStorage[U: ClassTag] (
-class CassandraStorage[T, U] ( address: String,
+class CassandraStorage[K, V] ( address: String,
                          keyspace: String,
-                         table: String) extends ModelStorage[T, U] with Logging {
+                         table: String) extends ModelStorage[K, V] with Logging {
 
   // Set up the Cassandra cluster and session
   private val cluster = Cluster.builder().addContactPoint(address).build()
@@ -37,19 +37,19 @@ class CassandraStorage[T, U] ( address: String,
    */
   override def stop() { cluster.close() }
 
-  override def put(kv: (T, U)): Unit = {
+  override def put(kv: (K, V)): Unit = {
     val kryo = KryoThreadLocal.kryoTL.get
     val k = kryo.serialize(kv._1)
     val v = kryo.serialize(kv._2)
     session.execute(QueryBuilder.insertInto(keyspace, table).value(Key, k).value(Value, v))
   }
 
-  override def get(key: T): Option[U] = {
+  override def get(key: K): Option[V] = {
     try {
       val rawBytes = session.execute(s"SELECT * FROM $keyspace.$table WHERE $Key = $key")
           .all().get(0).getBytes(Value)
       val kryo = KryoThreadLocal.kryoTL.get
-      val result = kryo.deserialize(rawBytes).asInstanceOf[U]
+      val result = kryo.deserialize(rawBytes).asInstanceOf[V]
       Some(result)
     } catch {
       case u: Throwable => None

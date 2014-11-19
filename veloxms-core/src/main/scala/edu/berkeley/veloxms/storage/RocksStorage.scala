@@ -7,7 +7,7 @@ import scala.util._
 import java.nio.ByteBuffer
 import scala.collection.immutable.HashMap
 
-class RocksStorage[T, U] ( path: String ) extends ModelStorage[T, U] with Logging {
+class RocksStorage[K, V] ( path: String ) extends ModelStorage[K, V] with Logging {
 
   // this is a static method that loads the RocksDB C++ library
   RocksDB.loadLibrary()
@@ -22,18 +22,18 @@ class RocksStorage[T, U] ( path: String ) extends ModelStorage[T, U] with Loggin
     database.close()
   }
 
-  override def put(kv: (T, U)): Unit = {
+  override def put(kv: (K, V)): Unit = {
     val kryo = KryoThreadLocal.kryoTL.get
     val keyBytes = StorageUtils.toByteArr(kv._1)
     val valueBytes = StorageUtils.toByteArr(kv._2)
     database.put(keyBytes, valueBytes)
   }
 
-  override def get(key: T): Option[U] = {
+  override def get(key: K): Option[V] = {
     try {
       val rawBytes = ByteBuffer.wrap(database.get(StorageUtils.toByteArr(key)))
       val kryo = KryoThreadLocal.kryoTL.get
-      val value = kryo.deserialize(rawBytes).asInstanceOf[U]
+      val value = kryo.deserialize(rawBytes).asInstanceOf[V]
       Some(value)
     } catch {
       case u: Throwable => None

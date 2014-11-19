@@ -12,15 +12,15 @@ import java.util.concurrent.ConcurrentHashMap
 /** Simple implementation of ModelStorage to avoid Tachyon
  * dependency. Should only be used for testing/debug purposes.
  */
-class JVMLocalStorage[T, U] (store: ConcurrentHashMap[T, U]) extends ModelStorage[T, U] with Logging {
+class JVMLocalStorage[K, V] (store: ConcurrentHashMap[K, V]) extends ModelStorage[K, V] with Logging {
   /**
    * Cleans up any necessary resources
    */
   override def stop() { }
 
-  override def put(kv: (T, U)): Unit = store.put(kv._1, kv._2)
+  override def put(kv: (K, V)): Unit = store.put(kv._1, kv._2)
 
-  override def get(key: T): Option[U] = {
+  override def get(key: K): Option[V] = {
     if (store.containsKey(key)) Some(store.get(key)) else None
   }
 }

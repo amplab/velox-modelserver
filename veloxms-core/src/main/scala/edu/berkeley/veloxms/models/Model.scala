@@ -72,7 +72,6 @@ abstract class Model[T:ClassTag, U] extends Logging {
 
   // TODO(crankshaw) fix the error handling here to return default item features
   // TODO(crankshaw) the error handling here is fucked
-  // WARNING: do not mutate output
   private def getFeatures(item: T): FeatureVector = {
     val features: Try[FeatureVector] = featureCache.getItem(item) match {
       case Some(f) => Success(f)
@@ -88,7 +87,7 @@ abstract class Model[T:ClassTag, U] extends Logging {
           })
       }
     }
-    features.get
+    features.get.clone()
   }
 
   def predict(uid: Long, context: JsonNode): Double = {

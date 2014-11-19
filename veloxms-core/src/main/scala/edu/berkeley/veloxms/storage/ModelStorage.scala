@@ -12,16 +12,16 @@ import edu.berkeley.veloxms._
  * Simple interface to abstract out the KV storage backend used to store
  * the models from the application logic to access them.
  *
- * @tparam T The type of the stored keys
- * @tparam U The type of the stored values
+ * @tparam K The type of the stored keys
+ * @tparam V The type of the stored values
  */
-trait ModelStorage[T, U] extends Managed {
+trait ModelStorage[K, V] extends Managed {
 
     override def start() { }
 
-    def put(kv: (T, U)): Unit
+    def put(kv: (K, V)): Unit
 
-    def get(key: T): Option[U]
+    def get(key: K): Option[V]
 }
 
 

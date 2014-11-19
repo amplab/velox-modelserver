@@ -21,9 +21,9 @@ import edu.berkeley.veloxms.util.{VeloxKryoRegistrar, KryoThreadLocal}
 // import binary._
 
 // class TachyonStorage[U: ClassTag] (
-class TachyonStorage[T, U] (
+class TachyonStorage[K, V] (
                          tachyonMaster: String,
-                         storeName: String) extends ModelStorage[T, U] with Logging {
+                         storeName: String) extends ModelStorage[K, V] with Logging {
 
   val store = TachyonUtils.getStore(tachyonMaster, storeName) match {
     case Success(s) => s
@@ -31,7 +31,7 @@ class TachyonStorage[T, U] (
       s"Couldn't initialize use model: ${f.getMessage}")
   }
 
-  val storeCache = new ConcurrentHashMap[T, U]
+  val storeCache = new ConcurrentHashMap[K, V]
 
   logInfo("got tachyon stores")
 
@@ -40,13 +40,13 @@ class TachyonStorage[T, U] (
    */
   override def stop() {}
 
-  override def put(kv: (T, U)): Unit = ???
+  override def put(kv: (K, V)): Unit = storeCache.put(kv._1, kv._2)
 
-  override def get(key: T): Option[U] = {
+  override def get(key: K): Option[V] = {
     val result = Option(storeCache.get(key)).getOrElse({
       val rawBytes = ByteBuffer.wrap(store.get(StorageUtils.toByteArr(key)))
       val kryo = KryoThreadLocal.kryoTL.get
-      kryo.deserialize(rawBytes).asInstanceOf[U]
+      kryo.deserialize(rawBytes).asInstanceOf[V]
     })
     Some(result)
   }
