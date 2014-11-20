@@ -1,12 +1,8 @@
-package edu.berkeley.veloxms
+package edu.berkeley.veloxms.models
 
-import java.io.IOException
-import java.net.URLDecoder
-import java.nio.ByteBuffer
-import scala.collection.JavaConversions._
-import scala.util.{Try,Success,Failure}
+import edu.berkeley.veloxms._
 
-import com.google.common.io.{ByteStreams, Closeables}
+import scala.util.{Failure, Success}
 // import org.apache.hadoop.fs.Path
 // import org.apache.hadoop.io.{BytesWritable,NullWritable}
 // import org.apache.hadoop.mapreduce.{InputSplit,JobContext}
@@ -17,23 +13,16 @@ import com.google.common.io.{ByteStreams, Closeables}
 // import org.apache.spark.mllib.recommendation.{ALS,Rating}
 // import org.apache.spark.rdd.RDD
 // import org.apache.spark.SparkContext._
-import tachyon.r.sorted.{ClientStore,Utils}
-import tachyon.{Pair,TachyonURI}
-
 import edu.berkeley.veloxms.storage._
-import edu.berkeley.veloxms.util.Logging
-
-
-
-
 
 class MatrixFactorizationModel(
     val numFeatures: Int,
-    val modelStorage: ModelStorage[FeatureVector],
-    val averageUser: WeightVector,
-    val conf: VeloxConfiguration) extends Model[Long, FeatureVector] with Logging {
+    itemStorage: ModelStorage[Long, FeatureVector],
+    val userStorage: ModelStorage[Long, WeightVector],
+    val observationStorage: ModelStorage[Long, Map[Long, Double]],
+    val averageUser: WeightVector) extends Model[Long, FeatureVector] {
 
-    val defaultItem: FeatureVector = Array.fill[Double](conf.numFactors)(0.0)
+    val defaultItem: FeatureVector = Array.fill[Double](numFeatures)(0.0)
 
   // val logger = Logger(LoggerFactory.getLogger(classOf[MatrixFactorizationModel]))
 
@@ -42,47 +31,12 @@ class MatrixFactorizationModel(
    * by Velox on feature cache miss.
    */
   def computeFeatures(data: Long): FeatureVector = {
-    modelStorage.getFeatureData(data) match {
-      case Success(features) => features
-      case Failure(thrown) => {
-        val msg = "Error computing features: " + thrown
+    itemStorage.get(data) match {
+      case Some(features) => features
+      case None => {
+        val msg = "Error computing features"
         logWarning(msg)
         throw new Exception(msg)
-      }
-    }
-  }
-
-  def deserializeInput(data: Array[Byte]) : Long = {
-    ByteBuffer.wrap(data).getLong
-  }
-
-  // TODO(crankshaw) fix the error handling here to return default item features
-  // TODO(crankshaw) the error handling here is fucked
-  def getFeatures(item: Long, cache: FeatureCache[Long]): FeatureVector = {
-    val features: Try[FeatureVector] = cache.getItem(item) match {
-      case Some(f) => Success(f)
-      case None => {
-        Try(computeFeatures(item)).transform(
-          (f) => {
-            cache.addItem(item, f)
-            Success(f)
-          },
-          (t) => {
-            logWarning("Couldn't compute item features, using default of 0")
-            Success(defaultItem)
-        })
-      }
-    }
-    features.get
-  }
-
-  def getWeightVector(userId: Long) : WeightVector = {
-    val result: Try[Array[Double]] = modelStorage.getUserFactors(userId)
-    result match {
-      case Success(u) => u
-      case Failure(thrown) => {
-        logWarning("User weight not found: " + thrown)
-        averageUser
       }
     }
   }
@@ -91,7 +45,7 @@ class MatrixFactorizationModel(
    * THIS DOESN'T WORK YET!!!
    * Retrains the model in the provided Spark cluster
    */
-  def retrainInSpark(sparkMaster: String = conf.sparkMaster) {}
+  def retrainInSpark(sparkMaster: String) {}
 
     // TODO finish implementing this method
     //

@@ -1,6 +1,6 @@
 package edu.berkeley.veloxms.storage
 
-import edu.berkeley.veloxms.WeightVector
+import edu.berkeley.veloxms.{FeatureVector, WeightVector}
 import edu.berkeley.veloxms.util.KryoThreadLocal
 import org.scalatest._
 import org.rocksdb.{Options, RocksDB}
@@ -21,29 +21,31 @@ class RocksStorageSpec extends FlatSpec with Matchers {
 
   val kryo = KryoThreadLocal.kryoTL.get
 
-  users.put(StorageUtils.long2ByteArr(validUId), kryo.serialize(vector).array)
+  users.put(StorageUtils.toByteArr(validUId), kryo.serialize(vector).array)
 
-  ratings.put(StorageUtils.long2ByteArr(validUId), kryo.serialize(map).array)
+  ratings.put(StorageUtils.toByteArr(validUId), kryo.serialize(map).array)
 
   users.close
   items.close
   ratings.close
 
-  val storage = new RocksStorage(usersPath, itemsPath, ratingsPath, 50)
+  val itemStorage = new RocksStorage[Long, FeatureVector](itemsPath)
+  val userStorage = new RocksStorage[Long, WeightVector](usersPath)
+  val ratingStorage = new RocksStorage[Long, Map[Long, Double]](ratingsPath)
 
   // these tests tests both getUserFactors and getFeatureData since they use the exact same logic
   behavior of "RocksStorage#getUserFactors"
 
   it should "fail if the key doesn't exist" in {
-    val result = storage.getUserFactors(invalidUId)
+    val result = userStorage.get(invalidUId)
 
-    assert (result === null || result.isFailure)
+    assert (result === null || result.isEmpty)
   }
 
   it should "return the WeightVector if the key exists" in {
-    val result = storage.getUserFactors(validUId)
+    val result = userStorage.get(validUId)
 
-    assert (result.isSuccess)
+    assert (result.isDefined)
     assert (result.get === vector)
   }
 
@@ -51,19 +53,20 @@ class RocksStorageSpec extends FlatSpec with Matchers {
 
   // this is testing is deserialization still works with maps
   it should "return the Map if the key exists" in {
-    val result = storage.getAllObservations(validUId)
+    val result = ratingStorage.get(validUId)
 
-    assert (result.isSuccess)
+    assert (result.isDefined)
     assert (result.get === map)
   }
 
   behavior of "RocksStorage#addScore"
 
   it should "correctly add a score for an existing user" in {
-    storage.addScore(validUId, 10L, 10.0)
+    val allObservationScores = ratingStorage.get(validUId).getOrElse(Map()) + (10L -> 10.0)
+    ratingStorage.put(validUId -> allObservationScores)
 
-    val result = storage.getAllObservations(validUId)
-    assert(result.isSuccess)
+    val result = ratingStorage.get(validUId)
+    assert(result.isDefined)
 
     val map = result.get
 
@@ -72,10 +75,11 @@ class RocksStorageSpec extends FlatSpec with Matchers {
   }
 
   it should "correctly add a score for a previously unrecorded user" in {
-    storage.addScore (3l, 10L, 10.0)
+    val allObservationScores = ratingStorage.get(3l).getOrElse(Map()) + (10L -> 10.0)
+    ratingStorage.put(3l -> allObservationScores)
 
-    val result = storage.getAllObservations(3L)
-    assert(result.isSuccess)
+    val result = ratingStorage.get(3L)
+    assert(result.isDefined)
 
     val map = result.get
 

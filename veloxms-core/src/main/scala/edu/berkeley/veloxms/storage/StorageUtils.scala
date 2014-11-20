@@ -5,13 +5,13 @@ import edu.berkeley.veloxms.util.KryoThreadLocal
 
 object StorageUtils {
 
-  def long2ByteArr(id: Long): Array[Byte] = {
+  def toByteArr[T](id: T): Array[Byte] = {
     // val key = ByteBuffer.allocate(8)
     // key.putLong(id).array()
 
-    val buffer = ByteBuffer.allocate(12)
+    //val buffer = ByteBuffer.allocate(12)
     val kryo = KryoThreadLocal.kryoTL.get
-    val result = kryo.serialize(id, buffer).array
+    val result = kryo.serialize(id).array
     result
   }
 

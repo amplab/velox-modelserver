@@ -1,5 +1,6 @@
 package edu.berkeley.veloxms
 
+import edu.berkeley.veloxms.models.ModelFactory
 import edu.berkeley.veloxms.resources._
 import edu.berkeley.veloxms.storage._
 import io.dropwizard.Configuration
@@ -12,47 +13,42 @@ import com.massrelevance.dropwizard.bundles.ScalaBundle
 import javax.validation.constraints.NotNull
 
 import edu.berkeley.veloxms.util.Logging
+import org.eclipse.jetty.servlet.ServletHolder
 
 class VeloxConfiguration extends Configuration {
-  @NotNull val numFactors: Integer = 50
-
   val sparkMaster: String = "NoSparkMaster"
-  @(JsonProperty)("modelStorage")
-  val modelStorageFactory: ModelStorageFactory = new ModelStorageFactory
 
+  @(JsonProperty)("models")
+  val modelFactories: Map[String, ModelFactory] = Map()
   // sparkMaster: String
-    // whether to do preprocessing of dataset for testing purposes
-    // reloadTachyon: Boolean,
-    // rawDataLoc: String
+  // whether to do preprocessing of dataset for testing purposes
+  // reloadTachyon: Boolean,
+  // rawDataLoc: String
 }
 
 
 object VeloxApplication extends ScalaApplication[VeloxConfiguration] with Logging {
 
-    override def getName = "velox model server"
+  override def getName = "velox model server"
 
-    // TODO I think this is fucked - look at Spark's Logging.scala to fix
-    // val logger = LoggerFactory.getLogger(classOf[VeloxApplication])
+  override def initialize(bootstrap: Bootstrap[VeloxConfiguration]) {
+    bootstrap.addBundle(new ScalaBundle)
+    // init global state
+  }
 
-    override def initialize(bootstrap: Bootstrap[VeloxConfiguration]) {
-        bootstrap.addBundle(new ScalaBundle)
-        // init global state
-    }
-
-    override def run(conf: VeloxConfiguration, env: Environment) {
-        val modelStorage = conf.modelStorageFactory.build(env, conf.numFactors)
-
-        val averageUser = Array.fill[Double](conf.numFactors)(1.0)
-        val featureCache = new FeatureCache[Long](FeatureCache.tempBudget)
-        val matrixFactorizationModel =
-            new MatrixFactorizationModel(conf.numFactors, modelStorage, averageUser, conf)
-
-        env.jersey().register(new MatrixFactorizationPredictionResource(
-            matrixFactorizationModel, featureCache))
-
-        env.jersey().register(new MatrixFactorizationUpdateResource(
-            matrixFactorizationModel, featureCache, conf.sparkMaster))
-    }
+  override def run(conf: VeloxConfiguration, env: Environment) {
+    conf.modelFactories.foreach { case (name, modelFactory) => {
+      val model = modelFactory.build(env)
+      val predictServlet = new PointPredictionServlet(model, env.metrics().timer(name + "/predict/"))
+      val observeServlet = new AddObservationServlet(model, conf.sparkMaster, env.metrics().timer(name + "/observe/"))
+      val retrainServlet = new RetrainServlet(model, conf.sparkMaster, env.metrics().timer(name + "/retrain/"))
+      env.getApplicationContext.addServlet(new ServletHolder(predictServlet), "/predict/" + name)
+      env.getApplicationContext.addServlet(new ServletHolder(observeServlet), "/observe/" + name)
+      env.getApplicationContext.addServlet(new ServletHolder(retrainServlet), "/retrain/" + name)
+    }}
+    logInfo("Registered models: " + conf.modelFactories.keys.mkString(","))
+    env.jersey().register(new ModelListResource(conf.modelFactories.keys.toSeq))
+  }
 }
 
 
