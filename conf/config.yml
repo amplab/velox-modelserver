@@ -2,8 +2,9 @@
 
 models:
     matrixfact:
-        modelType: MatrixFactorizationModel
-        numFactors: 50
+#        modelType: MatrixFactorizationModel
+        modelType: NewsgroupsModel
+        numFactors: 20
         storage:
             items:
                 storageType: jvmRandomItems
@@ -22,10 +23,17 @@ models:
             ratings:
                 storageType: jvmRandomObservations
                 totalNumUsers: 1000
-                numItems: 500
+                numItems: 0
                 numPartitions: 2
                 modelSize: 50
                 partition: 0
+        #    ratings:
+        #        storageType: jvmRandomObservations
+        #        totalNumUsers: 1000
+        #        numItems: 500
+        #        numPartitions: 2
+        #        modelSize: 50
+        #        partition: 0
 
     ## Configuring the storages using Tachyon
     #    storage:
@@ -85,7 +93,7 @@ models:
     #           path: /tmp/ratings
 
 
-sparkMaster: spark://ec2-54-92-229-50.compute-1.amazonaws.com:7077
+sparkMaster: local[4]#spark://ec2-54-92-229-50.compute-1.amazonaws.com:7077
 
 # matPredictionsLoc: tachyon://ec2-184-73-72-139.compute-1.amazonaws.com:19998/mat-predictions
 logging:

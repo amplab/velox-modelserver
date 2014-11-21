@@ -35,6 +35,16 @@ class ModelFactory extends Logging {
         val averageUser = Array.fill[Double](numFactors)(1.0)
         new MatrixFactorizationModel(numFactors, itemStore, userStore, observationStore, averageUser)
       }
+      case "NewsgroupsModel" => {
+        require(modelStorageFactories.contains("users"))
+        require(modelStorageFactories.contains("ratings"))
+
+        // Build and manage the modelStorages
+        val userStore = modelStorageFactories.get("users").get.build[Long, WeightVector](env)
+        val observationStore = modelStorageFactories.get("ratings").get.build[Long, Map[String, Double]](env)
+        val averageUser = Array.fill[Double](numFactors)(1.0)
+        new NewsgroupsModel(numFactors, userStore, observationStore, averageUser)
+      }
       case _ => {
         throw new IllegalArgumentException(s"Unknown model type: $modelType")
       }
