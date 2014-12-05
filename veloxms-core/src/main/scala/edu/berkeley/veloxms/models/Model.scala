@@ -64,7 +64,7 @@ abstract class Model[T:ClassTag, U] extends Logging {
     result match {
       case Some(u) => u
       case None => {
-        logWarning("User weight not found")
+        logWarning(s"User weight not found, userID: $userId")
         averageUser
       }
     }
@@ -118,8 +118,8 @@ abstract class Model[T:ClassTag, U] extends Logging {
       val oldUserWeights = getWeightVector(uid)
       val newUserWeights = updateUserWeights(
         allItemFeatures, allObservationScores, numFeatures)
-      logInfo(s"Old weight: (${oldUserWeights.mkString(",")})")
-      logInfo(s"New weight: (${newUserWeights.mkString(",")})")
+      // logInfo(s"Old weight: (${oldUserWeights.mkString(",")})")
+      // logInfo(s"New weight: (${newUserWeights.mkString(",")})")
 
       userStorage.put(uid -> newUserWeights)
     }
