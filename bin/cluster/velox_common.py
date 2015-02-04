@@ -9,6 +9,7 @@ from os.path import expanduser
 import yaml
 import requests
 import json
+from requests import exceptions
 
 KEY_NAME = "veloxms-aws-deploy"
 VOLUME_SIZE = 50
@@ -463,9 +464,10 @@ def stop_velox_processes():
     pprint('Termination command sent.')
 
 def install_ykit(cluster):
-    run_cmd("all-hosts", "wget http://www.yourkit.com/download/yjp-2013-build-13074-linux.tar.bz2")
-    run_cmd("all-hosts", "tar -xvf yjp-2013-build-13074-linux.tar.bz2")
-    run_cmd("all-hosts", "mv yjp-2013-build-13074 yourkit")
+    ykit_version = 14112
+    run_cmd("all-hosts", "wget http://www.yourkit.com/download/yjp-2014-build-%d-linux.tar.bz2" % ykit_version)
+    run_cmd("all-hosts", "tar -xvf yjp-2014-build-%d-linux.tar.bz2" % ykit_version)
+    run_cmd("all-hosts", "mv yjp-2014-build-%d yourkit" % ykit_version)
     # master = cluster.clients[0].ip
     # run_cmd_single(master, "wget http://www.yourkit.com/download/yjp-2013-build-13072-linux.tar.bz2")
     # run_cmd("all-hosts", "scp ubuntu@%s:yjp-2013-build-13072-linux.tar.bz2 yjp-2013.tar.bz2" %  master)
@@ -514,7 +516,7 @@ def run_my_command(cluster):
     cmd = "killall java; pkill -9 java"
     run_cmd("all-hosts", cmd)
 
-def get_metrics(cluster, file_name, **kwargs):
+def get_metrics(cluster, file_name, header=None, **kwargs):
     url = "http://%s:%d/metrics"
     timing_info = {}
     for sid in range(0, cluster.numServers):
@@ -522,11 +524,14 @@ def get_metrics(cluster, file_name, **kwargs):
         metrics_req = requests.get(url % (server.ip, METRICS_PORT))
         timing = metrics_req.json()[u'timers']
         timing_info[server.ip] = timing
-    with open("hosts/%s.json" % file_name, 'w') as f:
+    with open("metrics/%s.json" % file_name, 'w') as f:
+        if header is not None:
+            f.write(header)
+            f.write("\n")
         json.dump(timing_info, f, sort_keys=True, indent=4, separators=(',', ': '))
 
 
-def restart_velox(cluster, heap_size, rm_logs=False, **kwargs):
+def restart_velox(cluster, heap_size, rm_logs=False, profile=False, **kwargs):
 
     kill_veloxms_servers()
     sleep(2)
@@ -543,25 +548,28 @@ def restart_velox(cluster, heap_size, rm_logs=False, **kwargs):
         print "Clearing log files"
         run_cmd("all-servers", "rm /home/ubuntu/velox-modelserver/logs/*; ")
 
-#     pstr = ""
-#     if profile:
-#         # pstr += "-agentlib:hprof=cpu=samples,interval=20,depth=%d,file=java.hprof.server.txt" % (profile_depth)
-#         pstr += "-agentpath:/home/ubuntu/yourkit/bin/linux-x86-64/libyjpagent.so"
-    start_server_cmd = ("java -XX:+%(gc)s -Xms%(heap_size)dg -Xmx%(heap_size)dg "
+    pstr = ""
+    if profile:
+        # pstr += "-agentlib:hprof=cpu=samples,interval=20,depth=2,file=java.hprof.server.txt"
+        pstr += "-agentpath:/home/ubuntu/yourkit/bin/linux-x86-64/libyjpagent.so"
+    start_server_cmd = ("java %(pstr)s -XX:+%(gc)s -Xms%(heap_size)dg -Xmx%(heap_size)dg "
                         "-Dlog4j.configuration=file:%(log4j_file)s "
-                        "-Ddw.modelStorage.partition=%(sid)d "
+                        "-Ddw.models.matrixfact.storage.items.partition=%(sid)d "
+                        "-Ddw.models.matrixfact.storage.users.partition=%(sid)d "
+                        "-Ddw.models.matrixfact.storage.ratings.partition=%(sid)d "
                         # "-Dfs.s3n.awsAccessKeyId=%s "
                         # "-Dfs.s3n.awsSecretAccessKey=%s "
                         "-cp %(velox_root)s/%(server_jar)s "
                         "%(server_class)s server "
                         "%(velox_root)s/conf/config.yml ")
-    cmd_args = {"heap_size": heap_size,
-                "log4j_file": log4j_file,
+    cmd_args = {'pstr': pstr,
+                'heap_size': heap_size,
+                'log4j_file': log4j_file,
                 'gc': GARBAGE_COLLECTOR,
                 # "sid": sid,
-                "velox_root": velox_root,
-                "server_class": VELOX_SERVER_CLASS,
-                "server_jar": VELOX_SERVER_JAR}
+                'velox_root': velox_root,
+                'server_class': VELOX_SERVER_CLASS,
+                'server_jar': VELOX_SERVER_JAR}
 
     for sid in range(0, cluster.numServers):
         cmd_args["sid"] = sid
@@ -589,7 +597,28 @@ def start_servers(cluster, heap_size, use_tachyon=False, **kwargs):
 
     restart_velox(cluster, heap_size)
 
-def run_client_bench(cluster, **kwargs):
+def run_client_bench(
+        cluster,
+        num_partitions=2,
+        num_reqs=1000,
+        percent_obs=0.2,
+        throttle_reqs=200,
+        **kwargs):
+
+    restart_velox(cluster, HEAP_SIZE_GB, rm_logs=True, profile=False)
+    url = 'http://%s:8080/predict/matrixfact' % cluster.servers[0].ip
+    payload = json.dumps({'uid': 10, 'context': 4})
+    headers = {'Content-type': 'application/json'}
+    while True:
+        try:
+            r = requests.post(url, payload, headers=headers)
+            print r.json()
+            # in case the other server needs to finish, sleep an extra 10 seconds
+            sleep(10)
+            break
+        except exceptions.ConnectionError: 
+            print "Sleeping another 10 seconds..."
+            sleep(10)
 
     base_cmd = ("pkill -9 java; "
                 "java -XX:+%(gc)s -Xmx%(heap_size)dg -Xms%(heap_size)dg "
@@ -608,14 +637,14 @@ def run_client_bench(cluster, **kwargs):
 
     cmd_args = {'heap_size': HEAP_SIZE_GB,
                 'velox_home': '/home/ubuntu/velox-modelserver',
-                'num_reqs': 5000,
+                'num_reqs': num_reqs,
                 'num_users': 100000,
                 'num_items': 50000,
-                'num_partitions': 2,
-                'percent_obs': 0.1,
+                'num_partitions': num_partitions,
+                'percent_obs': percent_obs,
                 'parallelism': 10,
                 'conn_timeout': 10000,
-                'throttle_reqs': 800,
+                'throttle_reqs': throttle_reqs,
                 'status_time': 10,
                 'client_jar': VELOX_CLIENT_JAR,
                 'client_class': VELOX_CLIENT_BENCHMARK_CLASS,
@@ -636,6 +665,7 @@ def run_client_bench(cluster, **kwargs):
     cmd_str = base_cmd % cmd_args
 
     run_cmd_in_velox("all-clients", cmd_str)
+    return cmd_str
     # run_cmd_single(cluster.clients[0].ip, cmd_str)
 
 

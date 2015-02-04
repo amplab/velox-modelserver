@@ -78,7 +78,7 @@ def command_start_velox_servers(args):
     stop_velox_processes()
     # restart_tachyon()
     assign_hosts(cluster)
-    start_servers(cluster, HEAP_SIZE_GB, use_tachyon=True, **kwargs)
+    start_servers(cluster, HEAP_SIZE_GB, use_tachyon=False, **kwargs)
     pprint("Velox servers started")
 
 def command_client_bench(args):
@@ -121,19 +121,19 @@ if __name__ == "__main__":
                                   help='Run JVM with hprof cpu profiling. [default: %(default)s]')
     common_benchmark.add_argument('--profile_depth', dest='profile_depth', default=2, type=int,
                                   help='Stack depth to trace when running profiling. [default: %(default)s]')
-    common_benchmark.add_argument('--read_pct', dest='read_pct',
-                                  default=0.5, type=float,
-                                  help='Percentage of workload operations which are reads. [default: %(default)s]')
-    common_benchmark.add_argument('--max_time', dest='max_time',
-                                  default=60, type=int,
-                                  help='Maximum execution time (in seconds) of the benchmark. [default: %(default)s]')
-    common_benchmark.add_argument('--ops', dest='ops',
-                                  default=100000, type=int,
-                                  help='Number of operations to perform in the benchmark. [default: %(default)s]')
-
-    common_benchmark.add_argument('--heap_size_gb', dest='heap_size',
-                                  default=HEAP_SIZE_GB, type=int,
-                                  help='Size (in GB) to make the JVM heap. [default: %(default)s]')
+    # common_benchmark.add_argument('--read_pct', dest='read_pct',
+    #                               default=0.5, type=float,
+    #                               help='Percentage of workload operations which are reads. [default: %(default)s]')
+    # common_benchmark.add_argument('--max_time', dest='max_time',
+    #                               default=60, type=int,
+    #                               help='Maximum execution time (in seconds) of the benchmark. [default: %(default)s]')
+    # common_benchmark.add_argument('--ops', dest='ops',
+    #                               default=100000, type=int,
+    #                               help='Number of operations to perform in the benchmark. [default: %(default)s]')
+    #
+    # common_benchmark.add_argument('--heap_size_gb', dest='heap_size',
+    #                               default=HEAP_SIZE_GB, type=int,
+    #                               help='Size (in GB) to make the JVM heap. [default: %(default)s]')
 
     # common benchmark options for ec2 (includes benchmark base)
     common_benchmark_ec2 = argparse.ArgumentParser(add_help=False, parents=[common_benchmark])
@@ -207,11 +207,11 @@ if __name__ == "__main__":
     ####### benchmark commands #######
     ##################################
     parser_start_velox = subparsers.add_parser('start_velox', help='Start the velox servers',
-                                                parents=[common_cluster_ec2])
+                                                parents=[common_cluster_ec2, common_benchmark_ec2])
     parser_start_velox.set_defaults(func=command_start_velox_servers)
 
     parser_restart_veloxms = subparsers.add_parser('restart_veloxms', help='Restart velox servers',
-                                                parents=[common_cluster_ec2])
+                                                parents=[common_cluster_ec2, common_benchmark_ec2])
     parser_restart_veloxms.set_defaults(func=command_restart_veloxms)
 
     parser_restart_veloxms.add_argument('--rm_logs', dest="rm_logs", action='store_true',
@@ -227,7 +227,7 @@ if __name__ == "__main__":
 
 
     parser_run_bench = subparsers.add_parser('run_benchmark', help='Run simple client benchmark',
-                                 parents=[common_cluster_ec2])
+                                 parents=[common_cluster_ec2, common_benchmark_ec2])
     parser_run_bench.set_defaults(func=command_client_bench)
 
     args = parser.parse_args()

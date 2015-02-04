@@ -6,8 +6,9 @@ import java.nio.file.{Paths, Files}
 import scala.util._
 import edu.berkeley.veloxms._
 import java.nio.ByteBuffer
-import edu.berkeley.veloxms.util.{KryoThreadLocal, Logging}
+import edu.berkeley.veloxms.util._
 import java.util.concurrent.ConcurrentHashMap
+import scala.collection.mutable
 
 /** Simple implementation of ModelStorage to avoid Tachyon
  * dependency. Should only be used for testing/debug purposes.
@@ -27,19 +28,73 @@ class JVMLocalStorage[K, V] (store: ConcurrentHashMap[K, V]) extends ModelStorag
 
 object JVMLocalStorage extends Logging {
 
-  def generateRandomObservationData(totalNumUsers: Int, numItems: Int, numPartitions: Int, partition: Int, maxScore: Int): JVMLocalStorage[Long, Map[Long, Double]] = {
+  def generateRandomObservationData(
+      totalNumUsers: Int,
+      numItems: Int,
+      numPartitions: Int,
+      partition: Int,
+      maxScore: Double,
+      percentOfItems: Double = 2): JVMLocalStorage[Long, Map[Long, Double]] = {
+
     var rand = new Random
     val obsMap = new ConcurrentHashMap[Long, Map[Long, Double]]
     var user = 0
     while (user < totalNumUsers) {
       if (user % numPartitions == partition) {
         // generate observations for 10% of the items
-        val userObsMap = (0 until (numItems / 10)).map(x => (x.toLong, rand.nextDouble * maxScore)).toMap
+        val userObsMap = (0 until (numItems*percentOfItems/100.0).toInt)
+          .map(x => (x.toLong, rand.nextDouble * maxScore)).toMap
         obsMap.put(user, userObsMap)
       }
       user += 1
     }
     logInfo("Generated observation data")
+    new JVMLocalStorage(obsMap)
+  }
+
+  def generateRandomDocObservations(
+      totalNumUsers: Int,
+      numItems: Int,
+      numPartitions: Int,
+      partition: Int,
+      docLength: Int,
+      ngramFile: String,
+      maxScore: Double,
+      percentOfItems: Double = 2): JVMLocalStorage[Long, Map[String, Double]] = {
+
+    val rand = new Random(System.currentTimeMillis)
+    val corpus = NGramDocumentGenerator.createCorpus(numItems, docLength, ngramFile) 
+    val obsMap = new ConcurrentHashMap[Long, Map[String, Double]]
+    var user = 0
+    while (user < totalNumUsers) {
+      if (user % numPartitions == partition) {
+        // generate observations for 10% of the items
+        val userObsMap = (0 until (numItems*percentOfItems/100.0).toInt)
+          .map(x => (corpus(rand.nextInt(corpus.size)), rand.nextDouble * maxScore))
+          .toMap
+        obsMap.put(user, userObsMap)
+      }
+      user += 1
+    }
+    logInfo("Generated observation data")
+    new JVMLocalStorage(obsMap)
+  }
+
+  def generateEmptyObservationData(
+      totalNumUsers: Int,
+      numPartitions: Int,
+      partition: Int): JVMLocalStorage[Long, Map[String, Double]] = {
+    val obsMap = new ConcurrentHashMap[Long, Map[String, Double]]
+    var user = 0
+    while (user < totalNumUsers) {
+      if (user % numPartitions == partition) {
+        // generate observations for 10% of the items
+        val userObsMap: Map[String, Double] = Map[String, Double]()
+        obsMap.put(user, userObsMap)
+      }
+      user += 1
+    }
+    logInfo("Generated empty observation store")
     new JVMLocalStorage(obsMap)
   }
 
@@ -87,11 +142,11 @@ object JVMLocalStorage extends Logging {
 
   // helper method for reading model from file
   def readModelFromFile[T, U](file: String): ConcurrentHashMap[T, U] = {
-    var i = 0
     val kryo = KryoThreadLocal.kryoTL.get
     val rawBytes = ByteBuffer.wrap(Files.readAllBytes(Paths.get(file)))
     kryo.deserialize(rawBytes).asInstanceOf[ConcurrentHashMap[T, U]]
   }
+
 }
 
 

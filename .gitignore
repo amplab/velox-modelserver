@@ -9,19 +9,27 @@
 *.war
 *.ear
 
+*.pdf
+*.png
+
 *.idea
 dependency-reduced-pom.xml
 scalastyle-output.xml
-bin/cluster/hosts
+bin/cluster/data/
+bin/cluster/status_file
+
 
 target/
 logs/
 assembly/
+data/
+
+conf/config.yml
 
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 
-data/
+# data/
 
 # vim swap files
 *.sw*

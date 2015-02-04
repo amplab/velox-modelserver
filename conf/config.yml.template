@@ -1,31 +1,45 @@
-#ec2-184-73-72-139.compute-1.amazonaws.com 
-
-models:
-    matrixfact:
-        modelType: MatrixFactorizationModel
-        numFactors: 50
-        storage:
-            items:
-                storageType: jvmRandomItems
-                totalNumUsers: 1000
-                numItems: 500
-                numPartitions: 2
-                modelSize: 50
-                partition: 0
-            users:
-                storageType: jvmRandomUsers
-                totalNumUsers: 1000
-                numItems: 500
-                numPartitions: 2
-                modelSize: 50
-                partition: 0
-            ratings:
-                storageType: jvmRandomObservations
-                totalNumUsers: 1000
-                numItems: 500
-                numPartitions: 2
-                modelSize: 50
-                partition: 0
+hostname: none
+# models:
+#  newsgroups:
+#    modelSize: 500
+#    modelType: NewsgroupsModel
+#    partitionFile: /home/ubuntu/velox-modelserver/conf/server_partitions.txt
+#    storage:
+#      ratings:
+#        numPartitions: 3
+#        storageType: jvmEmptyObservationData
+#        totalNumUsers: 100000
+#      users:
+#        numPartitions: 3
+#        storageType: jvmRandomUsers
+#        totalNumUsers: 100000
+#
+#    matrixfact:
+#        modelType: MatrixFactorizationModel
+#        modelSize: 50
+#        partitionFile: /home/ubuntu/velox-modelserver/conf/server_partitions.txt
+#        storage:
+#            items:
+#                storageType: jvmRandomItems
+#                numItems: 50000
+#                # totalNumUsers: 100000
+#                # numPartitions: 2
+#                # modelSize: 50
+#                # partition: 0
+#            users:
+#                storageType: jvmRandomUsers
+#                totalNumUsers: 100000
+#                numPartitions: 2
+#                # numItems: 50000
+#                # modelSize: 50
+#                # partition: 0
+#            ratings:
+#                storageType: jvmRandomObservations
+#                totalNumUsers: 100000
+#                numItems: 50000
+#                numPartitions: 2
+#                # modelSize: 50
+#                # partition: 0
 
     ## Configuring the storages using Tachyon
     #    storage:
@@ -87,7 +101,6 @@ models:
 
 sparkMaster: spark://ec2-54-92-229-50.compute-1.amazonaws.com:7077
 
-# matPredictionsLoc: tachyon://ec2-184-73-72-139.compute-1.amazonaws.com:19998/mat-predictions
 logging:
   appenders:
     - type: file

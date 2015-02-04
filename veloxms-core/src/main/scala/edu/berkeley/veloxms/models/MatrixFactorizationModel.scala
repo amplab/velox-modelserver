@@ -1,6 +1,14 @@
 package edu.berkeley.veloxms.models
 
 import edu.berkeley.veloxms._
+// import java.io.IOException
+// import java.net.URLDecoder
+// import java.nio.ByteBuffer
+// import scala.collection.JavaConversions._
+// import scala.util.{Try,Success,Failure}
+// import org.apache.spark._
+// import org.apache.spark.rdd._
+// import org.apache.spark.SparkContext._
 
 import scala.util.{Failure, Success}
 // import org.apache.hadoop.fs.Path
@@ -20,7 +28,11 @@ class MatrixFactorizationModel(
     itemStorage: ModelStorage[Long, FeatureVector],
     val userStorage: ModelStorage[Long, WeightVector],
     val observationStorage: ModelStorage[Long, Map[Long, Double]],
-    val averageUser: WeightVector) extends Model[Long, FeatureVector] {
+    val averageUser: WeightVector,
+    val cacheResults: Boolean,
+    val cacheFeatures: Boolean,
+    val cachePredictions: Boolean
+  ) extends Model[Long, FeatureVector] {
 
     val defaultItem: FeatureVector = Array.fill[Double](numFeatures)(0.0)
 
@@ -46,7 +58,20 @@ class MatrixFactorizationModel(
    * Retrains the model in the provided Spark cluster
    */
   def retrainInSpark(sparkMaster: String) {}
-
+  // def retrainInSpark(sparkMaster: String = conf.sparkMaster) {
+  //
+  //   val sparkHome = "/root/spark"
+  //   logWarning("Starting spark context")
+  //   val sc = new SparkContext(sparkMaster, "SparkTestApp", sparkHome,
+  //       SparkContext.jarOfObject(this).toSeq)
+  //   logWarning("Parallelizing data")
+  //   val data = sc.parallelize((0 to 5000))
+  //   logWarning(s"Counting data ${data.count}")
+  //   logWarning(s"Top is: ${data.top(10)}")
+  //   sc.stop()
+  //   logWarning("Done")
+  // }
+  //
     // TODO finish implementing this method
     //
     // val numFeatures = 50
@@ -111,13 +136,6 @@ class MatrixFactorizationModel(
     */
 
   // }
-
-}
-
-
-
-object MatrixFactorizationModel {
-  val lambda = 1
 
 }
 
