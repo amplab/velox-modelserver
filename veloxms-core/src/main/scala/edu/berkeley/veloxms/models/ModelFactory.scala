@@ -68,6 +68,9 @@ class ModelFactory extends Logging {
         model
 
       }
+      // To use the newsgroups model, the binary file containing the model must
+      // be specified in modelLoc. The binary is not included in the repo, but can be
+      // downloaded from https://s3.amazonaws.com/velox-public/news-classifier-from-tomer
       case "NewsgroupsModel" => {
         require(modelStorageFactories.contains("users"))
         require(modelStorageFactories.contains("ratings"))
