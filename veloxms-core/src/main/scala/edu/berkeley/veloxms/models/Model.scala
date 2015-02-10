@@ -10,7 +10,7 @@ import breeze.linalg._
 
 import scala.reflect._
 import scala.util.{Failure, Success, Try}
-
+import scala.util.Sorting
 
 
 /**
@@ -108,6 +108,10 @@ abstract class Model[T:ClassTag, U] extends Logging {
 
   def predict(uid: Long, context: JsonNode): Double = {
     val item: T = jsonMapper.readValue(context, classTag[T].runtimeClass.asInstanceOf[Class[T]])
+    predictItem(uid, item)
+  }
+
+  private[this] def predictItem(uid: Long, item: T): Double = {
     val score = predictionCache.getItem((uid, item)) match {
       case Some(p) => p
       case None => {
@@ -116,7 +120,7 @@ abstract class Model[T:ClassTag, U] extends Logging {
         var i = 0
         var accumScore = 0.0
         while (i < numFeatures) {
-          accumScore += features(i)*weightVector(i)
+          accumScore += features(i) * weightVector(i)
           i += 1
         }
         predictionCache.addItem((uid, item), accumScore)
@@ -124,6 +128,19 @@ abstract class Model[T:ClassTag, U] extends Logging {
       }
     }
     score
+  }
+
+  def predictTopK(uid: Long, k: Int, context: JsonNode): Array[T] = {
+    val itemOrdering = new Ordering[T] {
+      override def compare(x: T, y: T) = {
+        -1 * (predictItem(uid, x) compare predictItem(uid, y))
+      }
+    }
+
+    val candidateSet: Array[T] = jsonMapper.readValue(context, classTag[Array[T]].runtimeClass.asInstanceOf[Class[Array[T]]])
+    Sorting.quickSort(candidateSet)(itemOrdering)
+
+    candidateSet.slice(0, k)
   }
 
   def addObservation(uid: Long, context: JsonNode, score: Double) {
