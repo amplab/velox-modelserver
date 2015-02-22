@@ -54,7 +54,8 @@ object VeloxWorkloadDriver extends Logging {
     throttleRequests: Int = 1000,
     statusTime: Int = 10,
     ngramFile: String = null,
-    docLength: Int = 200
+    docLength: Int = 200,
+    candidateSetSize: Int = 100
   )
 
 
@@ -93,6 +94,9 @@ object VeloxWorkloadDriver extends Logging {
         .text("percent of requests that are top-k, " +
           s"default: ${defaultParams.percentTopK}")
         .action((x, c) => c.copy(percentTopK = x))
+      opt[Int]("candidateSetSize")
+        .text("size of the candidate set for top-k requests, " +
+          s"default: ${defaultParams.candidateSetSize}")
       // opt[Unit]("genTrain")
       //   .text("Flag to generate training data rather than sending reqs")
       //   .action((_, c) => c.copy(genTrain = true))
@@ -159,7 +163,8 @@ object VeloxWorkloadDriver extends Logging {
         numUsers = params.numUsers,
         numItems = params.numItems,
         percentObs = params.percentObs,
-        percentTopK = params.percentTopK)
+        percentTopK = params.percentTopK,
+        candidateSetSize = params.candidateSetSize)
       sendRequests(requestor, params, corpus)
     } getOrElse {
       sys.exit(1)
@@ -332,6 +337,7 @@ object VeloxWorkloadDriver extends Logging {
     val elapsedTime = (stopTime - startTime) / nanospersec
     val pthruput = numPreds.toDouble / elapsedTime.toDouble
     val othruput = numObs.toDouble / elapsedTime.toDouble
+    val kthruput = numTopK.toDouble / elapsedTime.toDouble
     val totthruput = (successes.size).toDouble / elapsedTime.toDouble
 
     val outstr = (s"duration: ${elapsedTime}\n" +
@@ -340,6 +346,7 @@ object VeloxWorkloadDriver extends Logging {
                   s"num_obs: ${numObs}\n" +
                   s"pred_thru: ${pthruput}\n" +
                   s"obs_thru: ${othruput}\n" +
+                  s"top_k_thru: ${kthruput}\n" +
                   s"total_thru: ${totthruput}\n" +
                   s"successes: ${successes.size}\n" +
                   s"failures: ${failures.size}\n")

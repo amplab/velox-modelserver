@@ -46,6 +46,7 @@ class Requestor (
     // percentObs: Double = 0.2,
     percentObs: Double = -1.0,
     percentTopK: Double = -1.0,
+    candidateSetSize: Int = 100,
     userDist: RequestDist = Uniform,
     itemDist: RequestDist = Uniform,
     maxScore: Double = 10.0,
@@ -54,7 +55,6 @@ class Requestor (
 
   val reqTypeRand = new Random
   val scoreRand = new Random
-  val candSetRand = new Random
   val topKRand = new Random
 
   val topKThreshhold: Double = if (percentObs == -1.0) percentTopK else percentObs + percentTopK
@@ -118,7 +118,7 @@ class Requestor (
       }
       Left(Left(ObserveRequest(user, item.get, scoreRand.nextDouble()*maxScore)))
     } else if (rand < topKThreshhold) {
-      Right(TopKPredictRequest(user, topKRand.nextInt(numItems.toInt), pickTopKCandidateSet(candSetRand.nextInt(numItems.toInt))))
+      Right(TopKPredictRequest(user, topKRand.nextInt(numItems.toInt), pickTopKCandidateSet(candidateSetSize)))
     } else {
       Left(Right(PredictRequest(user, pickItemPredict())))
     }
