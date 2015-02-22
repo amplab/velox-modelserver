@@ -27,7 +27,7 @@ object RequestDist extends Enumeration {
 // AddObservationResource.scala
 case class ObserveRequest(uid: Long, context: Long, score: Double)
 case class PredictRequest(uid: Long, context: Long)
-case class TopKPredictRequest(uid: Long, context: Array[Long])
+case class TopKPredictRequest(uid: Long, k: Int, context: Array[Long])
 
 case class NewsObserveRequest(uid: Long, context: String, score: Double)
 case class NewsPredictRequest(uid: Long, context: String)
@@ -54,6 +54,7 @@ class Requestor (
 
   val reqTypeRand = new Random
   val scoreRand = new Random
+  val candSetRand = new Random
   val topKRand = new Random
 
   val topKThreshhold: Double = if (percentObs == -1.0) percentTopK else percentObs + percentTopK
@@ -90,9 +91,9 @@ class Requestor (
     itemPredictionSampler.nextLong()
   }
 
-  def pickTopKPredict(k: Int): Array[Long] = {
-    val result = new Array[Long](k)
-    for (i <- 0 to k-1) {
+  def pickTopKCandidateSet(setSize: Int): Array[Long] = {
+    val result = new Array[Long](setSize)
+    for (i <- 0 to setSize-1) {
       result(i) = pickItemPredict()
     }
 
@@ -117,7 +118,7 @@ class Requestor (
       }
       Left(Left(ObserveRequest(user, item.get, scoreRand.nextDouble()*maxScore)))
     } else if (rand < topKThreshhold) {
-      Right(TopKPredictRequest(user, pickTopKPredict(topKRand.nextInt(numItems.toInt))))
+      Right(TopKPredictRequest(user, topKRand.nextInt(numItems.toInt), pickTopKCandidateSet(candSetRand.nextInt(numItems.toInt))))
     } else {
       Left(Right(PredictRequest(user, pickItemPredict())))
     }
