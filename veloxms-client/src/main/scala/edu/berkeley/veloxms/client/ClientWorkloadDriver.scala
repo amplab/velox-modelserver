@@ -158,7 +158,8 @@ object VeloxWorkloadDriver extends Logging {
       val requestor = new Requestor(
         numUsers = params.numUsers,
         numItems = params.numItems,
-        percentObs = params.percentObs)
+        percentObs = params.percentObs,
+        percentTopK = params.percentTopK)
       sendRequests(requestor, params, corpus)
     } getOrElse {
       sys.exit(1)
