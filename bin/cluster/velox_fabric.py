@@ -100,7 +100,7 @@ class Host:
 VELOX_SERVER_JAR = "veloxms-core/target/veloxms-core-0.0.1-SNAPSHOT.jar"
 VELOX_CLIENT_JAR = "veloxms-client/target/veloxms-client-0.0.1-SNAPSHOT.jar"
 
-VELOX_SERVER_CLASS = "edu.berkeley.veloxms.VeloxApplication"
+VELOX_SERVER_CLASS = "edu.berkeley.veloxms.VeloxEntry"
 
 VELOX_CLIENT_BENCHMARK_CLASS = "edu.berkeley.veloxms.client.VeloxWorkloadDriver"
 
@@ -456,6 +456,7 @@ def cmd_install_ykit():
 def cmd_build_velox(
         git_remote="git@github.com:amplab/velox-modelserver.git",
         branch="develop",
+        with_spark='n',
         with_tachyon='n',
         with_ykit='n',
         with_deploy_key='n',
@@ -483,9 +484,6 @@ def cmd_build_velox(
             as a deploy key (assumes the key is located in ~/.ssh/). Only
             used if with_deploy_key == 'y'. Default to "personalrepo-veloxms-deploy".
 
-        
-        
-
     """
     if with_deploy_key.lower() == 'y':
         execute(upload_deploy_key(localkey), roles=['clients', 'servers'])
@@ -493,6 +491,9 @@ def cmd_build_velox(
         execute(install_tachyon, roles=['clients', 'servers'])
     if with_ykit.lower() == 'y':
         execute(install_ykit, roles=['clients', 'servers'])
+    if with_spark.lower() == 'y':
+        execute(install_spark_1dot3, roles=['clients', 'servers'])
+
     
     execute(build_velox, git_remote, branch, roles=['clients', 'servers'])
         
@@ -521,6 +522,20 @@ def install_tachyon():
             run("mvn install:install-file -Dfile=core/target/tachyon-0.6.0-SNAPSHOT-jar-with-dependencies.jar "
                 "-DgroupId=org.tachyonproject -DartifactId=tachyon-parent "
                 "-Dversion=0.6.0-SNAPSHOT -Dpackaging=jar")
+@task
+@parallel
+def install_spark_1dot3():
+    with hide('stdout', 'stderr'):
+        puts("Installing Spark")
+        run("rm -rf ~/spark")
+        with cd("~/"):
+            run("git clone https://github.com/dcrankshaw/spark.git")
+        with cd("~/spark"):
+            run("git checkout v1.3.0-crankshaw")
+            run("mvn package install -DskipTests")
+            # run("mvn install:install-file -Dfile=core/target/tachyon-0.6.0-SNAPSHOT-jar-with-dependencies.jar "
+            #     "-DgroupId=org.tachyonproject -DartifactId=tachyon-parent "
+            #     "-Dversion=0.6.0-SNAPSHOT -Dpackaging=jar")
 
 
 @task
@@ -533,6 +548,8 @@ def build_velox(
         with settings(warn_only=True):
             if run("test -d ~/tachyon").failed:
                 abort("Please install Tachyon first")
+            if run("test -d ~/spark").failed:
+                abort("Please install Spark first")
             if run("test -d ~/velox-modelserver").failed:
                 # puts("Cloning Velox on %s" % env.host_string)
                 run("git clone %s" % git_remote)
@@ -638,8 +655,8 @@ def wait_servers_start():
             sleep(10)
 
 def get_default_bench():
-    return BenchmarkConfig(50, 100000, 50000, "jvmRandom", 45,
-                           GARBAGE_COLLECTOR, 20000, 0.2, 200,
+    return BenchmarkConfig(50, 100, 50, "jvmRandom", 45,
+                           GARBAGE_COLLECTOR, 200, 0.2, 200,
                            "MatrixFactorizationModel", 2.0, 1, False, False, False)
 
 
@@ -781,7 +798,7 @@ def start_velox_server(benchcfg, profile=False):
 @task
 @parallel
 def stop_velox_server():
-    run("pkill -9 -f VeloxApplication")
+    run("pkill -9 -f VeloxEntry")
     sleep(2)
 
 
@@ -903,8 +920,10 @@ def launch_cluster(
 
     # install tachyon, yourkit, and clone velox
     execute(upload_deploy_key, localkey, role='all')
-    puts("installing tachyon")
+    puts("installing Tachyon")
     execute(install_tachyon, role='all')
+    puts("installing Spark")
+    execute(install_spark_1dot3, role='all')
     puts("building velox")
     execute(build_velox,
             git_remote="git@github.com:dcrankshaw/velox-modelserver.git",
@@ -913,8 +932,8 @@ def launch_cluster(
     for h in velox_hosts.all_hosts:
         execute(set_hostname, h, host=h)
 
-    puts("installing ykit")
-    execute(install_ykit, role='all')
+    # puts("installing ykit")
+    # execute(install_ykit, role='all')
 
 
 @task

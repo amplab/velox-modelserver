@@ -13,7 +13,7 @@ import scala.io.Source
 import org.apache.spark.mllib.recommendation.Rating
 // import com.typesafe.scalalogging._
 import edu.berkeley.veloxms._
-import com.massrelevance.dropwizard.scala.params.{LongParam, IntParam, BooleanParam}
+// import com.massrelevance.dropwizard.scala.params.{LongParam, IntParam, BooleanParam}
 import com.codahale.metrics.annotation.Timed
 import javax.validation.Valid
 import javax.ws.rs._

@@ -6,9 +6,9 @@ import edu.berkeley.veloxms._
 // import java.nio.ByteBuffer
 // import scala.collection.JavaConversions._
 // import scala.util.{Try,Success,Failure}
-// import org.apache.spark._
-// import org.apache.spark.rdd._
-// import org.apache.spark.SparkContext._
+import org.apache.spark._
+import org.apache.spark.rdd._
+import org.apache.spark.SparkContext._
 
 import scala.util.{Failure, Success}
 // import org.apache.hadoop.fs.Path
@@ -57,8 +57,24 @@ class MatrixFactorizationModel(
    * THIS DOESN'T WORK YET!!!
    * Retrains the model in the provided Spark cluster
    */
-  def retrainInSpark(sparkMaster: String) {}
-  // def retrainInSpark(sparkMaster: String = conf.sparkMaster) {
+  def retrainInSpark(sparkMaster: String) {
+    val sparkHome = "/root/spark"
+    logWarning("Starting spark context")
+    val conf = new SparkConf()
+      .setMaster(sparkMaster)
+      .setAppName("VeloxOnSpark!")
+      .setJars(SparkContext.jarOfObject(this).toSeq)
+      .setSparkHome(sparkHome)
+      // .set("spark.akka.logAkkaConfig", "true")
+    val sc = new SparkContext(conf)
+    logWarning("Parallelizing data")
+    val data = sc.parallelize((0 to 5000))
+    logWarning(s"Counting data ${data.count}")
+    logWarning(s"Top is: ${data.top(10)}")
+    sc.stop()
+    println("Done")
+
+  }
   //
   //   val sparkHome = "/root/spark"
   //   logWarning("Starting spark context")

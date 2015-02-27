@@ -5,14 +5,13 @@ import edu.berkeley.veloxms.resources._
 import edu.berkeley.veloxms.storage._
 import edu.berkeley.veloxms.models._
 import io.dropwizard.Configuration
-
+import io.dropwizard.Application
 import io.dropwizard.setup.Bootstrap
 import io.dropwizard.setup.Environment
 import com.fasterxml.jackson.annotation.JsonProperty
-import com.massrelevance.dropwizard.ScalaApplication
-import com.massrelevance.dropwizard.bundles.ScalaBundle
 import javax.validation.constraints.NotNull
 import scala.collection.mutable
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
 
 import edu.berkeley.veloxms.util.Logging
 import org.eclipse.jetty.servlet.ServletHolder
@@ -29,14 +28,20 @@ class VeloxConfiguration extends Configuration {
   // rawDataLoc: String
 }
 
+object VeloxEntry {
 
-object VeloxApplication extends ScalaApplication[VeloxConfiguration] with Logging {
+  final def main(args: Array[String]) {
+    new VeloxApplication().run(args)
+  }
+
+}
+
+class VeloxApplication extends Application[VeloxConfiguration] with Logging {
 
   override def getName = "velox model server"
 
   override def initialize(bootstrap: Bootstrap[VeloxConfiguration]) {
-    bootstrap.addBundle(new ScalaBundle)
-    // init global state
+    bootstrap.getObjectMapper.registerModule(new DefaultScalaModule()) 
   }
 
   override def run(conf: VeloxConfiguration, env: Environment) {
