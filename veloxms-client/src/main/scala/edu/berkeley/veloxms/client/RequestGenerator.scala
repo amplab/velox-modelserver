@@ -108,6 +108,8 @@ class Requestor (
   def getRequest: Either[Either[ObserveRequest,PredictRequest], TopKPredictRequest] = {
     var user = pickUser()
     val rand: Double = reqTypeRand.nextDouble()
+    // This currently uses nested Eithers in order to choose between different kinds of requests (and because it used
+    // Eithers when there only two kinds of requests).
     if (rand < percentObs) {
       var item = pickItemObserve(user)
       // have to loop because when doing sampling without replacement we could run out of

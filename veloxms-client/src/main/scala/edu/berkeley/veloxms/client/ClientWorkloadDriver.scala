@@ -1,6 +1,7 @@
 package edu.berkeley.veloxms.client
 
 import com.fasterxml.jackson.databind.ObjectMapper
+
 // import com.fasterxml.jackson.datatype.guava.GuavaModule
 // import com.fasterxml.jackson.datatype.jdk7.Jdk7Module
 import dispatch.as.json4s._
@@ -242,7 +243,9 @@ object VeloxWorkloadDriver extends Logging {
     def createTopKRequest(req: TopKPredictRequest): Req = {
       val jsonString: String = params.modelType match {
         case NewsgroupsModel => {
-          ""
+          // This is currently not implemented because we are only benchmarking top-k against the matrix factorization
+          // model.
+          throw new UnsupportedOperationException()
         }
 
         case _ => mapper.writeValueAsString(req)

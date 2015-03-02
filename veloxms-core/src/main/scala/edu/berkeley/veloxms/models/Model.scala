@@ -131,6 +131,8 @@ abstract class Model[T:ClassTag, U] extends Logging {
   }
 
   def predictTopK(uid: Long, k: Int, context: JsonNode): Array[T] = {
+    // Note: There is probably some threshhold of k for which it makes more sense to iterate over the unsorted list
+    // instead of sorting the whole list.
     val itemOrdering = new Ordering[T] {
       override def compare(x: T, y: T) = {
         -1 * (predictItem(uid, x) compare predictItem(uid, y))
