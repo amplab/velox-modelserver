@@ -1,0 +1,45 @@
+package edu.berkeley.veloxms.resources.internal
+
+import javax.servlet.http.{HttpServletResponse, HttpServletRequest, HttpServlet}
+
+import com.codahale.metrics.Timer
+import edu.berkeley.veloxms.models.Model
+import edu.berkeley.veloxms._
+import org.apache.hadoop.conf._
+import org.apache.hadoop.fs._
+import org.apache.commons.io.IOUtils
+
+class WriteToHDFSServlet(model: Model[_, _], timer: Timer) extends HTTPServlet {
+
+  override def doGet(req: HttpServletRequest, resp: HttpServletResponse) {
+    val timeContext = timer.time()
+    try {
+      // TODO make sure that hadoop-site.xml, etc. are on classpath
+      val conf = new Configuration()
+      val fs = FileSystem.get(conf)
+      val hdfsLocation = "hdfs://"
+      val path = new Path(hdfsLocation)
+      val outFile = fs.create(path)
+      val observations = IOUtils.toInputStream(model.getObservationsAsCSV)
+      IOUtils.copy(observations, outFile)
+      resp.setContentType("application/json");
+      jsonMapper.writeValue(resp.getOutputStream, hdfsLocation)
+    } finally {
+      timeContext.stop()
+    }
+  }
+
+}
+
+class UpdateModelServlet(model: Model[_, _], timer: Timer) extends HTTPServlet {
+
+  override def doGet(req: HttpServletRequest, resp: HttpServletResponse) {
+    val timeContext = timer.time()
+    try {
+
+    } finally {
+      timeContext.stop()
+    }
+  }
+
+}

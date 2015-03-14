@@ -9,6 +9,7 @@ import java.nio.ByteBuffer
 import edu.berkeley.veloxms.util._
 import java.util.concurrent.ConcurrentHashMap
 import scala.collection.mutable
+import scala.collection.JavaConversions._
 
 /** Simple implementation of ModelStorage to avoid Tachyon
  * dependency. Should only be used for testing/debug purposes.
@@ -23,6 +24,11 @@ class JVMLocalStorage[K, V] (store: ConcurrentHashMap[K, V]) extends ModelStorag
 
   override def get(key: K): Option[V] = {
     if (store.containsKey(key)) Some(store.get(key)) else None
+  }
+
+  // TODO What is the return type?
+  override def getEntries: Map[K, V] = {
+    store.entrySet().map(e => (e.getKey(), e.getValue())).toMap
   }
 }
 

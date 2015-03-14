@@ -1,6 +1,8 @@
 package edu.berkeley
 
-import org.codehaus.jackson.map.ObjectMapper
+// import org.codehaus.jackson.map.ObjectMapper
+import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
 
 
 package object veloxms {
@@ -9,5 +11,5 @@ package object veloxms {
   type WeightVector = Array[Double]
   type UserID = Long
 
-  val jsonMapper = new ObjectMapper()
+  val jsonMapper = new ObjectMapper().registerModule(new DefaultScalaModule)
 }

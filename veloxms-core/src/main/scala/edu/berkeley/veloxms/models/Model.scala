@@ -4,7 +4,8 @@ package edu.berkeley.veloxms.models
 import edu.berkeley.veloxms._
 import edu.berkeley.veloxms.storage._
 import edu.berkeley.veloxms.util.Logging
-import org.codehaus.jackson.JsonNode
+// import org.codehaus.jackson.JsonNode
+import com.fasterxml.jackson.databind.JsonNode
 import org.jblas.{Solve, DoubleMatrix}
 import breeze.linalg._
 
@@ -55,6 +56,15 @@ abstract class Model[T:ClassTag, U] extends Logging {
    */
   val userStorage: ModelStorage[Long, WeightVector]
   val observationStorage: ModelStorage[Long, Map[T, Double]]
+
+  def getObservationsAsCSV: List[String] = {
+    val entries = observationStorage.getEntries
+    entries.flatMap({ case (user, obs) => {
+        obs.map { case (item, score) => s"$user, $item, $score/n" }
+      }
+    }).toList
+  }
+
 
   /** Average user weight vector.
    * Used for warmstart for new users
@@ -147,7 +157,7 @@ abstract class Model[T:ClassTag, U] extends Logging {
 
   def addObservation(uid: Long, context: JsonNode, score: Double) {
     (this, uid).synchronized {
-      val item: T = jsonMapper.readValue(context, classTag[T].runtimeClass.asInstanceOf[Class[T]])
+      val item: T = jsonMapper.treeToValue(context, classTag[T].runtimeClass.asInstanceOf[Class[T]])
       val newWeights = addObservationInternal(uid, item, score, true)
     }
   }

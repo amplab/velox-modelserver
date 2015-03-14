@@ -13,7 +13,7 @@ import javax.validation.constraints.NotNull
 import scala.collection.mutable
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 
-import edu.berkeley.veloxms.util.Logging
+import edu.berkeley.veloxms.util._
 import org.eclipse.jetty.servlet.ServletHolder
 
 class VeloxConfiguration extends Configuration {
@@ -46,12 +46,22 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
 
   override def run(conf: VeloxConfiguration, env: Environment) {
     val models = new mutable.HashMap[String, Model[_,_]]
+
+    // this assumes that etcd is running on each velox server
+    val etcdClient = new EtcdClient(conf.hostname, 4001, conf.hostname, new DispatchUtil)
+
     conf.modelFactories.foreach { case (name, modelFactory) => {
       val model = modelFactory.build(env, conf.hostname)
+
       val predictServlet = new PointPredictionServlet(model, env.metrics().timer(name + "/predict/"))
       val topKServlet = new TopKPredictionServlet(model, env.metrics().timer(name + "/predict_top_k/"))
       val observeServlet = new AddObservationServlet(model, conf.sparkMaster, env.metrics().timer(name + "/observe/"))
-      val retrainServlet = new RetrainServlet(model, conf.sparkMaster, env.metrics().timer(name + "/retrain/"))
+      val retrainServlet = new RetrainServlet(
+          model,
+          conf.sparkMaster,
+          env.metrics().timer(name + "/retrain/"),
+          etcdClient,
+          name)
       env.getApplicationContext.addServlet(new ServletHolder(predictServlet), "/predict/" + name)
       env.getApplicationContext.addServlet(new ServletHolder(topKServlet), "/predict_top_k/" + name)
       env.getApplicationContext.addServlet(new ServletHolder(observeServlet), "/observe/" + name)
@@ -63,5 +73,8 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
     env.jersey().register(new CacheHitResource(models.toMap))
   }
 }
+
+
+
 
 
