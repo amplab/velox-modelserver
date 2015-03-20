@@ -27,6 +27,7 @@ object RequestDist extends Enumeration {
 // AddObservationResource.scala
 case class ObserveRequest(uid: Long, context: Long, score: Double)
 case class PredictRequest(uid: Long, context: Long)
+case class TopKPredictRequest(uid: Long, k: Int, context: Array[Long])
 
 case class NewsObserveRequest(uid: Long, context: String, score: Double)
 case class NewsPredictRequest(uid: Long, context: String)
@@ -44,6 +45,8 @@ class Requestor (
     /* The percentage of requests that are adding observations */
     // percentObs: Double = 0.2,
     percentObs: Double = -1.0,
+    percentTopK: Double = -1.0,
+    candidateSetSize: Int = 100,
     userDist: RequestDist = Uniform,
     itemDist: RequestDist = Uniform,
     maxScore: Double = 10.0,
@@ -52,6 +55,9 @@ class Requestor (
 
   val reqTypeRand = new Random
   val scoreRand = new Random
+  val topKRand = new Random
+
+  val topKThreshhold: Double = if (percentObs == -1.0) percentTopK else percentObs + percentTopK
   
   // TODO(crankshaw) add other types of samplers
   val userSampler: PopSampler = userDist match {
@@ -85,14 +91,26 @@ class Requestor (
     itemPredictionSampler.nextLong()
   }
 
+  def pickTopKCandidateSet(setSize: Int): Array[Long] = {
+    val result = new Array[Long](setSize)
+    for (i <- 0 to setSize-1) {
+      result(i) = pickItemPredict()
+    }
+
+    result
+  }
+
   def pickItemObserve(user: Long): Option[Long] = {
     // TODO(crankshaw) handle running out of items for that user
     itemObservationSampler.nextItem(user)
   }
 
-  def getRequest: Either[ObserveRequest,PredictRequest] = {
+  def getRequest: Either[Either[ObserveRequest,PredictRequest], TopKPredictRequest] = {
     var user = pickUser()
-    if (reqTypeRand.nextDouble() < percentObs) {
+    val rand: Double = reqTypeRand.nextDouble()
+    // This currently uses nested Eithers in order to choose between different kinds of requests (and because it used
+    // Eithers when there only two kinds of requests).
+    if (rand < percentObs) {
       var item = pickItemObserve(user)
       // have to loop because when doing sampling without replacement we could run out of
       // items for a particular user to observe
@@ -100,9 +118,11 @@ class Requestor (
         user = pickUser()
         item = pickItemObserve(user)
       }
-      Left(ObserveRequest(user, item.get, scoreRand.nextDouble()*maxScore))
+      Left(Left(ObserveRequest(user, item.get, scoreRand.nextDouble()*maxScore)))
+    } else if (rand < topKThreshhold) {
+      Right(TopKPredictRequest(user, topKRand.nextInt(numItems.toInt), pickTopKCandidateSet(candidateSetSize)))
     } else {
-      Right(PredictRequest(user, pickItemPredict()))
+      Left(Right(PredictRequest(user, pickItemPredict())))
     }
 
   }

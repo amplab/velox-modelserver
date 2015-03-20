@@ -1,6 +1,7 @@
 package edu.berkeley.veloxms.client
 
 import com.fasterxml.jackson.databind.ObjectMapper
+
 // import com.fasterxml.jackson.datatype.guava.GuavaModule
 // import com.fasterxml.jackson.datatype.jdk7.Jdk7Module
 import dispatch.as.json4s._
@@ -47,13 +48,15 @@ object VeloxWorkloadDriver extends Logging {
     veloxPort: Int = 8080,
     numRequests: Int = 10000,
     percentObs: Double = 0.2,
+    percentTopK: Double = 0.1,
     numPartitions: Int = 4,
     numThreads: Int = 10,
     connTimeout: Int = 10000,
     throttleRequests: Int = 1000,
     statusTime: Int = 10,
     ngramFile: String = null,
-    docLength: Int = 200
+    docLength: Int = 200,
+    candidateSetSize: Int = 100
   )
 
 
@@ -88,6 +91,13 @@ object VeloxWorkloadDriver extends Logging {
         .text("percent of requests that are observations, " +
           s"default: ${defaultParams.percentObs}")
         .action((x, c) => c.copy(percentObs = x))
+      opt[Double]("percentTopK")
+        .text("percent of requests that are top-k, " +
+          s"default: ${defaultParams.percentTopK}")
+        .action((x, c) => c.copy(percentTopK = x))
+      opt[Int]("candidateSetSize")
+        .text("size of the candidate set for top-k requests, " +
+          s"default: ${defaultParams.candidateSetSize}")
       // opt[Unit]("genTrain")
       //   .text("Flag to generate training data rather than sending reqs")
       //   .action((_, c) => c.copy(genTrain = true))
@@ -153,7 +163,9 @@ object VeloxWorkloadDriver extends Logging {
       val requestor = new Requestor(
         numUsers = params.numUsers,
         numItems = params.numItems,
-        percentObs = params.percentObs)
+        percentObs = params.percentObs,
+        percentTopK = params.percentTopK,
+        candidateSetSize = params.candidateSetSize)
       sendRequests(requestor, params, corpus)
     } getOrElse {
       sys.exit(1)
@@ -196,12 +208,14 @@ object VeloxWorkloadDriver extends Logging {
 
     val nanospersec = math.pow(10, 9)
     var numPreds = 0
+    var numTopK = 0
     var numObs = 0
     val reqPerPartition = new Array[Int](params.numPartitions)
     val hosts = getHosts(params.veloxURLFile, params.veloxPort)
     val observePath = "observe"
     val retrainPath = "retrain"
     val predictPath = "predict"
+    val topKPath = "predict_top_k"
     val modelPath = params.modelType match {
       case NewsgroupsModel => "newsgroups"
       case _ => "matrixfact"
@@ -223,6 +237,25 @@ object VeloxWorkloadDriver extends Logging {
       val veloxHost = hosts(partition)
       val request = (veloxHost / predictPath / modelPath).POST << jsonString
       numPreds += 1
+      request
+    }
+
+    def createTopKRequest(req: TopKPredictRequest): Req = {
+      val jsonString: String = params.modelType match {
+        case NewsgroupsModel => {
+          // This is currently not implemented because we are only benchmarking top-k against the matrix factorization
+          // model.
+          throw new UnsupportedOperationException()
+        }
+
+        case _ => mapper.writeValueAsString(req)
+      }
+
+      val partition = (req.uid % params.numPartitions).toInt
+      reqPerPartition(partition) += 1
+      val veloxHost = hosts(partition)
+      val request = (veloxHost / topKPath / modelPath).POST << jsonString
+      numTopK += 1
       request
     }
 
@@ -285,8 +318,11 @@ object VeloxWorkloadDriver extends Logging {
     val responseFutures =
       for (i <- 0 until params.numRequests)
         yield requestor.getRequest.fold(
-          oreq => http(createObserveRequest(oreq) OK as.json4s.Json).either,
-          preq => http(createPredictRequest(preq) OK as.json4s.Json).either
+          l => l.fold(
+            oreq => http(createObserveRequest(oreq) OK as.json4s.Json),
+            preq => http(createPredictRequest(preq) OK as.json4s.Json)
+          ).either,
+          kreq => http(createTopKRequest(kreq) OK as.json4s.Json).either
         )
     val responses: Future[IndexedSeq[Either[Throwable, JValue]]] = Future.sequence(responseFutures)
 
@@ -304,13 +340,16 @@ object VeloxWorkloadDriver extends Logging {
     val elapsedTime = (stopTime - startTime) / nanospersec
     val pthruput = numPreds.toDouble / elapsedTime.toDouble
     val othruput = numObs.toDouble / elapsedTime.toDouble
+    val kthruput = numTopK.toDouble / elapsedTime.toDouble
     val totthruput = (successes.size).toDouble / elapsedTime.toDouble
 
     val outstr = (s"duration: ${elapsedTime}\n" +
                   s"num_pred: ${numPreds}\n" +
+                  s"num_top_k: ${numTopK}\n" +
                   s"num_obs: ${numObs}\n" +
                   s"pred_thru: ${pthruput}\n" +
                   s"obs_thru: ${othruput}\n" +
+                  s"top_k_thru: ${kthruput}\n" +
                   s"total_thru: ${totthruput}\n" +
                   s"successes: ${successes.size}\n" +
                   s"failures: ${failures.size}\n")

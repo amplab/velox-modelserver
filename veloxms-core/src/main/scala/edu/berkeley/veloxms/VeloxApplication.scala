@@ -44,9 +44,11 @@ object VeloxApplication extends ScalaApplication[VeloxConfiguration] with Loggin
     conf.modelFactories.foreach { case (name, modelFactory) => {
       val model = modelFactory.build(env, conf.hostname)
       val predictServlet = new PointPredictionServlet(model, env.metrics().timer(name + "/predict/"))
+      val topKServlet = new TopKPredictionServlet(model, env.metrics().timer(name + "/predict_top_k/"))
       val observeServlet = new AddObservationServlet(model, conf.sparkMaster, env.metrics().timer(name + "/observe/"))
       val retrainServlet = new RetrainServlet(model, conf.sparkMaster, env.metrics().timer(name + "/retrain/"))
       env.getApplicationContext.addServlet(new ServletHolder(predictServlet), "/predict/" + name)
+      env.getApplicationContext.addServlet(new ServletHolder(topKServlet), "/predict_top_k/" + name)
       env.getApplicationContext.addServlet(new ServletHolder(observeServlet), "/observe/" + name)
       env.getApplicationContext.addServlet(new ServletHolder(retrainServlet), "/retrain/" + name)
       models.put(name, model)

@@ -33,3 +33,6 @@ hs_err_pid*
 
 # vim swap files
 *.sw*
+
+# IntelliJ IDEA files
+*.iml
