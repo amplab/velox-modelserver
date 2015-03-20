@@ -2,6 +2,7 @@ package edu.berkeley.veloxms
 
 import edu.berkeley.veloxms.models.ModelFactory
 import edu.berkeley.veloxms.resources._
+import edu.berkeley.veloxms.resources.internal._
 import edu.berkeley.veloxms.storage._
 import edu.berkeley.veloxms.models._
 import io.dropwizard.Configuration
@@ -51,21 +52,36 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
     val etcdClient = new EtcdClient(conf.hostname, 4001, conf.hostname, new DispatchUtil)
 
     conf.modelFactories.foreach { case (name, modelFactory) => {
-      val model = modelFactory.build(env, conf.hostname)
+      val (model, partition, partitionMap) = modelFactory.build(env, conf.hostname)
 
       val predictServlet = new PointPredictionServlet(model, env.metrics().timer(name + "/predict/"))
       val topKServlet = new TopKPredictionServlet(model, env.metrics().timer(name + "/predict_top_k/"))
-      val observeServlet = new AddObservationServlet(model, conf.sparkMaster, env.metrics().timer(name + "/observe/"))
+      val observeServlet = new AddObservationServlet(
+          model,
+          conf.sparkMaster,
+          env.metrics().timer(name + "/observe/"))
+      val writeHdfsServlet = new WriteToHDFSServlet(
+          model,
+          env.metrics().timer(name + "/observe/"),
+          conf.sparkMaster,
+          partition)
       val retrainServlet = new RetrainServlet(
           model,
           conf.sparkMaster,
           env.metrics().timer(name + "/retrain/"),
           etcdClient,
-          name)
+          name,
+          partitionMap)
+      val loadNewModelServlet = new LoadNewModelServlet(
+          model, 
+          env.metrics().timer(name + "/loadmodel/"),
+          conf.sparkMaster)
       env.getApplicationContext.addServlet(new ServletHolder(predictServlet), "/predict/" + name)
       env.getApplicationContext.addServlet(new ServletHolder(topKServlet), "/predict_top_k/" + name)
       env.getApplicationContext.addServlet(new ServletHolder(observeServlet), "/observe/" + name)
       env.getApplicationContext.addServlet(new ServletHolder(retrainServlet), "/retrain/" + name)
+      env.getApplicationContext.addServlet(new ServletHolder(writeHdfsServlet), "/writehdfs/" + name)
+      env.getApplicationContext.addServlet(new ServletHolder(loadNewModelServlet), "/loadmodel/" + name)
       models.put(name, model)
     }}
     logInfo("Registered models: " + conf.modelFactories.keys.mkString(","))

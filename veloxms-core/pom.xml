@@ -86,6 +86,10 @@
       <groupId>net.databinder.dispatch</groupId>
       <artifactId>dispatch-core_${scala.binary.version}</artifactId>
     </dependency>
+    <dependency>
+      <groupId>org.scala-lang</groupId>
+      <artifactId>scalap</artifactId>
+    </dependency>
 
     <!-- <dependency> -->
       <!--   <groupId>io.dropwizard</groupId> -->

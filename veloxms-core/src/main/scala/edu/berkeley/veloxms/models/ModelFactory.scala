@@ -27,14 +27,14 @@ class ModelFactory extends Logging {
   @(JsonProperty)("storage")
   val modelStorageFactories: Map[String, ModelStorageFactory] = Map()
 
-  def build(env: Environment, hostname: String): Model[_, _] = {
+  def build(env: Environment, hostname: String): (Model[_, _], Int, Map[String, Int]) = {
     modelType match {
       case "MatrixFactorizationModel" => {
         require(modelStorageFactories.contains("users"))
         require(modelStorageFactories.contains("items"))
         require(modelStorageFactories.contains("ratings"))
         require(partitionFile != "")
-        val partition = getPartition(partitionFile, hostname)
+        val (partition, partitionMap) = getPartition(partitionFile, hostname)
         require(partition > -1)
         
 
@@ -65,7 +65,7 @@ class ModelFactory extends Logging {
         if (cachePartialSums) {
           model.precomputePartialSums(partition until numUsers by numPartitions)
         }
-        model
+        (model, partition, partitionMap)
 
       }
       // To use the newsgroups model, the binary file containing the model must
@@ -76,7 +76,7 @@ class ModelFactory extends Logging {
         require(modelStorageFactories.contains("ratings"))
         require(partitionFile != "")
         require(modelLoc != "")
-        val partition = getPartition(partitionFile, hostname)
+        val (partition, partitionMap) = getPartition(partitionFile, hostname)
         require(partition > -1)
 
         // Build and manage the modelStorages
@@ -104,7 +104,7 @@ class ModelFactory extends Logging {
         if (cachePartialSums) {
           model.precomputePartialSums(partition until numUsers by numPartitions)
         }
-        model
+        (model, partition, partitionMap)
       }
       case _ => {
         throw new IllegalArgumentException(s"Unknown model type: $modelType")
@@ -112,7 +112,7 @@ class ModelFactory extends Logging {
     }
   }
 
-  def getPartition(partitionFile: String, hostname: String): Int = {
+  def getPartition(partitionFile: String, hostname: String): (Int, Map[String, Int]) = {
     logInfo(s"My host name: $hostname")
     val hosts = Source.fromFile(partitionFile)
       .getLines
@@ -124,6 +124,6 @@ class ModelFactory extends Logging {
         (url, part)
       }).toMap
     val partition = hosts.get(hostname).getOrElse(-1)
-    partition
+    (partition, hosts)
   }
 }

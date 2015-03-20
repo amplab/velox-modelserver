@@ -168,12 +168,13 @@ class JSONEncoder(json.JSONEncoder):
 ###########################################################################
 
 @task
-def restart_velox_and_etcd():
-    kill_everything()
-    cmd_build_velox(git_remote="git@github.com:dcrankshaw/velox-modelserver.git",
-                    branch="spark1.3-integration")
-    cmd_start_new_etcd_cluster()
-    cmd_restart_velox()
+# @roles('servers')
+@parallel
+def upload_lib():
+    run("mkdir -p ~/velox_lib")
+    put("../../lib/*", "~/velox_lib")
+
+
 
 @task
 @roles('servers', 'clients')
@@ -370,6 +371,9 @@ def build_velox(
 
         # re-upload server_partitions after rebuilding
         put("../../conf/server_partitions.txt", "~/velox-modelserver/conf/server_partitions.txt")
+        with cd(VELOX_ROOT):
+            run("mkdir -p lib/")
+            run("cp ~/velox_lib/* lib/")
 
         with settings(warn_only=True):
             if local("test -f ../../%s" % NGRAM_FILE).succeeded:
@@ -377,6 +381,8 @@ def build_velox(
                     put("../../%s" % NGRAM_FILE, NGRAM_FILE)
 
 # @roles('clients')
+
+
 
 @task
 def upload_server_partitions():
@@ -554,6 +560,8 @@ def start_velox_server(benchcfg, profile=False):
     config_loc = "../../conf/config.yml"
     with cd(VELOX_ROOT):
         # put("../../%s" % NGRAM_FILE, NGRAM_FILE)
+
+
         put("../../conf/config.yml", "conf/config.yml")
     pstr = ""
     if profile:
@@ -566,7 +574,7 @@ def start_velox_server(benchcfg, profile=False):
                         " java %(pstr)s -XX:+%(gc)s -Xms%(heap_size)dg -Xmx%(heap_size)dg "
                         "-Dlog4j.configuration=file:%(log4j_file)s "
                         "-Ddw.hostname=$VELOX_HOSTNAME "
-                        "-cp %(velox_root)s/%(server_jar)s "
+                        "-cp %(velox_root)s/%(server_jar)s:%(velox_root)s/lib/* "
                         "%(server_class)s server "
                         "%(velox_root)s/conf/config.yml "
                         "& sleep 5; exit 0"
@@ -630,7 +638,7 @@ def launch_cluster(
         num_servers='2',
         num_clients='2',
         localkey="personalrepo-veloxms-deploy",
-        instance_type='r3.xlarge'):
+        instance_type='r3.2xlarge'):
     servers = int(num_servers)
     clients = int(num_clients)
     default_cluster = get_default_cluster(servers, clients, instance_type)
@@ -713,6 +721,7 @@ def launch_cluster(
 
     # install tachyon, yourkit, and clone velox
     execute(upload_deploy_key, localkey, role='all')
+
     puts("installing Tachyon")
     execute(install_tachyon, role='all')
     puts("installing etcd")
@@ -726,6 +735,7 @@ def launch_cluster(
     for h in velox_hosts.all_hosts:
         execute(set_hostname, h, host=h)
 
+    execute(upload_lib, role='all')
     # puts("installing ykit")
     # execute(install_ykit, role='all')
 

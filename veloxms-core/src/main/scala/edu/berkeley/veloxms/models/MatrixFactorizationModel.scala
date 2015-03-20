@@ -9,6 +9,7 @@ import edu.berkeley.veloxms._
 import org.apache.spark._
 import org.apache.spark.rdd._
 import org.apache.spark.SparkContext._
+import org.apache.spark.mllib.recommendation.{ALS,Rating}
 
 import scala.util.{Failure, Success}
 // import org.apache.hadoop.fs.Path
@@ -17,7 +18,6 @@ import scala.util.{Failure, Success}
 // import org.apache.hadoop.mapreduce.lib.input.CombineFileInputFormat
 // import org.apache.hadoop.mapreduce.lib.input.{CombineFileRecordReader,CombineFileSplit}
 // import org.apache.hadoop.mapreduce.{RecordReader,TaskAttemptContext}
-// import org.apache.spark._
 // import org.apache.spark.mllib.recommendation.{ALS,Rating}
 // import org.apache.spark.rdd.RDD
 // import org.apache.spark.SparkContext._
@@ -53,12 +53,22 @@ class MatrixFactorizationModel(
     }
   }
 
+
+  def loadTrainingData(sc: SparkContext, trainLoc: String): RDD[Rating] = {
+    sc.textFile(trainLoc).map(l => {
+        val splits = l.split(", ")
+        Rating(splits(0).toInt, splits(1).toInt, splits(2).toDouble)
+      }
+      // case Array(user, item, score) => Rating(user.toInt, item.toInt, score.toDouble)
+    )
+  }
+
   /**
    * THIS DOESN'T WORK YET!!!
    * Retrains the model in the provided Spark cluster
    */
-  def retrainInSpark(sparkMaster: String) {
-    val sparkHome = "/root/spark"
+  def retrainInSpark(sparkMaster: String, trainingDataDir: String, newModelsDir: String) {
+    val sparkHome = "/root/spark-1.3.0-bin-hadoop1"
     logWarning("Starting spark context")
     val conf = new SparkConf()
       .setMaster(sparkMaster)
@@ -67,12 +77,27 @@ class MatrixFactorizationModel(
       .setSparkHome(sparkHome)
       // .set("spark.akka.logAkkaConfig", "true")
     val sc = new SparkContext(conf)
-    logWarning("Parallelizing data")
-    val data = sc.parallelize((0 to 5000))
-    logWarning(s"Counting data ${data.count}")
-    logWarning(s"Top is: ${data.top(10)}")
+    val trainingData = loadTrainingData(sc, trainingDataDir)
+    val iterations = 5
+    val lambda = 1
+    val model = ALS.train(trainingData, numFeatures, iterations, lambda)
+    val userFeatures = model.userFeatures.map({
+      case (userId, features) => s"$userId, ${features.mkString(", ")}"
+    })
+
+    val itemFeatures = model.productFeatures.map({
+      case (itemId, features) => s"$itemId, ${features.mkString(", ")}"
+    })
+
+
+
+    // TODO the problem seems to be here:
+    userFeatures.saveAsTextFile(newModelsDir + "/users")
+    itemFeatures.saveAsTextFile(newModelsDir + "/items")
+    
+
     sc.stop()
-    println("Done")
+    logInfo("Finished retraining new model")
 
   }
   //

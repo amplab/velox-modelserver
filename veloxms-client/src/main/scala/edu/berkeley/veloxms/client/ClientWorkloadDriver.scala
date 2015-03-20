@@ -4,7 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper
 
 // import com.fasterxml.jackson.datatype.guava.GuavaModule
 // import com.fasterxml.jackson.datatype.jdk7.Jdk7Module
-import dispatch.as.json4s._
+//
+// import dispatch.as.json4s._
 import com.ning.http.client.Response
 import com.ning.http.client.extra.ThrottleRequestFilter
 import java.util.concurrent.atomic.AtomicInteger
@@ -13,7 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 import edu.berkeley.veloxms.util.{Logging, NGramDocumentGenerator}
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
-import org.json4s.JValue
+// import org.json4s.JValue
 import scala.collection.mutable
 import scala.collection.immutable
 import scala.io.Source
@@ -324,7 +325,7 @@ object VeloxWorkloadDriver extends Logging {
           ).either,
           kreq => http(createTopKRequest(kreq) OK as.json4s.Json).either
         )
-    val responses: Future[IndexedSeq[Either[Throwable, JValue]]] = Future.sequence(responseFutures)
+    val responses: Future[IndexedSeq[Either[Throwable, String]]] = Future.sequence(responseFutures)
 
     val (lefts, rights) = responses().partition(_.isInstanceOf[Left[_,_]])
 

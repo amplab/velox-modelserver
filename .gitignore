@@ -23,6 +23,7 @@ target/
 logs/
 assembly/
 data/
+lib/
 
 conf/config.yml
 

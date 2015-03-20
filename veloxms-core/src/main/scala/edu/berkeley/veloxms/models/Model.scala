@@ -60,7 +60,7 @@ abstract class Model[T:ClassTag, U] extends Logging {
   def getObservationsAsCSV: List[String] = {
     val entries = observationStorage.getEntries
     entries.flatMap({ case (user, obs) => {
-        obs.map { case (item, score) => s"$user, $item, $score/n" }
+        obs.map { case (item, score) => s"$user, $item, $score" }
       }
     }).toList
   }
@@ -79,7 +79,7 @@ abstract class Model[T:ClassTag, U] extends Logging {
 
   // TODO: probably want to elect a leader to initiate the Spark retraining
   // once we are running a Spark cluster
-  def retrainInSpark(sparkMaster: String)
+  def retrainInSpark(sparkMaster: String, trainingDataDir: String, newModelsDir: String)
 
   /**
    * Velox implemented - fetch from local Tachyon partition
