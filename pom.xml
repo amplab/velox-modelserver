@@ -208,13 +208,13 @@
         <groupId>io.dropwizard</groupId>
         <artifactId>dropwizard-core</artifactId>
         <version>${dropwizard.version}</version>
-        <exclusions>
-          <exclusion>
-            <groupId>org.slf4j</groupId>
-            <artifactId>log4j-over-slf4j</artifactId>
-          </exclusion>
-
-        </exclusions>
+        <!-- <exclusions> -->
+        <!--   <exclusion> -->
+        <!--     <groupId>org.slf4j</groupId> -->
+        <!--     <artifactId>log4j&#45;over&#45;slf4j</artifactId> -->
+        <!--   </exclusion> -->
+        <!--  -->
+        <!-- </exclusions> -->
       </dependency>
       <dependency>
         <groupId>org.scala-lang</groupId>
@@ -505,10 +505,10 @@
         <version>3.2</version>
         <scope>test</scope>
     </dependency>
-    <dependency>
-      <groupId>org.tachyonproject</groupId>
-      <artifactId>tachyon-parent</artifactId>
-      <version>${tachyon.version}</version>
+    <!-- <dependency> -->
+    <!--   <groupId>org.tachyonproject</groupId> -->
+    <!--   <artifactId>tachyon&#45;parent</artifactId> -->
+    <!--   <version>${tachyon.version}</version> -->
       <!-- <exclusions> -->
       <!--   <exclusion> -->
       <!--     <groupId>org.apache.hadoop</groupId> -->
@@ -551,7 +551,7 @@
           <!--   <artifactId>curator&#45;test</artifactId> -->
           <!-- </exclusion> -->
       <!-- </exclusions> -->
-    </dependency>
+    <!-- </dependency> -->
   </dependencies>
 
 </dependencyManagement>

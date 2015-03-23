@@ -57,10 +57,10 @@
       <groupId>org.jblas</groupId>
       <artifactId>jblas</artifactId>
     </dependency>
-    <dependency>
-      <groupId>org.tachyonproject</groupId>
-      <artifactId>tachyon-parent</artifactId>
-    </dependency>
+    <!-- <dependency> -->
+    <!--   <groupId>org.tachyonproject</groupId> -->
+    <!--   <artifactId>tachyon&#45;parent</artifactId> -->
+    <!-- </dependency> -->
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-mllib_${scala.binary.version}</artifactId>

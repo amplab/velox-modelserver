@@ -1,7 +1,7 @@
 package edu.berkeley.veloxms.storage
 
 import edu.berkeley.veloxms.FeatureVector
-import edu.berkeley.veloxms.misc.WriteModelsResource
+// import edu.berkeley.veloxms.misc.WriteModelsResource
 import edu.berkeley.veloxms.util.Logging
 import io.dropwizard.lifecycle.Managed
 import io.dropwizard.setup.Environment
@@ -80,13 +80,18 @@ class ModelStorageFactory extends Logging {
           percentOfItems).asInstanceOf[ModelStorage[T, U]]
       }
 
-      case "tachyon" => {
-        logInfo("Using tachyon storage")
-        env.jersey().register(new WriteModelsResource)
-        new TachyonStorage[T, U](
-          address,
-          path)
-      }
+      // case "tachyon" => {
+      //   logInfo("Using tachyon storage")
+      //   env.jersey().register(new WriteModelsResource)
+      //   new TachyonStorage[T, U](
+      //     address,
+      //     path)
+      // }
+
+
+
+
+
       // case "tachyonRandom" => {
       //   logInfo("Using tachyon storage")
       //   env.jersey().register(new WriteModelsResource)
