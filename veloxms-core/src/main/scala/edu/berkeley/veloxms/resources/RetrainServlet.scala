@@ -10,6 +10,9 @@ import edu.berkeley.veloxms._
 import edu.berkeley.veloxms.util._
 import edu.berkeley.veloxms.resources.internal.HDFSLocation
 import dispatch._, Defaults._
+import org.apache.hadoop.conf._
+import org.apache.hadoop.fs._
+
 
 
 /**
@@ -49,7 +52,6 @@ class RetrainServlet(
           case(h, _) => host(h, veloxPort).setContentType("application/json", "UTF-8")
         })
 
-        val recursive = true
 
         System.setProperty("HADOOP_USER_NAME", "root")
         val conf = new Configuration()
@@ -57,8 +59,9 @@ class RetrainServlet(
         conf.addResource(new Path("/home/ubuntu/velox-modelserver/conf/core-site.xml"))
         val fs = FileSystem.get(conf)
         val modelTrainDir = new Path(s"hdfs://$sparkMaster:9000/velox/$modelName/")
-        if fs.exists(modelTrainDir) {
-          fs.delete(modelTrainDir, recursive))
+        if (fs.exists(modelTrainDir)) {
+          val recursive = true
+          fs.delete(modelTrainDir, recursive)
         }
         fs.close()
 
