@@ -1,3 +1,3 @@
-servers = ["ec2-54-90-143-49.compute-1.amazonaws.com", "ec2-54-163-194-54.compute-1.amazonaws.com"]
+servers = ["ec2-54-234-239-98.compute-1.amazonaws.com", "ec2-54-145-96-15.compute-1.amazonaws.com"]
 clients = []
-all_hosts = ["ec2-54-90-143-49.compute-1.amazonaws.com", "ec2-54-163-194-54.compute-1.amazonaws.com"]
+all_hosts = ["ec2-54-234-239-98.compute-1.amazonaws.com", "ec2-54-145-96-15.compute-1.amazonaws.com"]

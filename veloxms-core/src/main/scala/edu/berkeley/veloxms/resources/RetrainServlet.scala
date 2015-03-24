@@ -13,17 +13,14 @@ import dispatch._, Defaults._
 
 
 /**
- * JK, I can just have the server coordinate everything:
  *  Server:
  *    - Acquire global retrain lock (lock per model) from etcd
- *    - Request servers write obs to HDFS - servers respond to request when done
+ *    - Tell servers to write obs to HDFS - servers respond to request when done
  *        * Don't forget, this should be done for the retrain master as well
  *    - Retrain in Spark
  *    - When Spark retrain done, request servers load new model - servers respond when done
  *        * Don't forget, this should be done for the retrain master as well
  *    - Release retrain lock
- *
- *
  *
  */
 
@@ -42,9 +39,6 @@ class RetrainServlet(
       // coordinate retraining: returns false if retrain already going on
 
       val http = Http.configure(_.setAllowPoolingConnection(true).setFollowRedirects(true))
-      /* BEGIN Pseudocode */
-      // acquire retrain lock from etcd:
-      // TODO should we wrap this in a try/finally to make sure lock get's released?
       logInfo(s"Starting retrain for model $modelName")
       val lockAcquired = etcdClient.acquireRetrainLock(modelName)
       val obsDataLocation = HDFSLocation(s"velox/$modelName/observations")
@@ -54,6 +48,19 @@ class RetrainServlet(
         val hosts = hostPartitionMap.map({
           case(h, _) => host(h, veloxPort).setContentType("application/json", "UTF-8")
         })
+
+        val recursive = true
+
+        System.setProperty("HADOOP_USER_NAME", "root")
+        val conf = new Configuration()
+        // TODO figure out what to do with the core-site.xml
+        conf.addResource(new Path("/home/ubuntu/velox-modelserver/conf/core-site.xml"))
+        val fs = FileSystem.get(conf)
+        val modelTrainDir = new Path(s"hdfs://$sparkMaster:9000/velox/$modelName/")
+        if fs.exists(modelTrainDir) {
+          fs.delete(modelTrainDir, recursive))
+        }
+        fs.close()
 
         // TODO Delete observation and new_model dirs if exist
         val writeRequests = hosts.map(
@@ -70,19 +77,17 @@ class RetrainServlet(
             s"spark://$sparkMaster:7077",
             s"hdfs://$sparkMaster:9000/${obsDataLocation.loc}",
             s"hdfs://$sparkMaster:9000/${newModelLocation.loc}")
-        //
-        // val loadModelRequests = hosts.map(
-        //   h => {
-        //     val req = (h / "loadmodel" / modelName)
-        //       .POST << jsonMapper.writeValueAsString(newModelLocation)
-        //     http(req OK as.String)
-        //   })
-        //
-        // val loadResponseFutures = Future.sequence(loadModelRequests)
-        // val loadResponses = Await.result(loadResponseFutures, Duration.Inf)
-        // logInfo(s"Load new model responses: ${loadResponses.mkString("\n")}")
-        val lockReleased = etcdClient.releaseRetrainLock(modelName)
-        logInfo(s"released lock successfully: $lockReleased")
+
+        val loadModelRequests = hosts.map(
+          h => {
+            val req = (h / "loadmodel" / modelName)
+              .POST << jsonMapper.writeValueAsString(newModelLocation)
+            http(req OK as.String)
+          })
+
+        val loadResponseFutures = Future.sequence(loadModelRequests)
+        val loadResponses = Await.result(loadResponseFutures, Duration.Inf)
+        logInfo(s"Load new model responses: ${loadResponses.mkString("\n")}")
         jsonMapper.writeValue(resp.getOutputStream, "Success")
       } else {
         jsonMapper.writeValue(resp.getOutputStream, "Failed to acquire lock")

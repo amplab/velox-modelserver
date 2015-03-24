@@ -44,17 +44,6 @@ class WriteToHDFSServlet(model: Model[_, _], timer: Timer, sparkMaster: String, 
 
 }
 
-// object Hdfs {
-//   def write(uri: String, filePath: String, data: Array[Byte]): Unit = {
-//     System.setProperty("HADOOP_USER_NAME", "root")
-//     val path = new Path(filePath)
-//     val conf = new Configuration()
-//     conf.set("fs.defaultFS", uri)
-//     val fs = FileSystem.get(conf)
-//     val os = fs.create(path)
-//     os.write(data)
-//     fs.close()
-//   }
 
 class LoadNewModelServlet(model: Model[_, _], timer: Timer, sparkMaster: String)
     extends HttpServlet with Logging {
@@ -69,11 +58,7 @@ class LoadNewModelServlet(model: Model[_, _], timer: Timer, sparkMaster: String)
       logInfo(conf.toString())
       val uri = s"hdfs://$sparkMaster:9000/${modelLocation.loc}/"
       val fs = FileSystem.get(conf)
-      val itemModelsPath = new Path(s"$uri/items")
-      val itemModelsInputStream = fs.open(itemModelsPath)
-      val itemModelStrings = new StringWriter()
-      IOUtils.copy(itemModelsInputStream, itemModelStrings)
-      val items = itemModelStrings.toString().split("\n").map(line => {
+      val items = readAllFiles(s"$uri/items", fs).split("\n").map(line => {
         val itemSplits = line.split(", ")
         val itemId = itemSplits(0).toLong
         val itemFeatures: Array[Double] = itemSplits.drop(1).map(_.toDouble).toArray
@@ -86,12 +71,7 @@ class LoadNewModelServlet(model: Model[_, _], timer: Timer, sparkMaster: String)
 
       // TODO only add users in this partition: if (userId % partNum == 0)
       // val newUserMap = new ConcurrentHashMap[Long, WeightVector]
-      //
-      val userModelsPath = new Path(s"$uri/users")
-      val userModelsInputStream = fs.open(userModelsPath)
-      val userModelStrings = new StringWriter()
-      IOUtils.copy(userModelsInputStream, userModelStrings)
-      val users = userModelStrings.toString().split("\n").map(line => {
+      val users = readAllFiles(s"$uri/users", fs).split("\n").map(line => {
         val userSplits = line.split(", ")
         val userId = userSplits(0).toLong
         val userFeatures: Array[Double] = userSplits.drop(1).map(_.toDouble).toArray
@@ -117,16 +97,17 @@ class LoadNewModelServlet(model: Model[_, _], timer: Timer, sparkMaster: String)
     }
   }
 
+  private def readAllFiles(dir: String, fs: FileSystem): String = {
+      val dirPath = new Path(dir)
+      val filesAsStrings = new StringWriter()
+      fs.listStatus(dirPath).foreach( f => {
+        val input = fs.open(f.getPath())
+        // TODO make sure this appends and doesn't overwrite
+        IOUtils.copy(input, filesAsStrings)
+      })
+      filesAsStrings.toString()
+  }
+
 }
-
-
-
-
-
-
-
-
-
-
 
 

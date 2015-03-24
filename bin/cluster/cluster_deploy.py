@@ -167,12 +167,12 @@ class JSONEncoder(json.JSONEncoder):
 
 ###########################################################################
 
-@task
-# @roles('servers')
-@parallel
-def upload_lib():
-    run("mkdir -p ~/velox_lib")
-    put("../../lib/*", "~/velox_lib")
+# @task
+# # @roles('servers')
+# @parallel
+# def upload_lib():
+#     run("mkdir -p ~/velox_lib")
+#     put("../../lib/*", "~/velox_lib")
 
 
 
@@ -371,9 +371,9 @@ def build_velox(
 
         # re-upload server_partitions after rebuilding
         put("../../conf/server_partitions.txt", "~/velox-modelserver/conf/server_partitions.txt")
-        with cd(VELOX_ROOT):
-            run("mkdir -p lib/")
-            run("cp ~/velox_lib/* lib/")
+        # with cd(VELOX_ROOT):
+        #     run("mkdir -p lib/")
+        #     run("cp ~/velox_lib/* lib/")
 
         with settings(warn_only=True):
             if local("test -f ../../%s" % NGRAM_FILE).succeeded:
@@ -736,7 +736,9 @@ def launch_cluster(
     for h in velox_hosts.all_hosts:
         execute(set_hostname, h, host=h)
 
-    execute(upload_lib, role='all')
+    cmd_start_new_etcd_cluster()
+
+    # execute(upload_lib, role='all')
     # puts("installing ykit")
     # execute(install_ykit, role='all')
 
