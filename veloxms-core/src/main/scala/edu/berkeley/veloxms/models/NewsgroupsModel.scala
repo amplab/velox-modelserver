@@ -45,7 +45,7 @@ class NewsgroupsModel(
     model.transform(data)
   }
 
-  def retrainInSpark(sparkMaster: String): Unit = {
+  def retrainInSpark(sparkMaster: String, trainingDataDir: String, newModelsDir: String) {
     val conf = new SparkConf().setAppName("classifier").setMaster("local[4]")//.setJars(SparkContext.jarOfObject(this).toSeq)
 
     val sc = new SparkContext(conf)

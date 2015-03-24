@@ -13,6 +13,7 @@ from time import sleep, time, strftime, gmtime, localtime
 import os.path
 from StringIO import StringIO
 import datetime
+import time
 from pymongo import MongoClient
 from mongo_utils import *
 
@@ -40,6 +41,48 @@ env.user = "ubuntu"
 env.key_filename = ["~/.ssh/aws_rsa"]
 # env.connection_attempts=10
 # env.timeout = 30
+
+
+
+class BenchmarkConfig:
+
+    def __init__(self,
+            model_dim,
+            num_users,
+            num_items,
+            storage_type,
+            heap_size,
+            gc,
+            num_reqs,
+            percent_obs,
+            max_conc_reqs,
+            model_type,
+            percent_training_data,
+            doc_length,
+            cache_partial_sum,
+            cache_features,
+            cache_predictions):
+            # commit_hash):
+        # Model/server settings
+        self.model_dim = model_dim
+        self.model_type = model_type
+        self.num_users = num_users
+        self.num_items = num_items
+        self.storage_type = storage_type
+        self.heap_size = heap_size
+        self.gc = gc
+
+        # Workload settings
+        self.num_reqs = num_reqs
+        self.percent_obs = percent_obs
+        self.max_conc_reqs = max_conc_reqs # aka throttle_reqs
+        self.percent_training_data = percent_training_data
+        self.doc_length = doc_length
+        self.cache_partial_sum = cache_partial_sum
+        self.cache_features = cache_features
+        self.cache_predictions = cache_predictions
+        # self.commit_hash = commit_hash
+        self.pre_cache = cache_partial_sum
 
 ### AWS SETTING ###
 class Cluster:
@@ -100,9 +143,8 @@ class Host:
 VELOX_SERVER_JAR = "veloxms-core/target/veloxms-core-0.0.1-SNAPSHOT.jar"
 VELOX_CLIENT_JAR = "veloxms-client/target/veloxms-client-0.0.1-SNAPSHOT.jar"
 
-VELOX_SERVER_CLASS = "edu.berkeley.veloxms.VeloxApplication"
+VELOX_SERVER_CLASS = "edu.berkeley.veloxms.VeloxEntry"
 
-VELOX_CLIENT_BENCHMARK_CLASS = "edu.berkeley.veloxms.client.VeloxWorkloadDriver"
 
 VELOX_ROOT = "/home/ubuntu/velox-modelserver"
 
@@ -113,86 +155,6 @@ METRICS_PORT = 8081
 GARBAGE_COLLECTOR = "UseConcMarkSweepGC"
 
 ### Benchmark settings ###
-class BenchmarkConfig:
-
-    def __init__(self,
-            model_dim,
-            num_users,
-            num_items,
-            storage_type,
-            heap_size,
-            gc,
-            num_reqs,
-            percent_obs,
-            max_conc_reqs,
-            model_type,
-            percent_training_data,
-            doc_length,
-            cache_partial_sum,
-            cache_features,
-            cache_predictions):
-            # commit_hash):
-        # Model/server settings
-        self.model_dim = model_dim
-        self.model_type = model_type
-        self.num_users = num_users
-        self.num_items = num_items
-        self.storage_type = storage_type
-        self.heap_size = heap_size
-        self.gc = gc
-
-        # Workload settings
-        self.num_reqs = num_reqs
-        self.percent_obs = percent_obs
-        self.max_conc_reqs = max_conc_reqs # aka throttle_reqs
-        self.percent_training_data = percent_training_data
-        self.doc_length = doc_length
-        self.cache_partial_sum = cache_partial_sum
-        self.cache_features = cache_features
-        self.cache_predictions = cache_predictions
-        # self.commit_hash = commit_hash
-        self.pre_cache = cache_partial_sum
-
-
-class ClientResults:
-    def __init__(self,
-            hostname,
-            num_predictions,
-            num_observations,
-            num_failed,
-            num_success,
-            total_thru,
-            pred_thru,
-            obs_thru,
-            duration):
-        self.hostname = hostname
-        self.num_pred = num_predictions
-        self.num_obs = num_observations
-        self.num_failed = num_failed
-        self.num_success = num_success
-        self.total_thru = total_thru
-        self.pred_thru = pred_thru
-        self.obs_thru = obs_thru
-        self.duration = duration
-
-class ServerResults:
-    def __init__(self,
-            hostname,
-            metrics_json,
-            cache_json,
-            cpu_info = None
-            # pred_metrics_json,
-            # obs_metrics_json,
-            # gc_metrics_json
-            ):
-        self.hostname = hostname
-        # self.pred_metrics_json = pred_metrics_json
-        # self.obs_metrics_json = obs_metrics_json
-        # self.gc_metrics_json = gc_metrics_json
-        self.metrics_json = metrics_json
-        self.cache_json = cache_json
-        # if cpu_info is not None:
-        #     self.cpu_info = cpu_info
 
 
 class JSONEncoder(json.JSONEncoder):
@@ -204,241 +166,31 @@ class JSONEncoder(json.JSONEncoder):
 # JSONEncoder().encode(analytics)
 
 ###########################################################################
-@task
-def run_full_benchmark():
-    """Main entry point for benchmarking. Configure run here.
 
-    """
-    with settings(warn_only=True):
-        local('rm status_file')
-    benchmark_name = "micro_caching_mf"
-    local("mkdir -p %s" % benchmark_name)
-    coll_name = benchmark_name
-    users = 1000
-    items = 50
-    model_dim = [25, 50, 100, 150, 200]
-    storage_type = "jvmRandom"
-    heap_size = 100
-    gc = GARBAGE_COLLECTOR
-    num_reqs = 50000
-    model_type = "MatrixFactorizationModel"
-    percent_training_data = 5.0
-    percent_obs = 0.0
-    max_conc = 300
-    cache_sum = False
-    cache_features = False
-    cache_preds = [True, False]
+# @task
+# # @roles('servers')
+# @parallel
+# def upload_lib():
+#     run("mkdir -p ~/velox_lib")
+#     put("../../lib/*", "~/velox_lib")
 
-    # with open('status_file', 'a') as f:
-    #     f.write("\n\nstarting benchmark %s" % benchmark_name)
-    #
-    # for cp in cache_preds:
-    #     for md in model_dim:
-    #         bench_cfg = BenchmarkConfig(
-    #                 md,
-    #                 users,
-    #                 items,
-    #                 storage_type,
-    #                 heap_size,
-    #                 gc,
-    #                 num_reqs,
-    #                 percent_obs,
-    #                 max_conc,
-    #                 model_type,
-    #                 percent_training_data,
-    #                 -1,
-    #                 cache_sum,
-    #                 cache_features,
-    #                 cp)
-    #         single_benchmark_run(bench_cfg, coll_name)
-    #         with open('status_file', 'a') as f:
-    #             f.write("%s\n" % str(bench_cfg.__dict__))
-    #         sleep(10)
 
-    benchmark_name = "micro_caching_news"
-    local("mkdir -p %s" % benchmark_name)
-    coll_name = benchmark_name
-    model_dim = 20
-    doc_length = [50, 75, 100, 150, 200]
-    model_type = "NewsgroupsModel"
-    percent_obs = 0.0
-    cache_sum = False
-    cache_features = [False]
-    cache_preds = [False]
-    # with open('status_file', 'a') as f:
-    #     f.write("\n\nstarting benchmark %s\n" % benchmark_name)
-    #
-    # for cp in cache_preds:
-    #     for cf in cache_features:
-    #         for dl in doc_length:
-    #             bench_cfg = BenchmarkConfig(
-    #                     model_dim,
-    #                     users,
-    #                     items,
-    #                     storage_type,
-    #                     heap_size,
-    #                     gc,
-    #                     num_reqs,
-    #                     percent_obs,
-    #                     max_conc,
-    #                     model_type,
-    #                     percent_training_data,
-    #                     dl,
-    #                     cache_sum,
-    #                     cf,
-    #                     cp)
-    #             single_benchmark_run(bench_cfg, coll_name)
-    #             with open('status_file', 'a') as f:
-    #                 f.write("%s\n" % str(bench_cfg.__dict__))
-    #             sleep(10)
-
-    benchmark_name = "micro_updates_news"
-    local("mkdir -p %s" % benchmark_name)
-    coll_name = benchmark_name
-    users = 1000
-    items = 100
-    model_dim = 20
-    doc_length = [50, 75, 100, 150, 200]
-    storage_type = "jvmRandom"
-    heap_size = 100
-    gc = GARBAGE_COLLECTOR
-    num_reqs = 10000
-    model_type = "NewsgroupsModel"
-    percent_training_data = 80.0
-    percent_obs = 0.3
-    max_conc = 300
-    cache_sum = [True, False]
-    cache_features = [True, False]
-    cache_preds = False
-    with open('status_file', 'a') as f:
-        f.write("\n\nstarting benchmark %s\n" % benchmark_name)
-
-    for dl in doc_length:
-        for cs in cache_sum:
-            for cf in cache_features:
-                bench_cfg = BenchmarkConfig(
-                        model_dim,
-                        users,
-                        items,
-                        storage_type,
-                        heap_size,
-                        gc,
-                        num_reqs,
-                        percent_obs,
-                        max_conc,
-                        model_type,
-                        percent_training_data,
-                        dl,
-                        cs,
-                        cf,
-                        cache_preds)
-                single_benchmark_run(bench_cfg, coll_name)
-                with open('status_file', 'a') as f:
-                    f.write("%s\n" % str(bench_cfg.__dict__))
-                sleep(10)
-
-@task
-def insert_into_mongo(result, coll_name):
-    client = MongoClient(MONGO_HOST, MONGO_PORT)
-    db = client[MONGO_DB]
-    db.add_son_manipulator(KeyTransform(".", "_"))
-    coll = db[coll_name]
-    doc_id = coll.insert(result)
-    puts("Successfully inserted into MongoDB with id: %s" % str(doc_id))
-
-@task
-def get_commit_hash():
-    res = local("git rev-parse HEAD", capture=True)
-    # print "RESULT IS: %s" % res
-
-def single_benchmark_run(bench_cfg, coll_name):
-    # bench_cfg = BenchmarkConfig(100, 100000, 50000, "jvmRandom", 45,
-    #                        GARBAGE_COLLECTOR, 10000, 0.1, 200)
-    cmd_restart_velox(benchcfg=bench_cfg, rm_logs='y')
-    cmd_run_client_bench(benchcfg=bench_cfg)
-    sleep(5)
-    server_results, client_results = cmd_get_results()
-    git_hash = local("git rev-parse HEAD", capture=True)
-    format_str = '%Y-%m-%d-%H-%M-%S'
-    localnow = strftime(format_str, localtime())
-    all_results = {
-            'config': bench_cfg.__dict__,
-            'cluster': get_default_cluster(
-                          len(velox_hosts.servers),
-                          len(velox_hosts.clients)).__dict__,
-            'timestamp': time(),
-            'commit_hash': git_hash,
-            'servers': server_results,
-            'clients': client_results,
-            'localnow': localnow
-            }
-
-    results_base = '%s/results_%s.json'
-    with open(results_base % (coll_name, localnow), 'w') as f:
-        json.dump(all_results, f, sort_keys=True, indent=4, separators=(',', ': '))
-
-    all_results['date'] = datetime.datetime.utcnow(),
-    insert_into_mongo(all_results, coll_name)
 
 @task
 @roles('servers', 'clients')
 @parallel
 def kill_everything():
+    # TODO Figure out how to stop etcd
     with settings(warn_only=True):
         run("pkill -9 java")
         sleep(2)
         run("pkill -9 java")
 
-@task
-@parallel
-def cmd_get_results():
-    client_results = execute(collect_client_results, role='clients')
-    server_results = execute(collect_server_results, role='servers')
-    return (server_results, client_results)
-
-@task
-def collect_server_results():
-    metrics_url = "http://%s:%d/metrics" % (env.host, METRICS_PORT)
-    cache_url = "http://%s:%d/cachehits" % (env.host, 8080)
-    metrics_req = requests.get(metrics_url)
-    result = metrics_req.json()
-    cache_req = requests.get(cache_url)
-    cache_results = cache_req.json()
-    print cache_results
-    # metrics = {}
-    # timing = metrics_req.json()[u'timers']
-    # json.dump(timing_info, f, sort_keys=True, indent=4, separators=(',', ': '))
-    server_result = ServerResults(env.host, result, cache_results)
-    # server_result = ServerResults(env.host, result, "")
-    return server_result.__dict__
+        # sudo("killall etcd")
+        # sleep(2)
+        # sudo("killall etcd")
 
 
-@task
-def collect_client_results():
-    results_file = StringIO()
-    with cd(VELOX_ROOT):
-        get("client_output.txt", results_file)
-    lines = results_file.getvalue().split('\n')
-    results = {}
-    for l in lines:
-        if len(l) > 0:
-            splits = l.split(": ")
-            field_name = splits[0]
-            field_val = splits[1]
-            results[field_name] = field_val
-    # puts(results)
-    client_results = ClientResults(
-            env.host,
-            int(results['num_pred']),
-            int(results['num_obs']),
-            int(results['failures']),
-            int(results['successes']),
-            float(results['total_thru']),
-            float(results['pred_thru']),
-            float(results['obs_thru']),
-            float(results['duration']))
-    puts(client_results.__dict__)
-    return client_results.__dict__
 
 @task
 # @roles('servers', 'clients')
@@ -483,9 +235,6 @@ def cmd_build_velox(
             as a deploy key (assumes the key is located in ~/.ssh/). Only
             used if with_deploy_key == 'y'. Default to "personalrepo-veloxms-deploy".
 
-        
-        
-
     """
     if with_deploy_key.lower() == 'y':
         execute(upload_deploy_key(localkey), roles=['clients', 'servers'])
@@ -493,6 +242,7 @@ def cmd_build_velox(
         execute(install_tachyon, roles=['clients', 'servers'])
     if with_ykit.lower() == 'y':
         execute(install_ykit, roles=['clients', 'servers'])
+
     
     execute(build_velox, git_remote, branch, roles=['clients', 'servers'])
         
@@ -509,6 +259,81 @@ def install_ykit():
 
 @task
 @parallel
+def install_etcd():
+    """
+    This assumes upstart is being used to rn the daemon (this is the case for ubuntu 14.04)
+
+    """
+    with hide('stdout', 'stderr'):
+        with settings(warn_only=True):
+            if run("test -d ~/etcd").failed:
+                run("curl -L  https://github.com/coreos/etcd/releases/download/v2.0.5/etcd-v2.0.5-linux-amd64.tar.gz -o etcd-v2.0.5-linux-amd64.tar.gz")
+                run("tar xzvf etcd-v2.0.5-linux-amd64.tar.gz; mv etcd-v2.0.5-linux-amd64 etcd")
+        put("../etcd_utils/etcd.conf", "/etc/init/etcd.conf", use_sudo=True)
+        put("../etcd_utils/start_etcd.sh", "~/start_etcd.sh", mirror_local_mode=True)
+
+@task
+@parallel
+def cmd_start_new_etcd_cluster():
+    token = "velox_etcd_%d" % int(time.time())
+    for part in range(len(velox_hosts.servers)):
+        execute(start_etcd, part, velox_hosts.servers, token, host=velox_hosts.servers[part])
+
+
+
+@task
+# @parallel
+def start_etcd(partition, all_peers, cluster_token):
+    """
+        partition is the partition number of this velox server
+        all_peers is a list of all servers to create the etcd cluster with
+        cluster_token is a unique name to give the cluster (can just be cluster_TIME or something"
+
+    """
+
+    # cmd = (
+    #         "~/etcd/etcd -name velox%(partition)d -initial-advertise-peer-urls http://%(hostname)s:2380 "
+    #         "-listen-peer-urls http://%(hostname)s:2380 "
+    #         "-initial-cluster-token %(cluster_token)s "
+    #         "-initial-cluster %(init_cluster)s "
+    #         "-initial-cluster-state new "
+    #         "-listen-client-urls http://%(hostname)s:4001 "
+    #         )
+    hostname = all_peers[partition]
+    init_cluster = ""
+    for i in range(len(all_peers)):
+        init_cluster += "velox%d=http://%s:2380," %(i, all_peers[i])
+    # cmd_args = {"partition": partition,
+    #             "hostname": hostname,
+    #             "init_cluster": init_cluster,
+    #             "cluster_token": cluster_token
+    #             }
+
+    run("echo export ETCD_PARTITION=%s > ~/etcd_variables.sh" % partition)
+    run("echo export HOSTNAME=%s >> ~/etcd_variables.sh" % hostname)
+    run("echo export ETCD_CLUSTER_TOKEN=%s >> ~/etcd_variables.sh" % cluster_token)
+    run("echo export ETCD_CLUSTER=%s >> ~/etcd_variables.sh" % init_cluster)
+    
+    sudo("start etcd")
+
+
+    # with hide('stdout', 'stderr'):
+    #     run(cmd % cmd_args)
+
+@task
+@parallel
+def cmd_stop_etcd():
+    execute(stop_etcd, role='servers')
+
+
+@task
+def stop_etcd():
+    sudo("stop etcd")
+    
+
+
+@task
+@parallel
 def install_tachyon():
     with hide('stdout', 'stderr'):
         puts("Installing tachyon")
@@ -521,8 +346,6 @@ def install_tachyon():
             run("mvn install:install-file -Dfile=core/target/tachyon-0.6.0-SNAPSHOT-jar-with-dependencies.jar "
                 "-DgroupId=org.tachyonproject -DartifactId=tachyon-parent "
                 "-Dversion=0.6.0-SNAPSHOT -Dpackaging=jar")
-
-
 @task
 @parallel
 def build_velox(
@@ -559,16 +382,8 @@ def build_velox(
                     put("../../%s" % NGRAM_FILE, NGRAM_FILE)
 
 # @roles('clients')
-@task
-@parallel
-def cmd_run_client_bench(benchcfg=None):
-    wait_servers_start()
-    if benchcfg == None:
-        benchcfg = get_default_bench()
 
-    execute(upload_server_partitions, role='clients')
 
-    execute(start_client, benchcfg, role='clients')
 
 @task
 def upload_server_partitions():
@@ -638,11 +453,12 @@ def wait_servers_start():
             sleep(10)
 
 def get_default_bench():
-    return BenchmarkConfig(50, 100000, 50000, "jvmRandom", 45,
-                           GARBAGE_COLLECTOR, 20000, 0.2, 200,
+    return BenchmarkConfig(50, 1000, 500, "jvmRandom", 10,
+                           GARBAGE_COLLECTOR, 200, 0.2, 200,
                            "MatrixFactorizationModel", 2.0, 1, False, False, False)
 
 
+# TODO separate out a VeloxConfig needed to start velox from the benchmark config
 # @roles('servers')
 @task
 @parallel
@@ -745,6 +561,8 @@ def start_velox_server(benchcfg, profile=False):
     config_loc = "../../conf/config.yml"
     with cd(VELOX_ROOT):
         # put("../../%s" % NGRAM_FILE, NGRAM_FILE)
+
+
         put("../../conf/config.yml", "conf/config.yml")
     pstr = ""
     if profile:
@@ -781,7 +599,7 @@ def start_velox_server(benchcfg, profile=False):
 @task
 @parallel
 def stop_velox_server():
-    run("pkill -9 -f VeloxApplication")
+    run("pkill -9 -f VeloxEntry")
     sleep(2)
 
 
@@ -801,12 +619,12 @@ Host github.com
 
 
 
-def get_default_cluster(servers, clients):
+def get_default_cluster(servers, clients, instance_type='r3.4xlarge'):
     default_cluster = Cluster('us-east-1',
                               'crankshaw-veloxms',
-                              'r3.4xlarge',
+                              instance_type,
                               'ami-10119778',
-                              1.5,
+                              1.0,
                               'veloxms',
                               servers,
                               clients)
@@ -820,10 +638,11 @@ def get_default_cluster(servers, clients):
 def launch_cluster(
         num_servers='2',
         num_clients='2',
-        localkey="personalrepo-veloxms-deploy"):
+        localkey="personalrepo-veloxms-deploy",
+        instance_type='r3.2xlarge'):
     servers = int(num_servers)
     clients = int(num_clients)
-    default_cluster = get_default_cluster(servers, clients)
+    default_cluster = get_default_cluster(servers, clients, instance_type)
 
     num_instances = servers + clients
     if not confirm("Spinning up %d instances in %s, okay?" % (num_instances, default_cluster.region)):
@@ -903,8 +722,12 @@ def launch_cluster(
 
     # install tachyon, yourkit, and clone velox
     execute(upload_deploy_key, localkey, role='all')
-    puts("installing tachyon")
-    execute(install_tachyon, role='all')
+
+    puts("Skipping Tachyon install")
+    # execute(install_tachyon, role='all')
+    puts("installing etcd")
+    execute(install_etcd, role='servers')
+
     puts("building velox")
     execute(build_velox,
             git_remote="git@github.com:dcrankshaw/velox-modelserver.git",
@@ -913,10 +736,15 @@ def launch_cluster(
     for h in velox_hosts.all_hosts:
         execute(set_hostname, h, host=h)
 
-    puts("installing ykit")
-    execute(install_ykit, role='all')
+    cmd_start_new_etcd_cluster()
+
+    # execute(upload_lib, role='all')
+    # puts("installing ykit")
+    # execute(install_ykit, role='all')
 
 
+# can get public ip_addr on instance via:
+# curl http://169.254.169.254/latest/meta-data/public-ipv4
 @task
 def set_hostname(hostname):
     run("echo export VELOX_HOSTNAME=%s >> ~/ec2_variables.sh" % hostname)

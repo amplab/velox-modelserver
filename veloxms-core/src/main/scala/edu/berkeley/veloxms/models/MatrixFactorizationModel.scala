@@ -6,9 +6,10 @@ import edu.berkeley.veloxms._
 // import java.nio.ByteBuffer
 // import scala.collection.JavaConversions._
 // import scala.util.{Try,Success,Failure}
-// import org.apache.spark._
-// import org.apache.spark.rdd._
-// import org.apache.spark.SparkContext._
+import org.apache.spark._
+import org.apache.spark.rdd._
+import org.apache.spark.SparkContext._
+import org.apache.spark.mllib.recommendation.{ALS,Rating}
 
 import scala.util.{Failure, Success}
 // import org.apache.hadoop.fs.Path
@@ -17,7 +18,6 @@ import scala.util.{Failure, Success}
 // import org.apache.hadoop.mapreduce.lib.input.CombineFileInputFormat
 // import org.apache.hadoop.mapreduce.lib.input.{CombineFileRecordReader,CombineFileSplit}
 // import org.apache.hadoop.mapreduce.{RecordReader,TaskAttemptContext}
-// import org.apache.spark._
 // import org.apache.spark.mllib.recommendation.{ALS,Rating}
 // import org.apache.spark.rdd.RDD
 // import org.apache.spark.SparkContext._
@@ -53,89 +53,53 @@ class MatrixFactorizationModel(
     }
   }
 
+
+  def loadTrainingData(sc: SparkContext, trainLoc: String): RDD[Rating] = {
+    sc.textFile(trainLoc).map(l => {
+        val splits = l.split(", ")
+        Rating(splits(0).toInt, splits(1).toInt, splits(2).toDouble)
+      }
+      // case Array(user, item, score) => Rating(user.toInt, item.toInt, score.toDouble)
+    )
+  }
+
   /**
-   * THIS DOESN'T WORK YET!!!
    * Retrains the model in the provided Spark cluster
    */
-  def retrainInSpark(sparkMaster: String) {}
-  // def retrainInSpark(sparkMaster: String = conf.sparkMaster) {
-  //
-  //   val sparkHome = "/root/spark"
-  //   logWarning("Starting spark context")
-  //   val sc = new SparkContext(sparkMaster, "SparkTestApp", sparkHome,
-  //       SparkContext.jarOfObject(this).toSeq)
-  //   logWarning("Parallelizing data")
-  //   val data = sc.parallelize((0 to 5000))
-  //   logWarning(s"Counting data ${data.count}")
-  //   logWarning(s"Top is: ${data.top(10)}")
-  //   sc.stop()
-  //   logWarning("Done")
-  // }
-  //
-    // TODO finish implementing this method
-    //
-    // val numFeatures = 50
-    // val numIters = 20
-    //
-    // //Had to comment out because of storage refactoring
-    // val trainingData = ""//s"${conf.tachyonMaster}/${conf.ratingsStoreName}"
-    //
-    //
-    //
-    // // get jar location: from http://stackoverflow.com/a/6849255/814642
-    // val path = classOf[MatrixFactorizationModel]
-    //   .getProtectionDomain()
-    //   .getCodeSource()
-    //   .getLocation()
-    //   .getPath()
-    // val decodedPath = URLDecoder.decode(path, "UTF-8")
-    // logInfo(s"Jar path: $decodedPath")
-    //
-    // val sparkConf = new SparkConf()
-    // .setMaster(sparkMaster)
-    // .setAppName("VeloxRetrainMatrixFact")
-    // .setJars(List(decodedPath))
-    //
-    // val sc = new SparkContext(sparkConf)
-    // // val bytesData: RDD[(String, Array[Byte])] = 
-    // //    sc.hadoopFile[String, Array[Byte], TachyonKVPartitionInputFormat](trainingData)
-    // logInfo("Created spark context")
-    // val bytesData: RDD[(String, Array[Byte])] =
-    //     sc.newAPIHadoopFile[String, Array[Byte], TachyonKVPartitionInputFormat](trainingData)
-    // logInfo(s"Read ${bytesData.count} partitions")
-    //
-    //
-    //
-    //   
-    // val debugStr = bytesData.map(_._1).collect().mkString(", ")
-    // logInfo(s"Filenames: $debugStr")
+  def retrainInSpark(sparkMaster: String, trainingDataDir: String, newModelsDir: String) {
+    // This is installation specific
+    val sparkHome = "/root/spark-1.3.0-bin-hadoop1"
+    logWarning("Starting spark context")
+    val conf = new SparkConf()
+      .setMaster(sparkMaster)
+      .setAppName("VeloxOnSpark!")
+      .setJars(SparkContext.jarOfObject(this).toSeq)
+      .setSparkHome(sparkHome)
+      // .set("spark.akka.logAkkaConfig", "true")
+    val sc = new SparkContext(conf)
+    val trainingData = loadTrainingData(sc, trainingDataDir)
+    val iterations = 5
+    val lambda = 1
+    val model = ALS.train(trainingData, numFeatures, iterations, lambda)
+    val userFeatures = model.userFeatures.map({
+      case (userId, features) => s"$userId, ${features.mkString(", ")}"
+    })
+
+    val itemFeatures = model.productFeatures.map({
+      case (itemId, features) => s"$itemId, ${features.mkString(", ")}"
+    })
+
+
+
+    // TODO the problem seems to be here:
+    userFeatures.saveAsTextFile(newModelsDir + "/users")
+    itemFeatures.saveAsTextFile(newModelsDir + "/items")
     
-    // val data = sc.textFile(trainingData)
-    // val sample = data.take(5)
-    // val kryo = KryoThreadLocal.kryoTL.get
-    // val result = kryo.deserialize(sample(0)).asInstanceOf[HashMap[Long, Double]]
-    //
-    // val ratings = data.map(_.split("::") match {
-    //   case Array(user, item, score, date) => Rating(user.toInt, item.toInt, score.toDouble)
-    // })
 
+    sc.stop()
+    logInfo("Finished retraining new model")
 
-    // val model = ALS.train(ratings, 50, 20, 1)
-
-    // model.userFeatures.mapPartitions( )//write to Tachyon)
-
-    /*
-
-    val userFeatures = model.userFeatures
-    val userFeaturesFlat = userFeatures.map{case (a, b) => (a, b.mkString(","))}
-    userFeaturesFlat.saveAsTextFile("userFeatures10M-r1.txt")
-
-    val productFeatures = model.productFeatures
-    val productFeaturesFlat = productFeatures.map{case (a, b) => (a, b.mkString(","))}
-    productFeaturesFlat.saveAsTextFile("productFeatures10M-r1.txt")
-    */
-
-  // }
+  }
 
 }
 

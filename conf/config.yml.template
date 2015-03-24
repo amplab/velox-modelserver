@@ -99,7 +99,7 @@ hostname: none
     #           path: /tmp/ratings
 
 
-sparkMaster: spark://ec2-54-92-229-50.compute-1.amazonaws.com:7077
+sparkMaster: ec2-54-204-106-155.compute-1.amazonaws.com
 
 logging:
   appenders:

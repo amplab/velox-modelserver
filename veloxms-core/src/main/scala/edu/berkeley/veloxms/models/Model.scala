@@ -4,7 +4,8 @@ package edu.berkeley.veloxms.models
 import edu.berkeley.veloxms._
 import edu.berkeley.veloxms.storage._
 import edu.berkeley.veloxms.util.Logging
-import org.codehaus.jackson.JsonNode
+// import org.codehaus.jackson.JsonNode
+import com.fasterxml.jackson.databind.JsonNode
 import org.jblas.{Solve, DoubleMatrix}
 import breeze.linalg._
 
@@ -56,6 +57,15 @@ abstract class Model[T:ClassTag, U] extends Logging {
   val userStorage: ModelStorage[Long, WeightVector]
   val observationStorage: ModelStorage[Long, Map[T, Double]]
 
+  def getObservationsAsCSV: List[String] = {
+    val entries = observationStorage.getEntries
+    entries.flatMap({ case (user, obs) => {
+        obs.map { case (item, score) => s"$user, $item, $score" }
+      }
+    }).toList
+  }
+
+
   /** Average user weight vector.
    * Used for warmstart for new users
    */
@@ -69,7 +79,7 @@ abstract class Model[T:ClassTag, U] extends Logging {
 
   // TODO: probably want to elect a leader to initiate the Spark retraining
   // once we are running a Spark cluster
-  def retrainInSpark(sparkMaster: String)
+  def retrainInSpark(sparkMaster: String, trainingDataDir: String, newModelsDir: String)
 
   /**
    * Velox implemented - fetch from local Tachyon partition
@@ -107,7 +117,7 @@ abstract class Model[T:ClassTag, U] extends Logging {
   }
 
   def predict(uid: Long, context: JsonNode): Double = {
-    val item: T = jsonMapper.readValue(context, classTag[T].runtimeClass.asInstanceOf[Class[T]])
+    val item: T = jsonMapper.treeToValue(context, classTag[T].runtimeClass.asInstanceOf[Class[T]])
     predictItem(uid, item)
   }
 
@@ -131,15 +141,14 @@ abstract class Model[T:ClassTag, U] extends Logging {
   }
 
   def predictTopK(uid: Long, k: Int, context: JsonNode): Array[T] = {
-    // Note: There is probably some threshhold of k for which it makes more sense to iterate over the unsorted list
+    // FIXME: There is probably some threshhold of k for which it makes more sense to iterate over the unsorted list
     // instead of sorting the whole list.
     val itemOrdering = new Ordering[T] {
       override def compare(x: T, y: T) = {
         -1 * (predictItem(uid, x) compare predictItem(uid, y))
       }
     }
-
-    val candidateSet: Array[T] = jsonMapper.readValue(context, classTag[Array[T]].runtimeClass.asInstanceOf[Class[Array[T]]])
+    val candidateSet: Array[T] = jsonMapper.treeToValue(context, classTag[Array[T]].runtimeClass.asInstanceOf[Class[Array[T]]])
     Sorting.quickSort(candidateSet)(itemOrdering)
 
     candidateSet.slice(0, k)
@@ -147,7 +156,7 @@ abstract class Model[T:ClassTag, U] extends Logging {
 
   def addObservation(uid: Long, context: JsonNode, score: Double) {
     (this, uid).synchronized {
-      val item: T = jsonMapper.readValue(context, classTag[T].runtimeClass.asInstanceOf[Class[T]])
+      val item: T = jsonMapper.treeToValue(context, classTag[T].runtimeClass.asInstanceOf[Class[T]])
       val newWeights = addObservationInternal(uid, item, score, true)
     }
   }
