@@ -50,7 +50,9 @@ extends FunctionHandler[T](f) with OkAnd404Handler[T]
 
 
 
-// Made a class (vs object) for testing purposes)
+// Made a class (vs object) for testing purposes. This allows me to
+// mock DispatchUtil and thus fake sending requests and getting responses from etcd,
+// so I can test different responses without needing an actual etcd cluster.
 class DispatchUtil extends Logging {
 
   val http = Http.configure(_.setAllowPoolingConnection(true)
@@ -78,6 +80,8 @@ class DispatchUtil extends Logging {
 // for now, etcdServer and hostname are probably the same
 class EtcdClient(etcdHost: String, etcdPort: Int, hostname: String, dispatchUtil: DispatchUtil) extends Logging {
 
+  // Etcd assumes the content type is application/x-www-form-urlencoded for puts. It won't
+  // read the value otherwise.
   val etcdServer = host(etcdHost, etcdPort).setContentType("application/x-www-form-urlencoded", "UTF-8")
   
   /**
@@ -187,8 +191,10 @@ class EtcdClient(etcdHost: String, etcdPort: Int, hostname: String, dispatchUtil
       val checkLockedJson = Await.result(checkLockedResponse, Duration.Inf)
       val lockStatus = jsonMapper.readValue(checkLockedJson, classOf[EtcdResponse])
 
+      // means we hold the lock and can release it
       lockReleased = if (lockStatus.node.value.get == hostname) {
-        // means we hold the lock and can release it
+        // TODO figure out the right way to actually encode this, is just a k=v string the
+        // best thing to do?
         val body = s"value=${EtcdConstants.UNLOCKED}"
         val releaseLockReq =
           (etcdServer / EtcdConstants.basePath / modelName / EtcdConstants.retrainLock)

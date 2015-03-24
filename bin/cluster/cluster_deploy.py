@@ -186,9 +186,9 @@ def kill_everything():
         sleep(2)
         run("pkill -9 java")
 
-        sudo("killall etcd")
-        sleep(2)
-        sudo("killall etcd")
+        # sudo("killall etcd")
+        # sleep(2)
+        # sudo("killall etcd")
 
 
 
@@ -260,6 +260,10 @@ def install_ykit():
 @task
 @parallel
 def install_etcd():
+    """
+    This assumes upstart is being used to rn the daemon (this is the case for ubuntu 14.04)
+
+    """
     with hide('stdout', 'stderr'):
         with settings(warn_only=True):
             if run("test -d ~/etcd").failed:
@@ -371,9 +375,6 @@ def build_velox(
 
         # re-upload server_partitions after rebuilding
         put("../../conf/server_partitions.txt", "~/velox-modelserver/conf/server_partitions.txt")
-        # with cd(VELOX_ROOT):
-        #     run("mkdir -p lib/")
-        #     run("cp ~/velox_lib/* lib/")
 
         with settings(warn_only=True):
             if local("test -f ../../%s" % NGRAM_FILE).succeeded:
@@ -574,7 +575,6 @@ def start_velox_server(benchcfg, profile=False):
                         " java %(pstr)s -XX:+%(gc)s -Xms%(heap_size)dg -Xmx%(heap_size)dg "
                         "-Dlog4j.configuration=file:%(log4j_file)s "
                         "-Ddw.hostname=$VELOX_HOSTNAME "
-                        # "-cp %(velox_root)s/%(server_jar)s:%(velox_root)s/lib/* "
                         "-cp %(velox_root)s/%(server_jar)s "
                         "%(server_class)s server "
                         "%(velox_root)s/conf/config.yml "
@@ -723,8 +723,8 @@ def launch_cluster(
     # install tachyon, yourkit, and clone velox
     execute(upload_deploy_key, localkey, role='all')
 
-    puts("installing Tachyon")
-    execute(install_tachyon, role='all')
+    puts("Skipping Tachyon install")
+    # execute(install_tachyon, role='all')
     puts("installing etcd")
     execute(install_etcd, role='servers')
 

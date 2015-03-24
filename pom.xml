@@ -505,6 +505,8 @@
         <version>3.2</version>
         <scope>test</scope>
     </dependency>
+    <!-- TODO add back support for tachyon. This probably involves changing the tachyon -->
+    <!-- hadoop.version in my packaging of tachyon   -->
     <!-- <dependency> -->
     <!--   <groupId>org.tachyonproject</groupId> -->
     <!--   <artifactId>tachyon&#45;parent</artifactId> -->
