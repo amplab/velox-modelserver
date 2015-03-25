@@ -1,6 +1,8 @@
 #Velox Model Server
 =================
 
+[![Build Status](https://amplab.cs.berkeley.edu/jenkins/buildStatus/icon?job=velox testing)](https://amplab.cs.berkeley.edu/jenkins/job/velox%20testing/)
+
 ## [Instructions for installing and running Velox](https://github.com/amplab/velox-modelserver/wiki/Installing-and-Running-Velox-on-ec2)
 
 
