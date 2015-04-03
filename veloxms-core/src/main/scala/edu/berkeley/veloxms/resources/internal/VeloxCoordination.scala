@@ -16,8 +16,12 @@ import org.apache.spark.{SparkContext, SparkConf}
 case class HDFSLocation(loc: String)
 case class LoadModelParameters(userWeightsLoc: String, version: Version)
 
-class WriteToHDFSServlet(model: Model[_, _], timer: Timer, sparkContext: SparkContext, sparkDataLocation: String, partition: Int) extends HttpServlet
-  with Logging {
+class WriteToHDFSServlet(
+    model: Model[_, _],
+    timer: Timer,
+    sparkContext: SparkContext,
+    sparkDataLocation: String,
+    partition: Int) extends HttpServlet with Logging {
 
   override def doPost(req: HttpServletRequest, resp: HttpServletResponse) {
     val timeContext = timer.time()

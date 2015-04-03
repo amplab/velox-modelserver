@@ -10,22 +10,26 @@ import edu.berkeley.veloxms.storage.BroadcastProvider
 import org.apache.spark.mllib.linalg.Vector
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkContext, SparkConf}
-
 import edu.berkeley.veloxms.util.{EtcdClient, Logging}
 
 
 class NewsgroupsModel(
-    val name: String,
+    val modelName: String,
     val broadcastProvider: BroadcastProvider,
     val modelLoc: String,
     val numFeatures: Int,
     val averageUser: WeightVector,
-    val cacheResults: Boolean,
+    val cachePartialSums: Boolean,
     val cacheFeatures: Boolean,
-    val cachePredictions: Boolean
+    val cachePredictions: Boolean,
+    val masterPartition: Int,
+    val hostPartitionMap: Map[String, Int],
+    val etcdClient: EtcdClient,
+    val sparkContext: SparkContext,
+    val sparkDataLocation: String
   ) extends Model[String, FeatureVector] with Logging {
 
-    val defaultItem: FeatureVector = Array.fill[Double](numFeatures)(0.0)
+  override def defaultItem: FeatureVector = Array.fill[Double](numFeatures)(0.0)
 
   private val initialModel: Transformer[String, FeatureVector] = {
     val fis = new FileInputStream(modelLoc)
