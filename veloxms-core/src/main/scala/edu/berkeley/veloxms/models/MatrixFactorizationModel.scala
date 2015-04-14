@@ -40,7 +40,9 @@ class MatrixFactorizationModel(
    * @param nextVersion
    * @return
    */
-  override protected def retrainFeatureModelsInSpark(observations: RDD[(UserID, Long, Double)], nextVersion: Version): RDD[(UserID, FeatureVector)] = {
+  override protected def retrainFeatureModelsInSpark(
+      observations: RDD[(UserID, Long, Double)],
+      nextVersion: Version): RDD[(UserID, FeatureVector)] = {
     val trainingData = observations.map(y => Rating(y._1.toInt, y._2.toInt, y._3))
     val iterations = 5
     val lambda = 1
