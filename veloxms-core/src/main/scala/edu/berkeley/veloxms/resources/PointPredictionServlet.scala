@@ -24,8 +24,8 @@ class PointPredictionServlet(model: Model[_, _], timer: Timer) extends HttpServl
       require(input.has("context"))
       val uid = input.get("uid").asLong
       val context = input.get("context")
-      val score = model.predict(uid, context)
-      resp.setContentType("application/json");
+      val score = model.predict(uid, context, model.currentVersion)
+      resp.setContentType("application/json")
       jsonMapper.writeValue(resp.getOutputStream, score)
     } finally {
       timeContext.stop()

@@ -19,7 +19,7 @@ class AddObservationServlet(model: Model[_, _], sparkMaster: String, timer: Time
       val context = input.get("context")
       val score = input.get("score").asDouble()
 
-      model.addObservation(uid, context, score)
+      model.addObservation(uid, context, score, model.currentVersion)
 
       resp.setContentType("application/json");
       jsonMapper.writeValue(resp.getOutputStream, "Successfully added observation")

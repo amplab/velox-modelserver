@@ -10,16 +10,15 @@ import org.apache.spark.mllib.linalg.Vector
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkContext, SparkConf}
 
-import edu.berkeley.veloxms.storage._
-import edu.berkeley.veloxms.util.Logging
+import edu.berkeley.veloxms.util.{EtcdClient, Logging}
 
 
 class NewsgroupsModel(
-    val numFeatures: Int,
-    val userStorage: ModelStorage[Long, WeightVector],
-    val observationStorage: ModelStorage[Long, Map[String, Double]],
-    val averageUser: WeightVector,
+    val name: String,
+    val etcdClient: EtcdClient,
     val modelLoc: String,
+    val numFeatures: Int,
+    val averageUser: WeightVector,
     val cacheResults: Boolean,
     val cacheFeatures: Boolean,
     val cachePredictions: Boolean
@@ -27,7 +26,7 @@ class NewsgroupsModel(
 
     val defaultItem: FeatureVector = Array.fill[Double](numFeatures)(0.0)
 
-  private var model: Transformer[String, FeatureVector] = {
+  private val initialModel: Transformer[String, FeatureVector] = {
     val fis = new FileInputStream(modelLoc)
     val ois = new ObjectInputStream(fis)
     val loadedPredictionPipeline = ois.readObject().asInstanceOf[Transformer[String, Vector]]
@@ -37,15 +36,17 @@ class NewsgroupsModel(
     }
   }
 
+  private val modelBroadcast = broadcast[Transformer[String, FeatureVector]]("model")
+
   /**
    * User provided implementation for the given model. Will be called
    * by Velox on feature cache miss.
    */
-  def computeFeatures(data: String): FeatureVector = {
-    model.transform(data)
+  override def computeFeatures(data: String, version: Version): FeatureVector = {
+    modelBroadcast.get(version).get.transform(data)
   }
 
-  def retrainInSpark(sparkMaster: String, trainingDataDir: String, newModelsDir: String) {
+  override protected def retrainFeatureModelsInSpark(observations: RDD[(UserID, String, Double)], nextVersion: Version): RDD[(String, FeatureVector)] = {
     val conf = new SparkConf().setAppName("classifier").setMaster("local[4]")//.setJars(SparkContext.jarOfObject(this).toSeq)
 
     val sc = new SparkContext(conf)
@@ -115,9 +116,11 @@ class NewsgroupsModel(
     val removeInt = new Transformer[(Int, Vector), Vector] {
       override def transform(in: (Int, Vector)): Vector = in._2
     }
-    this.model = attachInt andThen predictionPipeline andThen removeInt andThen new Transformer[Vector, FeatureVector] {
+    val nextModel = attachInt andThen predictionPipeline andThen removeInt andThen new Transformer[Vector, FeatureVector] {
       override def transform(in: Vector): FeatureVector = in.toArray
     }
+
+    modelBroadcast.put(nextModel, nextVersion)
 
     // Evaluate the classifier
     println("Evaluating classifier")
@@ -127,5 +130,8 @@ class NewsgroupsModel(
     println("Test Dataset:\n" + evaluator(testData).mkString("\n"))
 
     sc.stop()
+
+    val features = observations.map(_._2).distinct()
+    features.zip(features.mapPartitions(x => nextModel.transform(x)))
   }
 }

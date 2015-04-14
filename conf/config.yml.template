@@ -99,7 +99,8 @@ hostname: none
     #           path: /tmp/ratings
 
 
-sparkMaster: ec2-54-204-106-155.compute-1.amazonaws.com
+sparkMaster: ec2-54-158-166-184.compute-1.amazonaws.com
+sparkDataLocation: hdfs://ec2-54-158-166-184.compute-1.amazonaws.com:9000/velox
 
 logging:
   appenders:

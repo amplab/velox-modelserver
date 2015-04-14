@@ -19,6 +19,10 @@ import org.eclipse.jetty.servlet.ServletHolder
 
 class VeloxConfiguration extends Configuration {
   val sparkMaster: String = "NoSparkMaster"
+
+  // Location for the spark cluster to write data to & from
+  // Looks like hdfs://ec2-54-158-166-184.compute-1.amazonaws.com:9000/velox
+  val sparkDataLocation: String = "None"
   val hostname: String = "none"
 
   @(JsonProperty)("models")
@@ -52,7 +56,7 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
     val etcdClient = new EtcdClient(conf.hostname, 4001, conf.hostname, new DispatchUtil)
 
     conf.modelFactories.foreach { case (name, modelFactory) => {
-      val (model, partition, partitionMap) = modelFactory.build(env, conf.hostname)
+      val (model, partition, partitionMap) = modelFactory.build(env, name, conf.hostname, etcdClient)
 
       val predictServlet = new PointPredictionServlet(model, env.metrics().timer(name + "/predict/"))
       val topKServlet = new TopKPredictionServlet(model, env.metrics().timer(name + "/predict_top_k/"))
@@ -64,18 +68,21 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
           model,
           env.metrics().timer(name + "/observe/"),
           conf.sparkMaster,
+          conf.sparkDataLocation,
           partition)
       val retrainServlet = new RetrainServlet(
           model,
           conf.sparkMaster,
+          conf.sparkDataLocation,
           env.metrics().timer(name + "/retrain/"),
           etcdClient,
           name,
           partitionMap)
       val loadNewModelServlet = new LoadNewModelServlet(
-          model, 
+          model,
           env.metrics().timer(name + "/loadmodel/"),
-          conf.sparkMaster)
+          conf.sparkMaster,
+          conf.sparkDataLocation)
       env.getApplicationContext.addServlet(new ServletHolder(predictServlet), "/predict/" + name)
       env.getApplicationContext.addServlet(new ServletHolder(topKServlet), "/predict_top_k/" + name)
       env.getApplicationContext.addServlet(new ServletHolder(observeServlet), "/observe/" + name)
@@ -86,7 +93,7 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
     }}
     logInfo("Registered models: " + conf.modelFactories.keys.mkString(","))
     env.jersey().register(new ModelListResource(conf.modelFactories.keys.toSeq))
-    env.jersey().register(new CacheHitResource(models.toMap))
+    //env.jersey().register(new CacheHitResource(models.toMap))
   }
 }
 

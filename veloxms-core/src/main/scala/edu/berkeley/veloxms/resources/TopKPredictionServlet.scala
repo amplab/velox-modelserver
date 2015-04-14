@@ -20,7 +20,7 @@ class TopKPredictionServlet(model: Model[_, _], timer: Timer) extends HttpServle
       val k: Int = input.get("k").asInt()
       val context = input.get("context")
 
-      val topK = model.predictTopK(uid, k, context)
+      val topK = model.predictTopK(uid, k, context, model.currentVersion)
 
       resp.setContentType("application/json")
       jsonMapper.writeValue(resp.getOutputStream, topK)

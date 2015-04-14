@@ -4,7 +4,7 @@ package edu.berkeley.veloxms.util
 // import ExecutionContext.Implicits.global
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
-import scala.util.{Success, Failure}
+import scala.util.{Try, Success, Failure}
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.ning.http.client.Response
 import com.ning.http.client.extra.ThrottleRequestFilter
@@ -154,6 +154,27 @@ class EtcdClient(etcdHost: String, etcdPort: Int, hostname: String, dispatchUtil
         s"${checkUnlockedError.errorCode} ${checkUnlockedError.message}: ${checkUnlockedError.cause}")
       false
     }
+  }
+
+  // Puts a key, blocking
+  def put(key: String, value: String): Unit = {
+    val keyPutReq =
+      (etcdServer / EtcdConstants.basePath / key)
+          .PUT
+          .setContentType("application/x-www-form-urlencoded", "UTF-8")
+          .setBody(s"value=$value")
+
+    val putResponse = dispatchUtil.sendRequest(keyPutReq)
+    Await.result(putResponse, Duration.Inf)
+  }
+
+  // Gets a key
+  def get(key: String): Option[String] = {
+    val req = (etcdServer / EtcdConstants.basePath / key).GET
+    val resp = dispatchUtil.sendRequest(req)
+    val respJson = Await.result(resp, Duration.Inf)
+    val result = jsonMapper.readValue(respJson, classOf[EtcdResponse])
+    result.node.value
   }
 
   private[this] def lockCheckSucceeded(modelName: String, checkUnlockedJson: String): Boolean = {

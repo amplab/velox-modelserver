@@ -1,5 +1,6 @@
 package edu.berkeley.veloxms.resources
 
+import java.util.Date
 import javax.servlet.http.{HttpServletResponse, HttpServletRequest, HttpServlet}
 
 import scala.concurrent.Await
@@ -8,7 +9,7 @@ import com.codahale.metrics.Timer
 import edu.berkeley.veloxms.models.Model
 import edu.berkeley.veloxms._
 import edu.berkeley.veloxms.util._
-import edu.berkeley.veloxms.resources.internal.HDFSLocation
+import edu.berkeley.veloxms.resources.internal.{LoadModelParameters, HDFSLocation}
 import dispatch._, Defaults._
 import org.apache.hadoop.conf._
 import org.apache.hadoop.fs._
@@ -30,6 +31,7 @@ import org.apache.hadoop.fs._
 class RetrainServlet(
     model: Model[_, _],
     sparkMaster: String,
+    sparkDataLocation: String,
     timer: Timer,
     etcdClient: EtcdClient,
     modelName: String,
@@ -44,26 +46,15 @@ class RetrainServlet(
       val http = Http.configure(_.setAllowPoolingConnection(true).setFollowRedirects(true))
       logInfo(s"Starting retrain for model $modelName")
       val lockAcquired = etcdClient.acquireRetrainLock(modelName)
-      val obsDataLocation = HDFSLocation(s"velox/$modelName/observations")
-      val newModelLocation = HDFSLocation(s"velox/$modelName/retrained_model")
 
       if (lockAcquired) {
+        val nextVersion = new Date()
+        val obsDataLocation = HDFSLocation(s"$modelName/observations/${nextVersion.getTime}")
+        val newModelLocation = LoadModelParameters(s"$modelName/retrained_model/${nextVersion.getTime}", nextVersion)
+
         val hosts = hostPartitionMap.map({
           case(h, _) => host(h, veloxPort).setContentType("application/json", "UTF-8")
         })
-
-
-        System.setProperty("HADOOP_USER_NAME", "root")
-        val conf = new Configuration()
-        // TODO figure out what to do with the core-site.xml
-        conf.addResource(new Path("/home/ubuntu/velox-modelserver/conf/core-site.xml"))
-        val fs = FileSystem.get(conf)
-        val modelTrainDir = new Path(s"hdfs://$sparkMaster:9000/velox/$modelName/")
-        if (fs.exists(modelTrainDir)) {
-          val recursive = true
-          fs.delete(modelTrainDir, recursive)
-        }
-        fs.close()
 
         // TODO Delete observation and new_model dirs if exist
         val writeRequests = hosts.map(
@@ -77,9 +68,10 @@ class RetrainServlet(
         val writeResponses = Await.result(writeResponseFutures, Duration.Inf)
         logInfo(s"Write to hdfs responses: ${writeResponses.mkString("\n")}")
         model.retrainInSpark(
-            s"spark://$sparkMaster:7077",
-            s"hdfs://$sparkMaster:9000/${obsDataLocation.loc}",
-            s"hdfs://$sparkMaster:9000/${newModelLocation.loc}")
+          sparkMaster,
+          s"$sparkDataLocation/${obsDataLocation.loc}",
+          s"$sparkDataLocation/${newModelLocation.userWeightsLoc}",
+          nextVersion)
 
         val loadModelRequests = hosts.map(
           h => {
