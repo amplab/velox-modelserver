@@ -76,6 +76,7 @@ abstract class Model[T:ClassTag, U] extends Logging {
    **/
   val averageUser: WeightVector
 
+  // FIXME: Add some sort of Broadcast provider instead of hardcoding the EtcdBroadcast
   val broadcasts = new ConcurrentLinkedQueue[VersionedBroadcast[_]]()
   protected def broadcast[V](id: String): VersionedBroadcast[V] = {
     val b = new VersionedEtcdBroadcast[V](s"$name/$id", etcdClient)

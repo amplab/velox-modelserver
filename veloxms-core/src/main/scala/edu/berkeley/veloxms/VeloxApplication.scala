@@ -19,6 +19,9 @@ import org.eclipse.jetty.servlet.ServletHolder
 
 class VeloxConfiguration extends Configuration {
   val sparkMaster: String = "NoSparkMaster"
+
+  // Location for the spark cluster to write data to & from
+  // Looks like hdfs://ec2-54-158-166-184.compute-1.amazonaws.com:9000/velox
   val sparkDataLocation: String = "None"
   val hostname: String = "none"
 
@@ -50,7 +53,6 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
     val models = new mutable.HashMap[String, Model[_,_]]
 
     // this assumes that etcd is running on each velox server
-    // FIXME: There should be some sort of etcdClient provider so we don't have to pass it in a tree just to get it to the broadcasts!
     val etcdClient = new EtcdClient(conf.hostname, 4001, conf.hostname, new DispatchUtil)
 
     conf.modelFactories.foreach { case (name, modelFactory) => {
