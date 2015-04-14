@@ -46,7 +46,7 @@ class NewsgroupsModel(
     modelBroadcast.get(version).get.transform(data)
   }
 
-  override protected def retrainItemFeaturesInSpark(observations: RDD[(UserID, String, Double)], nextVersion: Version): RDD[(String, FeatureVector)] = {
+  override protected def retrainFeatureModelsInSpark(observations: RDD[(UserID, String, Double)], nextVersion: Version): RDD[(String, FeatureVector)] = {
     val conf = new SparkConf().setAppName("classifier").setMaster("local[4]")//.setJars(SparkContext.jarOfObject(this).toSeq)
 
     val sc = new SparkContext(conf)

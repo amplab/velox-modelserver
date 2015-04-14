@@ -2,7 +2,7 @@
 package edu.berkeley.veloxms.models
 
 import java.util.Date
-import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.{ConcurrentHashMap, ConcurrentLinkedQueue}
 
 import edu.berkeley.veloxms._
 import edu.berkeley.veloxms.storage._
@@ -10,9 +10,8 @@ import edu.berkeley.veloxms.util._
 import org.apache.spark.{SparkContext, SparkConf}
 import org.apache.spark.rdd.RDD
 
-import scala.collection.concurrent.TrieMap
-import scala.collection.concurrent.{Map => ConcurrentMap}
 import scala.collection.JavaConversions._
+import scala.collection.mutable
 
 // import org.codehaus.jackson.JsonNode
 import com.fasterxml.jackson.databind.{ObjectMapper, JsonNode}
@@ -36,17 +35,17 @@ abstract class Model[T:ClassTag, U] extends Logging {
   val name: String
   val etcdClient: EtcdClient
 
-  private var vers: Version = new Date(0)
-  def currentVersion: Version = vers
+  private var version: Version = new Date(0)
+  def currentVersion: Version = version
   def useVersion(version: Version): Unit = {
     // TODO: Implement cache invalidation!
     broadcasts.foreach(_.cache(version))
-    vers = version
+    this.version = version
   }
 
   // TODO: Observations should be stored w/ Timestamps, and in a more relational format w/ persistence
-  val observations: ConcurrentMap[UserID, ConcurrentMap[T, Double]] = new TrieMap()
-  val userWeights: ConcurrentMap[(UserID, Version), WeightVector] = new TrieMap()
+  val observations: ConcurrentHashMap[UserID, mutable.Map[T, Double]] = new ConcurrentHashMap()
+  val userWeights: ConcurrentHashMap[(UserID, Version), WeightVector] = new ConcurrentHashMap()
 
   val cacheResults: Boolean
   val cacheFeatures: Boolean
@@ -96,7 +95,7 @@ abstract class Model[T:ClassTag, U] extends Logging {
    * @param nextVersion
    * @return
    */
-  protected def retrainItemFeaturesInSpark(observations: RDD[(UserID, T, Double)], nextVersion: Version): RDD[(T, FeatureVector)]
+  protected def retrainFeatureModelsInSpark(observations: RDD[(UserID, T, Double)], nextVersion: Version): RDD[(T, FeatureVector)]
 
   // TODO: Make this much more efficient. Currently a very naive implementation
   // TODO: MAKE SURE THESE ARE CORRECT!!!
@@ -145,13 +144,12 @@ abstract class Model[T:ClassTag, U] extends Logging {
     // TODO: This could be made better
     val trainingData: RDD[(UserID, T, Double)] = sc.objectFile(s"$trainingDataDir/*/*")
 
-    val itemFeatures = retrainItemFeaturesInSpark(trainingData, nextVersion)
+    val itemFeatures = retrainFeatureModelsInSpark(trainingData, nextVersion)
     val userWeights = retrainUserWeightsInSpark(itemFeatures, trainingData).map({
       case (userId, weights) => s"$userId, ${weights.mkString(", ")}"
     })
 
 
-    // TODO the problem seems to be here:
     userWeights.saveAsTextFile(newModelsDir + "/users")
 
     sc.stop()
@@ -163,7 +161,7 @@ abstract class Model[T:ClassTag, U] extends Logging {
    *
    */
   private def getWeightVector(userId: Long, version: Version) : WeightVector = {
-    val result: Option[Array[Double]] = userWeights.get((userId, version))
+    val result: Option[Array[Double]] = Option(userWeights.get((userId, version)))
     result match {
       case Some(u) => u
       case None => {
@@ -254,11 +252,11 @@ abstract class Model[T:ClassTag, U] extends Logging {
     val partialScoresSum = precomputed.map(_._2).getOrElse(DenseVector.zeros[Double](k))
 
     val allScores: Seq[(T, Double)] = if (newData) {
-      val scores = observations.getOrElseUpdate(uid, new TrieMap())
+      val scores = observations.putIfAbsent(uid, mutable.Map())
       scores.put(context, score)
       scores.toSeq
     } else {
-      observations.getOrElseUpdate(uid, new TrieMap()).toSeq
+      observations.putIfAbsent(uid, mutable.Map()).toSeq
     }
 
     val newScores: Seq[(T, Double)] = if (precomputed == None) {
@@ -282,10 +280,11 @@ abstract class Model[T:ClassTag, U] extends Logging {
   }
 
   def writeUserWeights(weights: Map[UserID, WeightVector], version: Version): Unit = {
-    weights.foreach(x => userWeights.update((x._1, version), x._2))
+    weights.foreach(x => userWeights.put((x._1, version), x._2))
   }
 
   def getObservationsAsRDD(sc: SparkContext): RDD[(UserID, T, Double)] = {
+    // TODO: This may not be safe if observation updates keep happening?
     val x = observations.toSeq.flatMap({ case (user, obs) =>
       obs.map { case (item, score) => (user, item, score) }
     })
