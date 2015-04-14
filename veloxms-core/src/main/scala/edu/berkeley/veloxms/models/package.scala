@@ -4,6 +4,6 @@ import breeze.linalg._
 
 package object models {
 
-  type PartialResultsCache = ConcurrentHashMap[Long, (DenseMatrix[Double], DenseVector[Double])]
+  type PartialResultsCache = ConcurrentHashMap[(Version, UserID), (DenseMatrix[Double], DenseVector[Double])]
 
 }

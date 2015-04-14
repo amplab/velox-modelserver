@@ -1,12 +1,21 @@
 
 package edu.berkeley.veloxms.models
 
+import java.util.Date
+import java.util.concurrent.ConcurrentLinkedQueue
+
 import edu.berkeley.veloxms._
 import edu.berkeley.veloxms.storage._
-import edu.berkeley.veloxms.util.Logging
+import edu.berkeley.veloxms.util._
+import org.apache.spark.{SparkContext, SparkConf}
+import org.apache.spark.rdd.RDD
+
+import scala.collection.concurrent.TrieMap
+import scala.collection.concurrent.{Map => ConcurrentMap}
+import scala.collection.JavaConversions._
+
 // import org.codehaus.jackson.JsonNode
-import com.fasterxml.jackson.databind.JsonNode
-import org.jblas.{Solve, DoubleMatrix}
+import com.fasterxml.jackson.databind.{ObjectMapper, JsonNode}
 import breeze.linalg._
 
 import scala.reflect._
@@ -24,17 +33,30 @@ import scala.util.Sorting
  */
 abstract class Model[T:ClassTag, U] extends Logging {
 
+  val name: String
+  val etcdClient: EtcdClient
+
+  private var vers: Version = new Date(0)
+  def currentVersion: Version = vers
+  def useVersion(version: Version): Unit = {
+    // TODO: Implement cache invalidation!
+    broadcasts.foreach(_.cache(version))
+    vers = version
+  }
+
+  // TODO: Observations should be stored w/ Timestamps, and in a more relational format w/ persistence
+  val observations: ConcurrentMap[UserID, ConcurrentMap[T, Double]] = new TrieMap()
+  val userWeights: ConcurrentMap[(UserID, Version), WeightVector] = new TrieMap()
+
   val cacheResults: Boolean
-
   val cacheFeatures: Boolean
-
   val cachePredictions: Boolean
 
-  val featureCache: FeatureCache[T, Array[Double]] =
-      new FeatureCache[T, Array[Double]](cacheFeatures)
+  val featureCache: FeatureCache[(T, Version), Array[Double]] =
+      new FeatureCache[(T, Version), Array[Double]](cacheFeatures)
 
-  val predictionCache: FeatureCache[(Long, T), Double] =
-      new FeatureCache[(Long, T), Double](cachePredictions)
+  val predictionCache: FeatureCache[(UserID, T, Version), Double] =
+      new FeatureCache[(UserID, T, Version), Double](cachePredictions)
 
   private val partialResults = new PartialResultsCache()
 
@@ -49,44 +71,99 @@ abstract class Model[T:ClassTag, U] extends Logging {
    */
   val defaultItem: FeatureVector
 
-  /**
-   * Interface to the storage backend. Allows model implementers
-   * to access the storage system if needed for computing features,
-   * user weights.
-   */
-  val userStorage: ModelStorage[Long, WeightVector]
-  val observationStorage: ModelStorage[Long, Map[T, Double]]
-
-  def getObservationsAsCSV: List[String] = {
-    val entries = observationStorage.getEntries
-    entries.flatMap({ case (user, obs) => {
-        obs.map { case (item, score) => s"$user, $item, $score" }
-      }
-    }).toList
-  }
-
-
   /** Average user weight vector.
    * Used for warmstart for new users
-   */
+   * TODO: SHOULD BE RETRAINED WHEN BULK RETRAINING!!!
+   **/
   val averageUser: WeightVector
+
+  val broadcasts = new ConcurrentLinkedQueue[VersionedBroadcast[_]]()
+  protected def broadcast[V](id: String): VersionedBroadcast[V] = {
+    val b = new VersionedEtcdBroadcast[V](s"$name/$id", etcdClient)
+    broadcasts.add(b)
+    b
+  }
 
   /**
    * User provided implementation for the given model. Will be called
    * by Velox on feature cache miss.
    */
-  protected def computeFeatures(data: T) : FeatureVector
+  protected def computeFeatures(data: T, version: Version) : FeatureVector
+
+  /**
+   * Retrains 
+   * @param observations
+   * @param nextVersion
+   * @return
+   */
+  protected def retrainItemFeaturesInSpark(observations: RDD[(UserID, T, Double)], nextVersion: Version): RDD[(T, FeatureVector)]
+
+  // TODO: Make this much more efficient. Currently a very naive implementation
+  // TODO: MAKE SURE THESE ARE CORRECT!!!
+  private def retrainUserWeightsInSpark(itemFeatures: RDD[(T, FeatureVector)], observations: RDD[(UserID, T, Double)]): RDD[(UserID, WeightVector)] = {
+    val obs = observations.map(x => (x._2, (x._1, x._3)))
+    val featureRatings = itemFeatures.join(obs).map(x => (x._2._2._1, (x._2._1, x._2._2._2)))
+    val ratingsByUserId = featureRatings.groupByKey()
+    val lambda = UpdateMethods.lambda
+
+    // TODO: File a bug in the spark closure cleaner?
+    // Because w/o this line closure cleaner can't remove MatrixFactorizationModel (which isn't serializable) and the code breaks
+    val k = numFeatures
+    ratingsByUserId.map { case (id, ratings) => {
+      val partialFeaturesSum = DenseMatrix.zeros[Double](k, k)
+      val partialScoresSum = DenseVector.zeros[Double](k)
+
+      for ((features, score) <- ratings) {
+        val currentFeatures = new DenseVector(features) // Column Vector
+        val product = currentFeatures * currentFeatures.t
+        partialFeaturesSum += product
+        partialScoresSum += currentFeatures * score
+      }
+
+      val regularization = DenseMatrix.eye[Double](k) * (lambda*k)
+      partialFeaturesSum += regularization
+      val newUserWeights = partialFeaturesSum \ partialScoresSum
+      (id, newUserWeights.toArray)
+    }}
+  }
 
   // TODO: probably want to elect a leader to initiate the Spark retraining
   // once we are running a Spark cluster
-  def retrainInSpark(sparkMaster: String, trainingDataDir: String, newModelsDir: String)
+  def retrainInSpark(sparkMaster: String, trainingDataDir: String, newModelsDir: String, nextVersion: Version) {
+    // This is installation specific
+    val sparkHome = "/root/spark-1.3.0-bin-hadoop1"
+    logWarning("Starting spark context")
+    val conf = new SparkConf()
+        .setMaster(sparkMaster)
+        .setAppName("VeloxOnSpark!")
+        .setJars(SparkContext.jarOfObject(this).toSeq)
+        .setSparkHome(sparkHome)
+
+    val sc = new SparkContext(conf)
+
+    // TODO: Have to make sure this trainingData contains observations from ALL nodes!!
+    // TODO: This could be made better
+    val trainingData: RDD[(UserID, T, Double)] = sc.objectFile(s"$trainingDataDir/*/*")
+
+    val itemFeatures = retrainItemFeaturesInSpark(trainingData, nextVersion)
+    val userWeights = retrainUserWeightsInSpark(itemFeatures, trainingData).map({
+      case (userId, weights) => s"$userId, ${weights.mkString(", ")}"
+    })
+
+
+    // TODO the problem seems to be here:
+    userWeights.saveAsTextFile(newModelsDir + "/users")
+
+    sc.stop()
+    logInfo("Finished retraining new model")
+  }
 
   /**
    * Velox implemented - fetch from local Tachyon partition
    *
    */
-  private def getWeightVector(userId: Long) : WeightVector = {
-    val result: Option[Array[Double]] = userStorage.get(userId)
+  private def getWeightVector(userId: Long, version: Version) : WeightVector = {
+    val result: Option[Array[Double]] = userWeights.get((userId, version))
     result match {
       case Some(u) => u
       case None => {
@@ -98,13 +175,13 @@ abstract class Model[T:ClassTag, U] extends Logging {
 
   // TODO(crankshaw) fix the error handling here to return default item features
   // TODO(crankshaw) the error handling here is fucked
-  private def getFeatures(item: T): FeatureVector = {
-    val features: Try[FeatureVector] = featureCache.getItem(item) match {
+  private def getFeatures(item: T, version: Version): FeatureVector = {
+    val features: Try[FeatureVector] = featureCache.getItem(item, version) match {
       case Some(f) => Success(f)
       case None => {
-        Try(computeFeatures(item)).transform(
+        Try(computeFeatures(item, version)).transform(
           (f) => {
-            featureCache.addItem(item, f)
+            featureCache.addItem((item, version), f)
             Success(f)
           },
           (t) => {
@@ -116,36 +193,36 @@ abstract class Model[T:ClassTag, U] extends Logging {
     features.get.clone()
   }
 
-  def predict(uid: Long, context: JsonNode): Double = {
+  def predict(uid: UserID, context: JsonNode, version: Version): Double = {
     val item: T = jsonMapper.treeToValue(context, classTag[T].runtimeClass.asInstanceOf[Class[T]])
-    predictItem(uid, item)
+    predictItem(uid, item, version)
   }
 
-  private[this] def predictItem(uid: Long, item: T): Double = {
-    val score = predictionCache.getItem((uid, item)) match {
+  private[this] def predictItem(uid: UserID, item: T, version: Version): Double = {
+    val score = predictionCache.getItem((uid, item, version)) match {
       case Some(p) => p
       case None => {
-        val features = getFeatures(item)
-        val weightVector = getWeightVector(uid)
+        val features = getFeatures(item, version)
+        val weightVector = getWeightVector(uid, version)
         var i = 0
         var accumScore = 0.0
         while (i < numFeatures) {
           accumScore += features(i) * weightVector(i)
           i += 1
         }
-        predictionCache.addItem((uid, item), accumScore)
+        predictionCache.addItem((uid, item, version), accumScore)
         accumScore
       }
     }
     score
   }
 
-  def predictTopK(uid: Long, k: Int, context: JsonNode): Array[T] = {
+  def predictTopK(uid: Long, k: Int, context: JsonNode, version: Version): Array[T] = {
     // FIXME: There is probably some threshhold of k for which it makes more sense to iterate over the unsorted list
     // instead of sorting the whole list.
     val itemOrdering = new Ordering[T] {
       override def compare(x: T, y: T) = {
-        -1 * (predictItem(uid, x) compare predictItem(uid, y))
+        -1 * (predictItem(uid, x, version) compare predictItem(uid, y, version))
       }
     }
     val candidateSet: Array[T] = jsonMapper.treeToValue(context, classTag[Array[T]].runtimeClass.asInstanceOf[Class[Array[T]]])
@@ -154,10 +231,12 @@ abstract class Model[T:ClassTag, U] extends Logging {
     candidateSet.slice(0, k)
   }
 
-  def addObservation(uid: Long, context: JsonNode, score: Double) {
+  def addObservation(uid: Long, context: JsonNode, score: Double, version: Version) {
+    // TODO: ALWAYS add the new observation. partial results cache should depend on Version though!!
     (this, uid).synchronized {
       val item: T = jsonMapper.treeToValue(context, classTag[T].runtimeClass.asInstanceOf[Class[T]])
-      val newWeights = addObservationInternal(uid, item, score, true)
+      val newWeights = addObservationInternal(uid, item, score, version, newData = true)
+      userWeights.put((uid, version), newWeights)
     }
   }
 
@@ -165,52 +244,53 @@ abstract class Model[T:ClassTag, U] extends Logging {
       uid: Long,
       context: T,
       score: Double,
+      version: Version,
       newData: Boolean = true): WeightVector = {
 
     val k = numFeatures
-    val precomputed = Option(partialResults.get(uid))
+    // FIXME: This precomputed value may easily be wrong if keep swapping versions !!!!!!
+    val precomputed = Option(partialResults.get((version, uid)))
     val partialFeaturesSum = precomputed.map(_._1).getOrElse(DenseMatrix.zeros[Double](k, k))
     val partialScoresSum = precomputed.map(_._2).getOrElse(DenseVector.zeros[Double](k))
 
-
-
-    val allScores: Map[T, Double] = if (newData) {
-      val scores = observationStorage.get(uid).getOrElse(Map()) + (context -> score)
-      observationStorage.put(uid -> scores)
-      scores
+    val allScores: Seq[(T, Double)] = if (newData) {
+      val scores = observations.getOrElseUpdate(uid, new TrieMap())
+      scores.put(context, score)
+      scores.toSeq
     } else {
-      observationStorage.get(uid).getOrElse(Map())
+      observations.getOrElseUpdate(uid, new TrieMap()).toSeq
     }
-    val newScores: Map[T, Double] = if (precomputed == None) {
+
+    val newScores: Seq[(T, Double)] = if (precomputed == None) {
       allScores
     } else if (newData) {
-      Map(context -> score)
+      Seq(context -> score)
     } else {
-      Map()
+      Seq()
     }
-    val newItems: Map[T, FeatureVector] = newScores.map {
-      case (context, _) => (context, getFeatures(context))
+
+    val newItems: Seq[(FeatureVector, Double)] = newScores.map {
+      case (c, s) => (getFeatures(c, version), s)
     }
     val (newWeights, newPartialResult) = UpdateMethods.updateWithBreeze(
-      partialFeaturesSum, partialScoresSum, newItems, newScores, k)
+      partialFeaturesSum, partialScoresSum, newItems)
 
     if (cacheResults) {
-      partialResults.put(uid, newPartialResult)
+      partialResults.put((version, uid), newPartialResult)
     }
     newWeights
   }
 
-
-  def precomputePartialSums(users: Range) {
-    for (uid <- users) {
-      // val fakeSums = (DenseMatrix.rand[Double](numFeatures, numFeatures),
-      //   DenseVector.rand[Double](numFeatures))
-      // partialResults.put(uid, fakeSums)
-      addObservationInternal(uid, null.asInstanceOf[T], 0.0, false)
-    }
+  def writeUserWeights(weights: Map[UserID, WeightVector], version: Version): Unit = {
+    weights.foreach(x => userWeights.update((x._1, version), x._2))
   }
 
-
+  def getObservationsAsRDD(sc: SparkContext): RDD[(UserID, T, Double)] = {
+    val x = observations.toSeq.flatMap({ case (user, obs) =>
+      obs.map { case (item, score) => (user, item, score) }
+    })
+    sc.parallelize(x)
+  }
 
 }
 
@@ -228,96 +308,24 @@ object UpdateMethods {
   def updateWithBreeze[T:ClassTag](
       partialFeaturesSum: DenseMatrix[Double],
       partialScoresSum: DenseVector[Double],
-      newItems: Map[T, FeatureVector],
-      newScores: Map[T, Double],
-      k: Int): (WeightVector, (DenseMatrix[Double], DenseVector[Double])) = {
+      newRatings: TraversableOnce[(FeatureVector, Double)]):
+  (WeightVector, (DenseMatrix[Double], DenseVector[Double])) = {
 
-
-
-    var i = 0
-
-    val observedItems = newItems.keys.toList
-
-    while (i < observedItems.size) {
-      val currentItem = observedItems(i)
-      // TODO error handling
-      val currentFeaturesArray = newItems.get(currentItem) match {
-        case Some(f) => f
-        case None => throw new Exception(
-          s"Missing features in online update -- item: $currentItem")
-      }
-      // column vector
-      val currentFeatures = new DenseVector(currentFeaturesArray)
+    for ((features, score) <- newRatings) {
+      val currentFeatures = new DenseVector(features) // Column Vector
       val product = currentFeatures * currentFeatures.t
       partialFeaturesSum += product
-
-      val obsScore = newScores.get(currentItem) match {
-        case Some(o) => o
-        case None => throw new Exception(
-          s"Missing rating in online update -- item: $currentItem")
-      }
-
-      partialScoresSum += currentFeatures * obsScore
-      i += 1
+      partialScoresSum += currentFeatures * score
     }
 
-
     val partialResult = (partialFeaturesSum.copy, partialScoresSum.copy)
+    val k = partialScoresSum.length
 
     val regularization = DenseMatrix.eye[Double](k) * (lambda*k)
     partialFeaturesSum += regularization
     val newUserWeights = partialFeaturesSum \ partialScoresSum
     (newUserWeights.toArray, partialResult)
-
   }
-
-
-  /**
-   * The original implementation. Uses jblas for matrix ops, does no
-   * caching or anything smart.
-   */
-  // def updateJBLASNaive[T:ClassTag](allItemFeatures: Map[T, FeatureVector],
-  //                       allObservationScores: Map[T, Double], k: Int): WeightVector = {
-  //
-  //
-  //   val itemFeaturesSum = DoubleMatrix.zeros(k, k)
-  //   val itemScoreProductSum = DoubleMatrix.zeros(k)
-  //
-  //   var i = 0
-  //
-  //   val observedItems = allItemFeatures.keys.toList
-  //
-  //   while (i < observedItems.size) {
-  //     val currentItemId = observedItems(i)
-  //     // TODO error handling
-  //     val currentFeaturesArray = allItemFeatures.get(currentItemId) match {
-  //       case Some(f) => f
-  //       case None => throw new Exception(
-  //         s"Missing features in online update -- item: $currentItemId")
-  //     }
-  //     val currentFeatures = new DoubleMatrix(currentFeaturesArray)
-  //     val product = currentFeatures.mmul(currentFeatures.transpose())
-  //     itemFeaturesSum.addi(product)
-  //
-  //     val obsScore = allObservationScores.get(currentItemId) match {
-  //       case Some(o) => o
-  //       case None => throw new Exception(
-  //         s"Missing rating in online update -- item: $currentItemId")
-  //
-  //     }
-  //     itemScoreProductSum.addi(currentFeatures.mul(obsScore))
-  //     i += 1
-  //
-  //   }
-  //
-  //   // TODO: There should be no dependency on MatrixFactorizationModel here
-  //   val regularization = DoubleMatrix.eye(k).muli(lambda*k)
-  //   itemFeaturesSum.addi(regularization)
-  //   val newUserWeights = Solve.solve(itemFeaturesSum, itemScoreProductSum)
-  //   newUserWeights.toArray()
-  //
-  // }
-
 }
 
 

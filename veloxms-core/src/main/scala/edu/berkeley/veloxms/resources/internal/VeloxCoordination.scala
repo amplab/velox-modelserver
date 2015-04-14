@@ -11,30 +11,35 @@ import org.apache.hadoop.fs._
 import org.apache.commons.io.IOUtils
 import java.io.StringWriter
 
-case class HDFSLocation(loc: String)
+import org.apache.spark.{SparkContext, SparkConf}
 
-class WriteToHDFSServlet(model: Model[_, _], timer: Timer, sparkMaster: String, partition: Int) extends HttpServlet
+case class HDFSLocation(loc: String)
+case class LoadModelParameters(userWeightsLoc: String, version: Version)
+
+class WriteToHDFSServlet(model: Model[_, _], timer: Timer, sparkMaster: String, sparkDataLocation: String, partition: Int) extends HttpServlet
   with Logging {
 
   override def doPost(req: HttpServletRequest, resp: HttpServletResponse) {
     val timeContext = timer.time()
     try {
       val obsLocation = jsonMapper.readValue(req.getInputStream, classOf[HDFSLocation])
-      // TODO make sure that hadoop-site.xml, etc. are on classpath
-      System.setProperty("HADOOP_USER_NAME", "root")
-      val conf = new Configuration()
-      conf.addResource(new Path("/home/ubuntu/velox-modelserver/conf/core-site.xml"))
-      logInfo(conf.toString())
-      val uri = s"hdfs://$sparkMaster:9000/${obsLocation.loc}/part_$partition"
+      val uri = s"$sparkDataLocation/${obsLocation.loc}/part_$partition"
 
-      // conf.set("fs.defaultFS", uri)
-      val path = new Path(uri)
-      val fs = FileSystem.get(conf)
-      val overwrite = true
-      val outFile = fs.create(path, overwrite) // overwrite existing file
-      val observations = IOUtils.toInputStream(model.getObservationsAsCSV.mkString("\n"))
-      IOUtils.copy(observations, outFile)
-      fs.close()
+      val sparkHome = "/root/spark-1.3.0-bin-hadoop1"
+      logWarning("Starting spark context")
+      val sparkConf = new SparkConf()
+          .setMaster(sparkMaster)
+          .setAppName("VeloxOnSpark!")
+          .setJars(SparkContext.jarOfObject(this).toSeq)
+          .setSparkHome(sparkHome)
+      // .set("spark.akka.logAkkaConfig", "true")
+      val sc = new SparkContext(sparkConf)
+
+      val observations = model.getObservationsAsRDD(sc)
+      observations.saveAsObjectFile(uri)
+
+      sc.stop()
+
       resp.setContentType("application/json");
       jsonMapper.writeValue(resp.getOutputStream, "success")
     } finally {
@@ -45,49 +50,43 @@ class WriteToHDFSServlet(model: Model[_, _], timer: Timer, sparkMaster: String, 
 }
 
 
-class LoadNewModelServlet(model: Model[_, _], timer: Timer, sparkMaster: String)
+class LoadNewModelServlet(model: Model[_, _], timer: Timer, sparkMaster: String, sparkDataLocation: String)
     extends HttpServlet with Logging {
 
   override def doPost(req: HttpServletRequest, resp: HttpServletResponse) {
     val timeContext = timer.time()
-    val modelLocation = jsonMapper.readValue(req.getInputStream, classOf[HDFSLocation])
+    val modelLocation = jsonMapper.readValue(req.getInputStream, classOf[LoadModelParameters])
     try {
-      System.setProperty("HADOOP_USER_NAME", "root")
-      val conf = new Configuration()
-      conf.addResource(new Path("/home/ubuntu/velox-modelserver/conf/core-site.xml"))
-      logInfo(conf.toString())
-      val uri = s"hdfs://$sparkMaster:9000/${modelLocation.loc}/"
-      val fs = FileSystem.get(conf)
-      val items = readAllFiles(s"$uri/items", fs).split("\n").map(line => {
-        val itemSplits = line.split(", ")
-        val itemId = itemSplits(0).toLong
-        val itemFeatures: Array[Double] = itemSplits.drop(1).map(_.toDouble).toArray
-        // TODO this should be inserted into storage backend
-        (itemId, itemFeatures)
-      }).toMap
-      val firstItem = items.head
-      logInfo(s"Loaded new models for ${items.size} items. " +
-        s"First one is:\n${firstItem._1}, ${firstItem._2.mkString(", ")}")
+      val uri = s"$sparkDataLocation/${modelLocation.userWeightsLoc}"
+
+      val sparkHome = "/root/spark-1.3.0-bin-hadoop1"
+      logWarning("Starting spark context")
+      val sparkConf = new SparkConf()
+          .setMaster(sparkMaster)
+          .setAppName("VeloxOnSpark!")
+          .setJars(SparkContext.jarOfObject(this).toSeq)
+          .setSparkHome(sparkHome)
+
+      val sc = new SparkContext(sparkConf)
 
       // TODO only add users in this partition: if (userId % partNum == 0)
-      // val newUserMap = new ConcurrentHashMap[Long, WeightVector]
-      val users = readAllFiles(s"$uri/users", fs).split("\n").map(line => {
+      val users = sc.textFile(s"$uri/users/*").map(line => {
         val userSplits = line.split(", ")
         val userId = userSplits(0).toLong
-        val userFeatures: Array[Double] = userSplits.drop(1).map(_.toDouble).toArray
+        val userFeatures: Array[Double] = userSplits.drop(1).map(_.toDouble)
         // TODO this should be inserted into storage backend
         (userId, userFeatures)
-      }).toMap
+      }).collect().toMap
 
       val firstUser = users.head
       logInfo(s"Loaded new models for ${users.size} users. " +
         s"First one is:\n${firstUser._1}, ${firstUser._2.mkString(", ")}")
 
 
-      // TODO figure out best way to switch to new user and item maps
-      // should probably be atomic
+      // TODO: Should make sure it's sufficiently atomic
+      model.writeUserWeights(users, modelLocation.version)
+      model.useVersion(modelLocation.version)
 
-      fs.close()
       resp.setContentType("application/json");
       jsonMapper.writeValue(resp.getOutputStream, "success")
 
@@ -96,18 +95,6 @@ class LoadNewModelServlet(model: Model[_, _], timer: Timer, sparkMaster: String)
       timeContext.stop()
     }
   }
-
-  private def readAllFiles(dir: String, fs: FileSystem): String = {
-      val dirPath = new Path(dir)
-      val filesAsStrings = new StringWriter()
-      fs.listStatus(dirPath).foreach( f => {
-        val input = fs.open(f.getPath())
-        // TODO make sure this appends and doesn't overwrite
-        IOUtils.copy(input, filesAsStrings)
-      })
-      filesAsStrings.toString()
-  }
-
 }
 
 
