@@ -1,13 +1,13 @@
 package edu.berkeley.veloxms.models
 
 import edu.berkeley.veloxms._
-import edu.berkeley.veloxms.util.EtcdClient
+import edu.berkeley.veloxms.storage.BroadcastProvider
 import org.apache.spark.rdd._
 import org.apache.spark.mllib.recommendation.{ALS,Rating}
 
 class MatrixFactorizationModel(
     val name: String,
-    val etcdClient: EtcdClient,
+    val broadcastProvider: BroadcastProvider,
     val numFeatures: Int,
     val averageUser: WeightVector,
     val cacheResults: Boolean,

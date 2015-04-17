@@ -33,9 +33,9 @@ import scala.util.Sorting
 abstract class Model[T:ClassTag, U] extends Logging {
 
   val name: String
-  val etcdClient: EtcdClient
+  val broadcastProvider: BroadcastProvider
 
-  private var version: Version = new Date(0)
+  private var version: Version = new Date(0).getTime
   def currentVersion: Version = version
   def useVersion(version: Version): Unit = {
     // TODO: Implement cache invalidation!
@@ -76,10 +76,9 @@ abstract class Model[T:ClassTag, U] extends Logging {
    **/
   val averageUser: WeightVector
 
-  // FIXME: Add some sort of Broadcast provider instead of hardcoding the EtcdBroadcast
   val broadcasts = new ConcurrentLinkedQueue[VersionedBroadcast[_]]()
-  protected def broadcast[V](id: String): VersionedBroadcast[V] = {
-    val b = new VersionedEtcdBroadcast[V](s"$name/$id", etcdClient)
+  protected def broadcast[V: ClassTag](id: String): VersionedBroadcast[V] = {
+    val b = broadcastProvider.get[V](s"$name/$id")
     broadcasts.add(b)
     b
   }
@@ -129,21 +128,10 @@ abstract class Model[T:ClassTag, U] extends Logging {
 
   // TODO: probably want to elect a leader to initiate the Spark retraining
   // once we are running a Spark cluster
-  def retrainInSpark(sparkMaster: String, trainingDataDir: String, newModelsDir: String, nextVersion: Version) {
-    // This is installation specific
-    val sparkHome = "/root/spark-1.3.0-bin-hadoop1"
-    logWarning("Starting spark context")
-    val conf = new SparkConf()
-        .setMaster(sparkMaster)
-        .setAppName("VeloxOnSpark!")
-        .setJars(SparkContext.jarOfObject(this).toSeq)
-        .setSparkHome(sparkHome)
-
-    val sc = new SparkContext(conf)
-
+  def retrainInSpark(sparkContext: SparkContext, trainingDataDir: String, newModelsDir: String, nextVersion: Version) {
     // TODO: Have to make sure this trainingData contains observations from ALL nodes!!
     // TODO: This could be made better
-    val trainingData: RDD[(UserID, T, Double)] = sc.objectFile(s"$trainingDataDir/*/*")
+    val trainingData: RDD[(UserID, T, Double)] = sparkContext.objectFile(s"$trainingDataDir/*/*")
 
     val itemFeatures = retrainFeatureModelsInSpark(trainingData, nextVersion)
     val userWeights = retrainUserWeightsInSpark(itemFeatures, trainingData).map({
@@ -153,7 +141,6 @@ abstract class Model[T:ClassTag, U] extends Logging {
 
     userWeights.saveAsTextFile(newModelsDir + "/users")
 
-    sc.stop()
     logInfo("Finished retraining new model")
   }
 
@@ -253,11 +240,13 @@ abstract class Model[T:ClassTag, U] extends Logging {
     val partialScoresSum = precomputed.map(_._2).getOrElse(DenseVector.zeros[Double](k))
 
     val allScores: Seq[(T, Double)] = if (newData) {
-      val scores = observations.putIfAbsent(uid, mutable.Map())
+      observations.putIfAbsent(uid, mutable.Map())
+      val scores = observations.get(uid)
       scores.put(context, score)
       scores.toSeq
     } else {
-      observations.putIfAbsent(uid, mutable.Map()).toSeq
+      observations.putIfAbsent(uid, mutable.Map())
+      observations.get(uid).toSeq
     }
 
     val newScores: Seq[(T, Double)] = if (precomputed == None) {

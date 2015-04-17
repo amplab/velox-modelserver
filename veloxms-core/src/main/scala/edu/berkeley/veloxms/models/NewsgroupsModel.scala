@@ -6,6 +6,7 @@ import edu.berkeley.veloxms._
 import edu.berkeley.veloxms.pipelines.transformers.{SimpleNGramTokenizer, MulticlassClassifierEvaluator}
 import edu.berkeley.veloxms.pipelines._
 import edu.berkeley.veloxms.pipelines.estimators.{MulticlassNaiveBayesEstimator, MostFrequentSparseFeatureSelector}
+import edu.berkeley.veloxms.storage.BroadcastProvider
 import org.apache.spark.mllib.linalg.Vector
 import org.apache.spark.rdd.RDD
 import org.apache.spark.{SparkContext, SparkConf}
@@ -15,7 +16,7 @@ import edu.berkeley.veloxms.util.{EtcdClient, Logging}
 
 class NewsgroupsModel(
     val name: String,
-    val etcdClient: EtcdClient,
+    val broadcastProvider: BroadcastProvider,
     val modelLoc: String,
     val numFeatures: Int,
     val averageUser: WeightVector,

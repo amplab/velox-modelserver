@@ -16,7 +16,7 @@ import org.apache.spark.{SparkContext, SparkConf}
 case class HDFSLocation(loc: String)
 case class LoadModelParameters(userWeightsLoc: String, version: Version)
 
-class WriteToHDFSServlet(model: Model[_, _], timer: Timer, sparkMaster: String, sparkDataLocation: String, partition: Int) extends HttpServlet
+class WriteToHDFSServlet(model: Model[_, _], timer: Timer, sparkContext: SparkContext, sparkDataLocation: String, partition: Int) extends HttpServlet
   with Logging {
 
   override def doPost(req: HttpServletRequest, resp: HttpServletResponse) {
@@ -25,22 +25,10 @@ class WriteToHDFSServlet(model: Model[_, _], timer: Timer, sparkMaster: String, 
       val obsLocation = jsonMapper.readValue(req.getInputStream, classOf[HDFSLocation])
       val uri = s"$sparkDataLocation/${obsLocation.loc}/part_$partition"
 
-      val sparkHome = "/root/spark-1.3.0-bin-hadoop1"
-      logWarning("Starting spark context")
-      val sparkConf = new SparkConf()
-          .setMaster(sparkMaster)
-          .setAppName("VeloxOnSpark!")
-          .setJars(SparkContext.jarOfObject(this).toSeq)
-          .setSparkHome(sparkHome)
-      // .set("spark.akka.logAkkaConfig", "true")
-      val sc = new SparkContext(sparkConf)
-
-      val observations = model.getObservationsAsRDD(sc)
+      val observations = model.getObservationsAsRDD(sparkContext)
       observations.saveAsObjectFile(uri)
 
-      sc.stop()
-
-      resp.setContentType("application/json");
+      resp.setContentType("application/json")
       jsonMapper.writeValue(resp.getOutputStream, "success")
     } finally {
       timeContext.stop()
@@ -50,7 +38,7 @@ class WriteToHDFSServlet(model: Model[_, _], timer: Timer, sparkMaster: String, 
 }
 
 
-class LoadNewModelServlet(model: Model[_, _], timer: Timer, sparkMaster: String, sparkDataLocation: String)
+class LoadNewModelServlet(model: Model[_, _], timer: Timer, sparkContext: SparkContext, sparkDataLocation: String)
     extends HttpServlet with Logging {
 
   override def doPost(req: HttpServletRequest, resp: HttpServletResponse) {
@@ -59,18 +47,8 @@ class LoadNewModelServlet(model: Model[_, _], timer: Timer, sparkMaster: String,
     try {
       val uri = s"$sparkDataLocation/${modelLocation.userWeightsLoc}"
 
-      val sparkHome = "/root/spark-1.3.0-bin-hadoop1"
-      logWarning("Starting spark context")
-      val sparkConf = new SparkConf()
-          .setMaster(sparkMaster)
-          .setAppName("VeloxOnSpark!")
-          .setJars(SparkContext.jarOfObject(this).toSeq)
-          .setSparkHome(sparkHome)
-
-      val sc = new SparkContext(sparkConf)
-
       // TODO only add users in this partition: if (userId % partNum == 0)
-      val users = sc.textFile(s"$uri/users/*").map(line => {
+      val users = sparkContext.textFile(s"$uri/users/*").map(line => {
         val userSplits = line.split(", ")
         val userId = userSplits(0).toLong
         val userFeatures: Array[Double] = userSplits.drop(1).map(_.toDouble)

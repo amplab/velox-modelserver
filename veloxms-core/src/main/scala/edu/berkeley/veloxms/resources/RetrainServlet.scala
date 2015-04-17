@@ -3,6 +3,8 @@ package edu.berkeley.veloxms.resources
 import java.util.Date
 import javax.servlet.http.{HttpServletResponse, HttpServletRequest, HttpServlet}
 
+import org.apache.spark.SparkContext
+
 import scala.concurrent.Await
 import scala.concurrent.duration.Duration
 import com.codahale.metrics.Timer
@@ -30,7 +32,7 @@ import org.apache.hadoop.fs._
 
 class RetrainServlet(
     model: Model[_, _],
-    sparkMaster: String,
+    sparkContext: SparkContext,
     sparkDataLocation: String,
     timer: Timer,
     etcdClient: EtcdClient,
@@ -48,9 +50,9 @@ class RetrainServlet(
       val lockAcquired = etcdClient.acquireRetrainLock(modelName)
 
       if (lockAcquired) {
-        val nextVersion = new Date()
-        val obsDataLocation = HDFSLocation(s"$modelName/observations/${nextVersion.getTime}")
-        val newModelLocation = LoadModelParameters(s"$modelName/retrained_model/${nextVersion.getTime}", nextVersion)
+        val nextVersion = new Date().getTime
+        val obsDataLocation = HDFSLocation(s"$modelName/observations/$nextVersion")
+        val newModelLocation = LoadModelParameters(s"$modelName/retrained_model/$nextVersion", nextVersion)
 
         val hosts = hostPartitionMap.map({
           case(h, _) => host(h, veloxPort).setContentType("application/json", "UTF-8")
@@ -68,7 +70,7 @@ class RetrainServlet(
         val writeResponses = Await.result(writeResponseFutures, Duration.Inf)
         logInfo(s"Write to hdfs responses: ${writeResponses.mkString("\n")}")
         model.retrainInSpark(
-          sparkMaster,
+          sparkContext,
           s"$sparkDataLocation/${obsDataLocation.loc}",
           s"$sparkDataLocation/${newModelLocation.userWeightsLoc}",
           nextVersion)
