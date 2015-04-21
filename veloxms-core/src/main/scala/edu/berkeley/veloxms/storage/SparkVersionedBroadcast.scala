@@ -10,6 +10,7 @@ import scala.reflect.ClassTag
 
 /**
  * A versioned broadcast that works via reading & writing to a global filesystem via the spark cluster
+ * @tparam T Has ClassTag because sc.objectFile (to load the broadcast) requires a classtag
  */
 class SparkVersionedBroadcast[T: ClassTag](sc: SparkContext, path: String) extends VersionedBroadcast[T] {
   private val cachedValues: mutable.Map[Version, T] = mutable.Map()

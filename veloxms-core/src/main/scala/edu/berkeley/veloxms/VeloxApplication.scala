@@ -56,7 +56,7 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
 
     // this assumes that etcd is running on each velox server
     val etcdClient = new EtcdClient(conf.hostname, 4001, conf.hostname, new DispatchUtil)
-    logWarning("Starting spark context")
+    logInfo("Starting spark context")
     val sparkConf = new SparkConf()
         .setMaster(conf.sparkMaster)
         .setAppName("VeloxOnSpark!")
