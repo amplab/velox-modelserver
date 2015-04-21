@@ -13,7 +13,7 @@ package object veloxms {
   type FeatureVector = Array[Double]
   type WeightVector = Array[Double]
   type UserID = Long
-  type Version = Date
+  type Version = Long
 
   val jsonMapper = new ObjectMapper().registerModule(new DefaultScalaModule)
 }

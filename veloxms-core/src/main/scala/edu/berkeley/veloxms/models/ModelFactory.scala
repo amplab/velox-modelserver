@@ -4,6 +4,7 @@ import javax.validation.constraints.NotNull
 
 import com.fasterxml.jackson.annotation.JsonProperty
 import edu.berkeley.veloxms._
+import edu.berkeley.veloxms.storage.BroadcastProvider
 import edu.berkeley.veloxms.util.{EtcdClient, Logging}
 import io.dropwizard.setup.Environment
 import org.hibernate.validator.constraints.NotEmpty
@@ -21,7 +22,7 @@ class ModelFactory extends Logging {
   val cachePredictions: Boolean = false
   val cacheFeatures: Boolean = false
 
-  def build(env: Environment, modelName: String, hostname: String, etcdClient: EtcdClient): (Model[_, _], Int, Map[String, Int]) = {
+  def build(env: Environment, modelName: String, hostname: String, broadcastProvider: BroadcastProvider): (Model[_, _], Int, Map[String, Int]) = {
     modelType match {
       case "MatrixFactorizationModel" => {
         require(partitionFile != "")
@@ -31,7 +32,7 @@ class ModelFactory extends Logging {
         val averageUser = Array.fill[Double](modelSize)(1.0)
         val model = new MatrixFactorizationModel(
             modelName,
-            etcdClient,
+            broadcastProvider,
             modelSize,
             averageUser,
             cachePartialSums,
@@ -54,7 +55,7 @@ class ModelFactory extends Logging {
         val averageUser = Array.fill[Double](modelSize)(1.0)
         val model = new NewsgroupsModel(
             modelName,
-            etcdClient,
+            broadcastProvider,
             modelLoc,
             modelSize,
             averageUser,

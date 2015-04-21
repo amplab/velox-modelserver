@@ -11,6 +11,8 @@ import io.dropwizard.setup.Bootstrap
 import io.dropwizard.setup.Environment
 import com.fasterxml.jackson.annotation.JsonProperty
 import javax.validation.constraints.NotNull
+import org.apache.spark.{SparkContext, SparkConf}
+
 import scala.collection.mutable
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
 
@@ -54,9 +56,17 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
 
     // this assumes that etcd is running on each velox server
     val etcdClient = new EtcdClient(conf.hostname, 4001, conf.hostname, new DispatchUtil)
+    logInfo("Starting spark context")
+    val sparkConf = new SparkConf()
+        .setMaster(conf.sparkMaster)
+        .setAppName("VeloxOnSpark!")
+        .setJars(SparkContext.jarOfObject(this).toSeq)
+
+    val sparkContext = new SparkContext(sparkConf)
+    val broadcastProvider = new SparkVersionedBroadcastProvider(sparkContext, conf.sparkDataLocation)
 
     conf.modelFactories.foreach { case (name, modelFactory) => {
-      val (model, partition, partitionMap) = modelFactory.build(env, name, conf.hostname, etcdClient)
+      val (model, partition, partitionMap) = modelFactory.build(env, name, conf.hostname, broadcastProvider)
 
       val predictServlet = new PointPredictionServlet(model, env.metrics().timer(name + "/predict/"))
       val topKServlet = new TopKPredictionServlet(model, env.metrics().timer(name + "/predict_top_k/"))
@@ -67,12 +77,12 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
       val writeHdfsServlet = new WriteToHDFSServlet(
           model,
           env.metrics().timer(name + "/observe/"),
-          conf.sparkMaster,
+          sparkContext,
           conf.sparkDataLocation,
           partition)
       val retrainServlet = new RetrainServlet(
           model,
-          conf.sparkMaster,
+          sparkContext,
           conf.sparkDataLocation,
           env.metrics().timer(name + "/retrain/"),
           etcdClient,
@@ -81,7 +91,7 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
       val loadNewModelServlet = new LoadNewModelServlet(
           model,
           env.metrics().timer(name + "/loadmodel/"),
-          conf.sparkMaster,
+          sparkContext,
           conf.sparkDataLocation)
       env.getApplicationContext.addServlet(new ServletHolder(predictServlet), "/predict/" + name)
       env.getApplicationContext.addServlet(new ServletHolder(topKServlet), "/predict_top_k/" + name)
