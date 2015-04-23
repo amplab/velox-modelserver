@@ -16,9 +16,7 @@ base_path = "/v2/keys/cluster_config"
 pp = pprint.PrettyPrinter(indent=4)
 
 partitions = {
-                'ec2-54.com': 0,
-                'ec2-202.com': 1,
-                '127.0.0.1': 2
+                '127.0.0.1': 0
              }
 
 
@@ -29,7 +27,6 @@ matrixfact_config = {
                         'cachePredictions': 'False',
                         'dimensions': 50,
                         'modelType': 'MatrixFactorizationModel',
-                        'storageConfig': {'storageType': 'OnHeap'}
                     }
 
 newsgroups_config = {
@@ -38,13 +35,12 @@ newsgroups_config = {
                         'cachePredictions': 'False',
                         'dimensions': 50,
                         'modelType': 'NewsgroupsModel',
-                        'storageConfig': {'storageType': 'OnHeap'},
                         'modelLoc': '/Users/crankshaw/veloxms/data/news-classifier-from-tomer'
                     }
 
 sample_config_1 = {
                     # 'hostname': "localhost",
-                    'sparkMaster': "ec2-54-204-155.compute-1.amazonaws.com",
+                    'sparkMaster': "ec2-54-161-45-155.compute-1.amazonaws.com",
                     'veloxPartitions': json.dumps(partitions),
                     'models': {
                         'matrixfact': matrixfact_config,
@@ -54,7 +50,8 @@ sample_config_1 = {
 
 sample_config_2 = {
                     # 'hostname': "localhost",
-                    'sparkMaster': "ec2-foo-bar-baz.compute-1.amazonaws.com",
+                    'sparkMaster': "spark://ec2-54-161-45-155.compute-1.amazonaws.com:7077",
+                    'sparkDataLocation': "hdfs://ec2-54-161-45-155.compute-1.amazonaws.com:9000/velox",
                     'veloxPartitions': json.dumps(partitions),
                     'models': [
                         { 'matrixfact': json.dumps(matrixfact_config) },

@@ -182,11 +182,9 @@ case class VeloxModelConfig(
   cachePredictions: Boolean,
   dimensions: Int,
   modelType: String,
-  storageConfig: StorageConfig,
   modelLoc: Option[String]
 )
 
-case class StorageConfig(storageType: String)
 
 
 
