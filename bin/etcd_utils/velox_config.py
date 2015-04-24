@@ -15,6 +15,9 @@ base_path = "/v2/keys/cluster_config"
 
 pp = pprint.PrettyPrinter(indent=4)
 
+# Dict whose keys are hostnames or IP addresses and whose values are the
+# partition assignments of those machines. Partition assignments should be
+# unique
 partitions = {
                 '127.0.0.1': 0
              }
@@ -49,22 +52,16 @@ sample_config_1 = {
                 }
 
 sample_config_2 = {
-                    # 'hostname': "localhost",
                     'sparkMaster': "spark://ec2-54-161-45-155.compute-1.amazonaws.com:7077",
                     'sparkDataLocation': "hdfs://ec2-54-161-45-155.compute-1.amazonaws.com:9000/velox",
                     'veloxPartitions': json.dumps(partitions),
                     'models': [
                         { 'matrixfact': json.dumps(matrixfact_config) },
-                        # { 'newsgroups': json.dumps(newsgroups_config) }
                     ]
                 }
 
 def add_kv_to_etcd(key_path, value):
 
-    # headers = {'content-type': 'application/x-www-form-urlencoded'}
-
-    # request lib automatically form encodes payload data passed as a dict
-    # http://docs.python-requests.org/en/latest/user/quickstart/#more-complicated-post-requests
     payload = {'value': str(value)}
     r = requests.put(etcd_host + key_path, data=payload)
     pp.pprint(r.json())
@@ -93,30 +90,4 @@ def main():
 
 if __name__=='__main__':
     main()
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

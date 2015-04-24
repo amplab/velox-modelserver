@@ -169,6 +169,9 @@ abstract class Model[T:ClassTag, U] extends Logging {
     logInfo("Finished retraining new model")
   }
 
+  // TODO: This should not be in Model. It should be moved to some sort of
+  // retrain manager separate from the model implementation. That is also probably
+  // where the online and offline retrain scheduling should go.
   def batchTrain(): String = {
 
     var retrainResult = ""
@@ -370,6 +373,8 @@ abstract class Model[T:ClassTag, U] extends Logging {
   /**
    * Initializes scheduling of batch (offline) training periodically
    * @param period how often to retrain offline
+   * TODO(tomerk): Update to use Guava's ScheduledService, the same way we are planning on scheduling
+   * online updates.
    */
   def scheduleOfflineRetraining(period: Duration) {
     val poolsize = 1
