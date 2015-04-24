@@ -24,7 +24,11 @@ case class NodeListElement(
   key: String,
   dir: Option[Boolean],
   value: Option[String],
-  nodes: Option[List[NodeListElement]]
+  nodes: Option[List[NodeListElement]],
+  createdIndex: Int,
+  modifiedIndex: Int,
+  expiration: Option[String],
+  ttl: Option[Int]
 )
 
   

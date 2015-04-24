@@ -3,19 +3,25 @@ package edu.berkeley.veloxms.models
 import edu.berkeley.veloxms._
 import edu.berkeley.veloxms.storage.BroadcastProvider
 import org.apache.spark.rdd._
+import org.apache.spark.SparkContext
 import org.apache.spark.mllib.recommendation.{ALS,Rating}
-
+import edu.berkeley.veloxms.util._
 class MatrixFactorizationModel(
-    val name: String,
+    val modelName: String,
     val broadcastProvider: BroadcastProvider,
     val numFeatures: Int,
     val averageUser: WeightVector,
-    val cacheResults: Boolean,
+    val cachePartialSums: Boolean,
     val cacheFeatures: Boolean,
-    val cachePredictions: Boolean
+    val cachePredictions: Boolean,
+    val masterPartition: Int,
+    val hostPartitionMap: Map[String, Int],
+    val etcdClient: EtcdClient,
+    val sparkContext: SparkContext,
+    val sparkDataLocation: String
   ) extends Model[Long, FeatureVector] {
 
-  val defaultItem: FeatureVector = Array.fill[Double](numFeatures)(0.0)
+  override def defaultItem: FeatureVector = Array.fill[Double](numFeatures)(0.0)
 
   val itemStorage = broadcast[Map[Long, FeatureVector]]("items")
 

@@ -7,7 +7,7 @@ import edu.berkeley.veloxms._
 import edu.berkeley.veloxms.models.Model
 import edu.berkeley.veloxms.util.Logging
 
-class AddObservationServlet(model: Model[_, _], sparkMaster: String, timer: Timer) extends HttpServlet with Logging {
+class AddObservationServlet(model: Model[_, _], timer: Timer) extends HttpServlet with Logging {
   override def doPost(req: HttpServletRequest, resp: HttpServletResponse) {
     val timeContext = timer.time()
     try {

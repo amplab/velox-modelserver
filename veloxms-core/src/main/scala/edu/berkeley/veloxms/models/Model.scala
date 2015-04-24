@@ -5,6 +5,7 @@ import java.util.Date
 import java.util.concurrent.{ConcurrentHashMap, ConcurrentLinkedQueue}
 
 import edu.berkeley.veloxms._
+import edu.berkeley.veloxms.util._
 import edu.berkeley.veloxms.storage._
 import edu.berkeley.veloxms.util._
 import org.apache.spark.{SparkContext, SparkConf}
@@ -16,10 +17,18 @@ import scala.collection.mutable
 // import org.codehaus.jackson.JsonNode
 import com.fasterxml.jackson.databind.{ObjectMapper, JsonNode}
 import breeze.linalg._
+import java.util.concurrent.{ScheduledThreadPoolExecutor, TimeUnit}
 
 import scala.reflect._
 import scala.util.{Failure, Success, Try}
 import scala.util.Sorting
+import scala.concurrent.duration.Duration
+import scala.concurrent.Await
+
+import edu.berkeley.veloxms.resources.internal.{LoadModelParameters, HDFSLocation}
+import dispatch._, Defaults._
+import org.apache.hadoop.conf._
+import org.apache.hadoop.fs._
 
 
 /**
@@ -32,8 +41,12 @@ import scala.util.Sorting
  */
 abstract class Model[T:ClassTag, U] extends Logging {
 
-  val name: String
-  val broadcastProvider: BroadcastProvider
+
+  val featureCache: FeatureCache[(T, Version), Array[Double]] =
+      new FeatureCache[(T, Version), Array[Double]](cacheFeatures)
+
+  val predictionCache: FeatureCache[(UserID, T, Version), Double] =
+      new FeatureCache[(UserID, T, Version), Double](cachePredictions)
 
   private var version: Version = new Date(0).getTime
   def currentVersion: Version = version
@@ -43,42 +56,54 @@ abstract class Model[T:ClassTag, U] extends Logging {
     this.version = version
   }
 
+  // Abstract members should be def, not val, as this provides
+  // much more flexibility about how they are implemented
+
+  def broadcastProvider: BroadcastProvider
+
+  def cachePartialSums: Boolean
+
+  def cacheFeatures: Boolean
+
+  def cachePredictions: Boolean
+
+  def masterPartition: Int
+
+  def modelName: String
+
   // TODO: Observations should be stored w/ Timestamps, and in a more relational format w/ persistence
   val observations: ConcurrentHashMap[UserID, mutable.Map[T, Double]] = new ConcurrentHashMap()
   val userWeights: ConcurrentHashMap[(UserID, Version), WeightVector] = new ConcurrentHashMap()
 
-  val cacheResults: Boolean
-  val cacheFeatures: Boolean
-  val cachePredictions: Boolean
+  def hostPartitionMap: Map[String, Int]
 
-  val featureCache: FeatureCache[(T, Version), Array[Double]] =
-      new FeatureCache[(T, Version), Array[Double]](cacheFeatures)
+  def etcdClient: EtcdClient
 
-  val predictionCache: FeatureCache[(UserID, T, Version), Double] =
-      new FeatureCache[(UserID, T, Version), Double](cachePredictions)
+  def sparkContext: SparkContext
 
-  private val partialResults = new PartialResultsCache()
-
+  def sparkDataLocation: String
 
   /** The number of features in this model.
    * Used for pre-allocating arrays/matrices
    */
-  val numFeatures: Int
+  def numFeatures: Int
 
   /**
    * The default feature vector to use for an incomputable item
    */
-  val defaultItem: FeatureVector
+  def defaultItem: FeatureVector
 
   /** Average user weight vector.
    * Used for warmstart for new users
    * TODO: SHOULD BE RETRAINED WHEN BULK RETRAINING!!!
    **/
-  val averageUser: WeightVector
+  def averageUser: WeightVector
+
+  private val partialResults = new PartialResultsCache()
 
   val broadcasts = new ConcurrentLinkedQueue[VersionedBroadcast[_]]()
   protected def broadcast[V: ClassTag](id: String): VersionedBroadcast[V] = {
-    val b = broadcastProvider.get[V](s"$name/$id")
+    val b = broadcastProvider.get[V](s"$modelName/$id")
     broadcasts.add(b)
     b
   }
@@ -142,6 +167,70 @@ abstract class Model[T:ClassTag, U] extends Logging {
     userWeights.saveAsTextFile(newModelsDir + "/users")
 
     logInfo("Finished retraining new model")
+  }
+
+  // TODO: This should not be in Model. It should be moved to some sort of
+  // retrain manager separate from the model implementation. That is also probably
+  // where the online and offline retrain scheduling should go.
+  def batchTrain(): String = {
+
+    var retrainResult = ""
+    val veloxPort = 8080
+    try {
+      // coordinate retraining: returns false if retrain already going on
+
+      val http = Http.configure(_.setAllowPoolingConnection(true).setFollowRedirects(true))
+      logInfo(s"Starting retrain for model $modelName")
+      val lockAcquired = etcdClient.acquireRetrainLock(modelName)
+
+      if (lockAcquired) {
+        val hosts = hostPartitionMap.map({
+          case(h, _) => host(h, veloxPort).setContentType("application/json", "UTF-8")
+        })
+
+        val nextVersion = new Date().getTime
+        val obsDataLocation = HDFSLocation(s"$modelName/observations/$nextVersion")
+        val newModelLocation = LoadModelParameters(s"$modelName/retrained_model/$nextVersion", nextVersion)
+
+
+        // TODO Delete observation and new_model dirs if exist
+        val writeRequests = hosts.map(
+          h => {
+            val req = (h / "writehdfs" / modelName)
+              .POST << jsonMapper.writeValueAsString(obsDataLocation)
+            http(req OK as.String)
+          })
+
+        val writeResponseFutures = Future.sequence(writeRequests)
+        val writeResponses = Await.result(writeResponseFutures, Duration.Inf)
+        logInfo(s"Write to hdfs responses: ${writeResponses.mkString("\n")}")
+
+        this.retrainInSpark(
+          sparkContext,
+          s"$sparkDataLocation/${obsDataLocation.loc}",
+          s"$sparkDataLocation/${newModelLocation.userWeightsLoc}",
+          nextVersion)
+
+        val loadModelRequests = hosts.map(
+          h => {
+            val req = (h / "loadmodel" / modelName)
+              .POST << jsonMapper.writeValueAsString(newModelLocation)
+            http(req OK as.String)
+          })
+
+        val loadResponseFutures = Future.sequence(loadModelRequests)
+        val loadResponses = Await.result(loadResponseFutures, Duration.Inf)
+        logInfo(s"Load new model responses: ${loadResponses.mkString("\n")}")
+        retrainResult = "Success"
+      } else {
+        retrainResult = "Failed to acquire lock"
+      }
+    } finally {
+      val lockReleased = etcdClient.releaseRetrainLock(modelName)
+      logInfo(s"released lock successfully: $lockReleased")
+    }
+    logInfo(s"Result of batch retrain: $retrainResult")
+    retrainResult
   }
 
   /**
@@ -263,7 +352,7 @@ abstract class Model[T:ClassTag, U] extends Logging {
     val (newWeights, newPartialResult) = UpdateMethods.updateWithBreeze(
       partialFeaturesSum, partialScoresSum, newItems)
 
-    if (cacheResults) {
+    if (cachePartialSums) {
       partialResults.put((version, uid), newPartialResult)
     }
     newWeights
@@ -281,6 +370,24 @@ abstract class Model[T:ClassTag, U] extends Logging {
     sc.parallelize(x)
   }
 
+  /**
+   * Initializes scheduling of batch (offline) training periodically
+   * @param period how often to retrain offline
+   * TODO(tomerk): Update to use Guava's ScheduledService, the same way we are planning on scheduling
+   * online updates.
+   */
+  def scheduleOfflineRetraining(period: Duration) {
+    val poolsize = 1
+    // TODO if we are scheduling multiple tasks, may want to only use
+    // a single Executor shared among the models
+    val executor = new ScheduledThreadPoolExecutor(poolsize)
+    val retrainCmd = new Runnable {
+      def run() {
+        batchTrain()
+      }
+    }
+    executor.scheduleWithFixedDelay(retrainCmd, period.toMillis, period.toMillis, TimeUnit.MILLISECONDS)
+  }
 }
 
 

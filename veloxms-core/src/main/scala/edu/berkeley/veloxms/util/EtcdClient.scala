@@ -34,6 +34,8 @@ object EtcdConstants {
 
 }
 
+class EtcdException(msg: String) extends RuntimeException(msg)
+
 // https://github.com/dispatch/reboot/blob/f09f246cd12c0bb9212f92667b4cd49810f84454/core/src/main/scala/handlers.scala
 trait OkAnd404Handler[T] extends AsyncHandler[T] {
   abstract override def onStatusReceived(status: HttpResponseStatus) = {
@@ -83,6 +85,38 @@ class EtcdClient(etcdHost: String, etcdPort: Int, hostname: String, dispatchUtil
   // Etcd assumes the content type is application/x-www-form-urlencoded for puts. It won't
   // read the value otherwise.
   val etcdServer = host(etcdHost, etcdPort).setContentType("application/x-www-form-urlencoded", "UTF-8")
+
+  // returns the value if the key exists
+  def getValue(key: String): String = {
+    val getReq = (etcdServer / EtcdConstants.basePath / key).GET
+    val getResponse = dispatchUtil.sendRequestAccept404(getReq)
+    val (status, json) = Await.result(getResponse, Duration.Inf)
+    if (status == 404) {
+      throw new EtcdException(s"Tried to get value for key $key that doesn't exist")
+    } else {
+      jsonMapper.readValue(json, classOf[EtcdResponse]).node.value.getOrElse("")
+    }
+  }
+
+  // returns the value if the key exists
+  def listDir(key: String): List[String] = {
+    val getReq = (etcdServer / EtcdConstants.basePath / key).GET
+    val getResponse = dispatchUtil.sendRequestAccept404(getReq)
+    val (status, json) = Await.result(getResponse, Duration.Inf)
+    if (status == 404) {
+      throw new EtcdException(s"Directory $key does not exist")
+    } else {
+      val nodesList = jsonMapper.readValue(json, classOf[EtcdListResponse]).node
+      if (nodesList.dir.isEmpty) {
+        throw new EtcdException(s"Node $key is not a directory")
+      } else if (nodesList.nodes.isEmpty) {
+        // dir exists but is empty
+        List[String]()
+      } else {
+        nodesList.nodes.get.map(_.key)
+      }
+    }
+  }
   
   /**
    * This is a blocking call
