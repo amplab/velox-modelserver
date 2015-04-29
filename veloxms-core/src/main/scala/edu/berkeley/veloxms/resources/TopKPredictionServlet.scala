@@ -7,7 +7,9 @@ import edu.berkeley.veloxms._
 
 import javax.servlet.http.{HttpServlet, HttpServletRequest, HttpServletResponse}
 
-class TopKPredictionServlet(model: Model[_, _], timer: Timer) extends HttpServlet {
+import scala.reflect._
+
+class TopKPredictionServlet[T : ClassTag](model: Model[T], timer: Timer) extends HttpServlet {
   override def doPost(req: HttpServletRequest, resp: HttpServletResponse) = {
     val timeContext = timer.time()
     try {
@@ -20,7 +22,8 @@ class TopKPredictionServlet(model: Model[_, _], timer: Timer) extends HttpServle
       val k: Int = input.get("k").asInt()
       val context = input.get("context")
 
-      val topK = model.predictTopK(uid, k, context, model.currentVersion)
+      val candidateSet: Array[T] = fromJson[Array[T]](context)
+      val topK = model.predictTopK(uid, k, candidateSet, model.currentVersion)
 
       resp.setContentType("application/json")
       jsonMapper.writeValue(resp.getOutputStream, topK)

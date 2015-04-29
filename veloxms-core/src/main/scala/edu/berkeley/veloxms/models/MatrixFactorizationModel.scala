@@ -10,18 +10,10 @@ class MatrixFactorizationModel(
     val modelName: String,
     val broadcastProvider: BroadcastProvider,
     val numFeatures: Int,
-    val averageUser: WeightVector,
-    val cachePartialSums: Boolean,
-    val cacheFeatures: Boolean,
-    val cachePredictions: Boolean,
-    val masterPartition: Int,
-    val hostPartitionMap: Map[String, Int],
-    val etcdClient: EtcdClient,
-    val sparkContext: SparkContext,
-    val sparkDataLocation: String
-  ) extends Model[Long, FeatureVector] {
+    val averageUser: WeightVector
+  ) extends Model[Long] {
 
-  override def defaultItem: FeatureVector = Array.fill[Double](numFeatures)(0.0)
+  val defaultItem: FeatureVector = Array.fill[Double](numFeatures)(0.0)
 
   val itemStorage = broadcast[Map[Long, FeatureVector]]("items")
 
@@ -33,9 +25,9 @@ class MatrixFactorizationModel(
     itemStorage.get(version).flatMap(_.get(data)) match {
       case Some(features) => features
       case None => {
-        val msg = s"Features for item $data not found"
+        val msg = s"Features for item $data not found, defaulting to a 0-vector"
         logWarning(msg)
-        throw new NoSuchElementException(msg)
+        defaultItem
       }
     }
   }
@@ -46,7 +38,7 @@ class MatrixFactorizationModel(
    * @param nextVersion
    * @return
    */
-  override protected def retrainFeatureModelsInSpark(
+  override def retrainFeatureModelsInSpark(
       observations: RDD[(UserID, Long, Double)],
       nextVersion: Version): RDD[(UserID, FeatureVector)] = {
     val trainingData = observations.map(y => Rating(y._1.toInt, y._2.toInt, y._3))

@@ -14,7 +14,9 @@ import edu.berkeley.veloxms._
 import com.codahale.metrics.annotation.Timed
 import edu.berkeley.veloxms.models.Model
 
-class PointPredictionServlet(model: Model[_, _], timer: Timer) extends HttpServlet {
+import scala.reflect._
+
+class PointPredictionServlet[T : ClassTag](model: Model[T], timer: Timer) extends HttpServlet {
   override def doPost(req: HttpServletRequest, resp: HttpServletResponse) {
     val timeContext = timer.time()
     try {
@@ -24,7 +26,9 @@ class PointPredictionServlet(model: Model[_, _], timer: Timer) extends HttpServl
       require(input.has("context"))
       val uid = input.get("uid").asLong
       val context = input.get("context")
-      val score = model.predict(uid, context, model.currentVersion)
+      val item: T = fromJson(context)
+
+      val score = model.predict(uid, item, model.currentVersion)
       resp.setContentType("application/json")
       jsonMapper.writeValue(resp.getOutputStream, score)
     } finally {

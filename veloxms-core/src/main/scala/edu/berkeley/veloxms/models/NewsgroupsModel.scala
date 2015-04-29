@@ -18,19 +18,9 @@ class NewsgroupsModel(
     val broadcastProvider: BroadcastProvider,
     val modelLoc: String,
     val numFeatures: Int,
-    val averageUser: WeightVector,
-    val cachePartialSums: Boolean,
-    val cacheFeatures: Boolean,
-    val cachePredictions: Boolean,
-    val masterPartition: Int,
-    val hostPartitionMap: Map[String, Int],
-    val etcdClient: EtcdClient,
-    val sparkContext: SparkContext,
-    val sparkDataLocation: String
-  ) extends Model[String, FeatureVector] with Logging {
-
-  override def defaultItem: FeatureVector = Array.fill[Double](numFeatures)(0.0)
-
+    val averageUser: WeightVector
+  ) extends Model[String] with Logging {
+  
   private val initialModel: Transformer[String, FeatureVector] = {
     val fis = new FileInputStream(modelLoc)
     val ois = new ObjectInputStream(fis)
@@ -51,7 +41,7 @@ class NewsgroupsModel(
     modelBroadcast.get(version).get.transform(data)
   }
 
-  override protected def retrainFeatureModelsInSpark(observations: RDD[(UserID, String, Double)], nextVersion: Version): RDD[(String, FeatureVector)] = {
+  override def retrainFeatureModelsInSpark(observations: RDD[(UserID, String, Double)], nextVersion: Version): RDD[(String, FeatureVector)] = {
     val conf = new SparkConf().setAppName("classifier").setMaster("local[4]")//.setJars(SparkContext.jarOfObject(this).toSeq)
 
     val sc = new SparkContext(conf)

@@ -52,8 +52,8 @@ sample_config_1 = {
                 }
 
 sample_config_2 = {
-                    'sparkMaster': "spark://ec2-54-161-45-155.compute-1.amazonaws.com:7077",
-                    'sparkDataLocation': "hdfs://ec2-54-161-45-155.compute-1.amazonaws.com:9000/velox",
+                    'sparkMaster': "local[2]",
+                    'sparkDataLocation': "/Users/tomerk11/Desktop/velox-data",
                     'veloxPartitions': json.dumps(partitions),
                     'models': [
                         { 'matrixfact': json.dumps(matrixfact_config) },

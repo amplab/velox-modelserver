@@ -1,18 +1,19 @@
 package edu.berkeley.veloxms.storage
 
 import edu.berkeley.veloxms._
-import edu.berkeley.veloxms.util.{EtcdClient, KryoThreadLocal}
+import edu.berkeley.veloxms.util.{Logging, EtcdClient, KryoThreadLocal}
 import org.apache.spark.{SparkContext, SparkConf}
 import sun.misc.{BASE64Decoder, BASE64Encoder}
 
 import scala.collection.mutable
 import scala.reflect.ClassTag
+import scala.util.control.NonFatal
 
 /**
  * A versioned broadcast that works via reading & writing to a global filesystem via the spark cluster
  * @tparam T Has ClassTag because sc.objectFile (to load the broadcast) requires a classtag
  */
-class SparkVersionedBroadcast[T: ClassTag](sc: SparkContext, path: String) extends VersionedBroadcast[T] {
+class SparkVersionedBroadcast[T: ClassTag](sc: SparkContext, path: String) extends VersionedBroadcast[T] with Logging {
   private val cachedValues: mutable.Map[Version, T] = mutable.Map()
 
   override def put(value: T, version: Version): Unit = this.synchronized {
@@ -31,6 +32,12 @@ class SparkVersionedBroadcast[T: ClassTag](sc: SparkContext, path: String) exten
 
   private def fetch(version: Version): Option[T] = {
     val location = s"$path/$version"
-    Some(sc.objectFile(location).first())
+    try {
+      Some(sc.objectFile(location).first())
+    } catch {
+      case NonFatal(e) =>
+        logWarning(s"Failed to load broadcast. ${e.getMessage}")
+        None
+    }
   }
 }

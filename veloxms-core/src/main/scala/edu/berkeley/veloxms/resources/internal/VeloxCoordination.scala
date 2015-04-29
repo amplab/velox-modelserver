@@ -1,23 +1,51 @@
 package edu.berkeley.veloxms.resources.internal
 
-import javax.servlet.http.{HttpServletResponse, HttpServletRequest, HttpServlet}
+import javax.servlet.http.{HttpServlet, HttpServletRequest, HttpServletResponse}
 
 import com.codahale.metrics.Timer
-import edu.berkeley.veloxms.models.Model
 import edu.berkeley.veloxms._
+import edu.berkeley.veloxms.background.OnlineUpdateManager
+import edu.berkeley.veloxms.models.Model
 import edu.berkeley.veloxms.util.Logging
-import org.apache.hadoop.conf._
-import org.apache.hadoop.fs._
-import org.apache.commons.io.IOUtils
-import java.io.StringWriter
-
-import org.apache.spark.{SparkContext, SparkConf}
+import org.apache.spark.SparkContext
 
 case class HDFSLocation(loc: String)
 case class LoadModelParameters(userWeightsLoc: String, version: Version)
 
-class WriteToHDFSServlet(
-    model: Model[_, _],
+class DisableOnlineUpdates(
+    onlineUpdateManager: OnlineUpdateManager[_],
+    timer: Timer) extends HttpServlet with Logging {
+
+  override def doPost(req: HttpServletRequest, resp: HttpServletResponse) {
+    val timeContext = timer.time()
+    try {
+      onlineUpdateManager.disableOnlineUpdates()
+      resp.setContentType("application/json")
+      jsonMapper.writeValue(resp.getOutputStream, "success")
+    } finally {
+      timeContext.stop()
+    }
+  }
+}
+
+class EnableOnlineUpdates(
+    onlineUpdateManager: OnlineUpdateManager[_],
+    timer: Timer) extends HttpServlet with Logging {
+
+  override def doPost(req: HttpServletRequest, resp: HttpServletResponse) {
+    val timeContext = timer.time()
+    try {
+      onlineUpdateManager.enableOnlineUpdates()
+      resp.setContentType("application/json")
+      jsonMapper.writeValue(resp.getOutputStream, "success")
+    } finally {
+      timeContext.stop()
+    }
+  }
+}
+
+class WriteToHDFSServlet[T](
+    model: Model[T],
     timer: Timer,
     sparkContext: SparkContext,
     sparkDataLocation: String,
@@ -38,11 +66,10 @@ class WriteToHDFSServlet(
       timeContext.stop()
     }
   }
-
 }
 
 
-class LoadNewModelServlet(model: Model[_, _], timer: Timer, sparkContext: SparkContext, sparkDataLocation: String)
+class LoadNewModelServlet(model: Model[_], timer: Timer, sparkContext: SparkContext, sparkDataLocation: String)
     extends HttpServlet with Logging {
 
   override def doPost(req: HttpServletRequest, resp: HttpServletResponse) {
@@ -56,7 +83,6 @@ class LoadNewModelServlet(model: Model[_, _], timer: Timer, sparkContext: SparkC
         val userSplits = line.split(", ")
         val userId = userSplits(0).toLong
         val userFeatures: Array[Double] = userSplits.drop(1).map(_.toDouble)
-        // TODO this should be inserted into storage backend
         (userId, userFeatures)
       }).collect().toMap
 
