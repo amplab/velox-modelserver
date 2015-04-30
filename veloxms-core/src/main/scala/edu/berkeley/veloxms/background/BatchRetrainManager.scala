@@ -76,7 +76,7 @@ class BatchRetrainManager[T](
         // Write the observations to the spark server
         val writeRequests = hosts.map(
           h => {
-            val req = (h / "writehdfs" / modelName)
+            val req = (h / "writetrainingdata" / modelName)
                 .POST << jsonMapper.writeValueAsString(obsDataLocation)
             http(req OK as.String)
           })

@@ -25,17 +25,15 @@ partitions = {
 
 
 matrixfact_config = {
-                        'cacheFeatures': 'False',
-                        'cachePartialSums': 'False',
-                        'cachePredictions': 'False',
+                        'onlineUpdateDelayInMillis': 5000,
+                        'batchRetrainDelayInMillis': 500000,
                         'dimensions': 50,
                         'modelType': 'MatrixFactorizationModel',
                     }
 
 newsgroups_config = {
-                        'cacheFeatures': 'False',
-                        'cachePartialSums': 'False',
-                        'cachePredictions': 'False',
+                        'onlineUpdateDelayInMillis': 5000,
+                        'batchRetrainDelayInMillis': 500000,
                         'dimensions': 50,
                         'modelType': 'NewsgroupsModel',
                         'modelLoc': '/Users/crankshaw/veloxms/data/news-classifier-from-tomer'

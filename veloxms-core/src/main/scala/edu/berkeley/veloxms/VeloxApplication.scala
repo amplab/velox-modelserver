@@ -103,6 +103,8 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
   def registerModelResources[T : ClassTag](
       model: Model[T],
       name: String,
+      onlineUpdateDelayInMillis: Long,
+      batchRetrainDelayInMillis: Long,
       sparkContext: SparkContext,
       etcdClient: EtcdClient,
       broadcastProvider: BroadcastProvider,
@@ -110,8 +112,7 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
       partitionMap: Map[String, Int],
       env: Environment,
       hostname: String): Unit = {
-    val onlineUpdateManager = new OnlineUpdateManager(model, 5, TimeUnit.SECONDS, env.metrics().timer(s"$name/online_update"))
-    // TODO (Dan): Have the env.lifecycle manage the batchretrainmanager w/ whatever delay settings you want
+    val onlineUpdateManager = new OnlineUpdateManager(model, onlineUpdateDelayInMillis, TimeUnit.MILLISECONDS, env.metrics().timer(s"$name/online_update"))
     val batchRetrainManager = new BatchRetrainManager(
       model,
       partitionMap,
@@ -119,8 +120,8 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
       etcdClient,
       sparkContext,
       sparkDataLocation,
-      50000,
-      TimeUnit.SECONDS)
+      batchRetrainDelayInMillis,
+      TimeUnit.MILLISECONDS)
 
     val predictServlet = new PointPredictionServlet(model, env.metrics().timer(name + "/predict/"))
     val topKServlet = new TopKPredictionServlet(model, env.metrics().timer(name + "/predict_top_k/"))
@@ -133,9 +134,9 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
     val observeServlet = new AddObservationServlet(
       onlineUpdateManager,
       env.metrics().timer(name + "/observe/"))
-    val writeHdfsServlet = new WriteToHDFSServlet(
+    val writeTrainingDataServlet = new WriteTrainingDataServlet(
       model,
-      env.metrics().timer(name + "/writehdfs/"),
+      env.metrics().timer(name + "/writetrainingdata/"),
       sparkContext,
       sparkDataLocation,
       partitionMap.getOrElse(hostname, -1))
@@ -155,9 +156,10 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
     env.getApplicationContext.addServlet(new ServletHolder(retrainServlet), "/retrain/" + name)
     env.getApplicationContext.addServlet(new ServletHolder(enableOnlineUpdatesServlet), "/enableonlineupdates/" + name)
     env.getApplicationContext.addServlet(new ServletHolder(disableOnlineUpdatesServlet), "/disableonlineupdates/" + name)
-    env.getApplicationContext.addServlet(new ServletHolder(writeHdfsServlet), "/writehdfs/" + name)
+    env.getApplicationContext.addServlet(new ServletHolder(writeTrainingDataServlet), "/writetrainingdata/" + name)
     env.getApplicationContext.addServlet(new ServletHolder(loadNewModelServlet), "/loadmodel/" + name)
     env.lifecycle().manage(onlineUpdateManager)
+    env.lifecycle().manage(batchRetrainManager)
   }
 
   def createModel(name: String,
@@ -189,6 +191,8 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
         registerModelResources(
           model,
           name,
+          modelConfig.onlineUpdateDelayInMillis,
+          modelConfig.batchRetrainDelayInMillis,
           sparkContext: SparkContext,
           etcdClient: EtcdClient,
           broadcastProvider: BroadcastProvider,
@@ -206,6 +210,8 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
         registerModelResources(
           model,
           name,
+          modelConfig.onlineUpdateDelayInMillis,
+          modelConfig.batchRetrainDelayInMillis,
           sparkContext: SparkContext,
           etcdClient: EtcdClient,
           broadcastProvider: BroadcastProvider,
@@ -219,12 +225,11 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
 }
 
 case class VeloxModelConfig(
-  cacheFeatures: Boolean,
-  cachePartialSums: Boolean,
-  cachePredictions: Boolean,
   dimensions: Int,
   modelType: String,
-  modelLoc: Option[String]
+  modelLoc: Option[String],
+  onlineUpdateDelayInMillis: Long,
+  batchRetrainDelayInMillis: Long
 )
 
 

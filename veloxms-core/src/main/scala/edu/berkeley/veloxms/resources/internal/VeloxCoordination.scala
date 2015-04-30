@@ -44,7 +44,7 @@ class EnableOnlineUpdates(
   }
 }
 
-class WriteToHDFSServlet[T](
+class WriteTrainingDataServlet[T](
     model: Model[T],
     timer: Timer,
     sparkContext: SparkContext,

@@ -7,10 +7,22 @@ import io.dropwizard.lifecycle.Managed
 
 import scala.util.control.NonFatal
 
+/**
+ * This is the parent class for all tasks that need to execute periodically in the background
+ * (not using servlet threads).
+ * Just needs to be managed by the dropwizard environment lifecycle
+ * after construction.
+ *
+ * @param delay  The delay between executions of this background task
+ * @param unit  The time unit the delay is in
+ */
 abstract class BackgroundTask(delay: Long, unit: TimeUnit) extends Managed with Logging {
   // TODO: Should be using a some sort of shared threadpool for background tasks
   private val executor = Executors.newSingleThreadScheduledExecutor()
 
+  /**
+   * The task to execute periodically in the background.
+   */
   protected def execute(): Unit
 
   private val task: Runnable = new Runnable {
