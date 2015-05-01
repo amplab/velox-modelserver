@@ -1,5 +1,8 @@
 package edu.berkeley.veloxms
 
+import java.util.concurrent.TimeUnit
+
+import edu.berkeley.veloxms.background.{OnlineUpdateManager, BatchRetrainManager}
 import edu.berkeley.veloxms.resources._
 import edu.berkeley.veloxms.resources.internal._
 import edu.berkeley.veloxms.storage._
@@ -15,6 +18,7 @@ import org.apache.spark.{SparkContext, SparkConf}
 
 import scala.collection.mutable
 import com.fasterxml.jackson.module.scala.DefaultScalaModule
+import scala.reflect.ClassTag
 import scala.util.control.NonFatal
 
 import edu.berkeley.veloxms.util._
@@ -66,7 +70,7 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
 
       logWarning(s"${modelNames.mkString(", ")}")
 
-      val models = modelNames.map(name => createModel(name,
+      val models = modelNames.foreach(name => createModel(name,
                                                       sparkContext,
                                                       etcdClient,
                                                       broadcastProvider,
@@ -96,6 +100,68 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
   }
 
 
+  def registerModelResources[T : ClassTag](
+      model: Model[T],
+      name: String,
+      onlineUpdateDelayInMillis: Long,
+      batchRetrainDelayInMillis: Long,
+      sparkContext: SparkContext,
+      etcdClient: EtcdClient,
+      broadcastProvider: BroadcastProvider,
+      sparkDataLocation: String,
+      partitionMap: Map[String, Int],
+      env: Environment,
+      hostname: String): Unit = {
+    val onlineUpdateManager = new OnlineUpdateManager(model, onlineUpdateDelayInMillis, TimeUnit.MILLISECONDS, env.metrics().timer(s"$name/online_update"))
+    val batchRetrainManager = new BatchRetrainManager(
+      model,
+      partitionMap,
+      0,
+      etcdClient,
+      sparkContext,
+      sparkDataLocation,
+      batchRetrainDelayInMillis,
+      TimeUnit.MILLISECONDS)
+
+    val predictServlet = new PointPredictionServlet(model, env.metrics().timer(name + "/predict/"))
+    val topKServlet = new TopKPredictionServlet(model, env.metrics().timer(name + "/predict_top_k/"))
+    val enableOnlineUpdatesServlet = new EnableOnlineUpdates(
+      onlineUpdateManager,
+      env.metrics().timer(name + "/enableonlineupdates/"))
+    val disableOnlineUpdatesServlet = new DisableOnlineUpdates(
+      onlineUpdateManager,
+      env.metrics().timer(name + "/disableonlineupdates/"))
+    val observeServlet = new AddObservationServlet(
+      onlineUpdateManager,
+      env.metrics().timer(name + "/observe/"))
+    val writeTrainingDataServlet = new WriteTrainingDataServlet(
+      model,
+      env.metrics().timer(name + "/writetrainingdata/"),
+      sparkContext,
+      sparkDataLocation,
+      partitionMap.getOrElse(hostname, -1))
+    val retrainServlet = new RetrainServlet(
+      batchRetrainManager,
+      env.metrics().timer(name + "/retrain/"),
+      etcdClient,
+      partitionMap)
+    val loadNewModelServlet = new LoadNewModelServlet(
+      model,
+      env.metrics().timer(name + "/loadmodel/"),
+      sparkContext,
+      sparkDataLocation)
+    env.getApplicationContext.addServlet(new ServletHolder(predictServlet), "/predict/" + name)
+    env.getApplicationContext.addServlet(new ServletHolder(topKServlet), "/predict_top_k/" + name)
+    env.getApplicationContext.addServlet(new ServletHolder(observeServlet), "/observe/" + name)
+    env.getApplicationContext.addServlet(new ServletHolder(retrainServlet), "/retrain/" + name)
+    env.getApplicationContext.addServlet(new ServletHolder(enableOnlineUpdatesServlet), "/enableonlineupdates/" + name)
+    env.getApplicationContext.addServlet(new ServletHolder(disableOnlineUpdatesServlet), "/disableonlineupdates/" + name)
+    env.getApplicationContext.addServlet(new ServletHolder(writeTrainingDataServlet), "/writetrainingdata/" + name)
+    env.getApplicationContext.addServlet(new ServletHolder(loadNewModelServlet), "/loadmodel/" + name)
+    env.lifecycle().manage(onlineUpdateManager)
+    env.lifecycle().manage(batchRetrainManager)
+  }
+
   def createModel(name: String,
                   sparkContext: SparkContext,
                   etcdClient: EtcdClient,
@@ -104,85 +170,65 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
                   partitionMap: Map[String, Int],
                   env: Environment,
                   hostname: String
-                  ): Model[_,_] = {
+                  ): Unit = {
 
     val key = s"$configEtcdPath/models/$name"
     val json = etcdClient.getValue(key)
     val modelConfig = jsonMapper.readValue(json, classOf[VeloxModelConfig])
-    val mc = modelConfig
+
     // TODO(crankshaw) cleanup model constructor code after Tomer
     // finishes refactoring model and storage configuration
-    val averageUser = Array.fill[Double](mc.dimensions)(1.0)
+    val averageUser = Array.fill[Double](modelConfig.dimensions)(1.0)
     // TODO add newsgroups model loc
     val modelLoc = ""
-    val model = modelConfig.modelType match {
-      case "MatrixFactorizationModel" => new MatrixFactorizationModel(
+    modelConfig.modelType match {
+      case "MatrixFactorizationModel" =>
+        val model = new MatrixFactorizationModel(
           name,
           broadcastProvider,
-          mc.dimensions,
-          averageUser,
-          mc.cachePartialSums,
-          mc.cacheFeatures,
-          mc.cachePredictions,
-          0,
-          partitionMap,
-          etcdClient,
+          modelConfig.dimensions,
+          averageUser)
+        registerModelResources(
+          model,
+          name,
+          modelConfig.onlineUpdateDelayInMillis,
+          modelConfig.batchRetrainDelayInMillis,
           sparkContext,
-          sparkDataLocation)
-      case "NewsgroupsModel" => new NewsgroupsModel(
+          etcdClient,
+          broadcastProvider,
+          sparkDataLocation,
+          partitionMap,
+          env,
+          hostname)
+      case "NewsgroupsModel" =>
+        val model = new NewsgroupsModel(
           name,
           broadcastProvider,
-          mc.modelLoc.get,
-          mc.dimensions,
-          averageUser,
-          mc.cachePartialSums,
-          mc.cacheFeatures,
-          mc.cachePredictions,
-          0,
-          partitionMap,
-          etcdClient,
+          modelConfig.modelLoc.get,
+          modelConfig.dimensions,
+          averageUser)
+        registerModelResources(
+          model,
+          name,
+          modelConfig.onlineUpdateDelayInMillis,
+          modelConfig.batchRetrainDelayInMillis,
           sparkContext,
-          sparkDataLocation)
+          etcdClient,
+          broadcastProvider,
+          sparkDataLocation,
+          partitionMap,
+          env,
+          hostname)
     }
-
-    val predictServlet = new PointPredictionServlet(model, env.metrics().timer(name + "/predict/"))
-    val topKServlet = new TopKPredictionServlet(model, env.metrics().timer(name + "/predict_top_k/"))
-    val observeServlet = new AddObservationServlet(
-        model,
-        env.metrics().timer(name + "/observe/"))
-    val writeHdfsServlet = new WriteToHDFSServlet(
-        model,
-        env.metrics().timer(name + "/observe/"),
-        sparkContext,
-        sparkDataLocation,
-        partitionMap.get(hostname).getOrElse(-1))
-    val retrainServlet = new RetrainServlet(
-        model,
-        env.metrics().timer(name + "/retrain/"),
-        etcdClient,
-        partitionMap)
-    val loadNewModelServlet = new LoadNewModelServlet(
-        model, 
-        env.metrics().timer(name + "/loadmodel/"),
-        sparkContext,
-        sparkDataLocation)
-    env.getApplicationContext.addServlet(new ServletHolder(predictServlet), "/predict/" + name)
-    env.getApplicationContext.addServlet(new ServletHolder(topKServlet), "/predict_top_k/" + name)
-    env.getApplicationContext.addServlet(new ServletHolder(observeServlet), "/observe/" + name)
-    env.getApplicationContext.addServlet(new ServletHolder(retrainServlet), "/retrain/" + name)
-    env.getApplicationContext.addServlet(new ServletHolder(writeHdfsServlet), "/writehdfs/" + name)
-    env.getApplicationContext.addServlet(new ServletHolder(loadNewModelServlet), "/loadmodel/" + name)
-    model
   }
 }
 
 case class VeloxModelConfig(
-  cacheFeatures: Boolean,
-  cachePartialSums: Boolean,
-  cachePredictions: Boolean,
   dimensions: Int,
   modelType: String,
-  modelLoc: Option[String]
+  modelLoc: Option[String],
+  onlineUpdateDelayInMillis: Long,
+  batchRetrainDelayInMillis: Long
 )
 
 
