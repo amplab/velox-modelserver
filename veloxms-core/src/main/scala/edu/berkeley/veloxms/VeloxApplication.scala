@@ -70,7 +70,7 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
 
       logWarning(s"${modelNames.mkString(", ")}")
 
-      val models = modelNames.map(name => createModel(name,
+      val models = modelNames.foreach(name => createModel(name,
                                                       sparkContext,
                                                       etcdClient,
                                                       broadcastProvider,
@@ -193,13 +193,13 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
           name,
           modelConfig.onlineUpdateDelayInMillis,
           modelConfig.batchRetrainDelayInMillis,
-          sparkContext: SparkContext,
-          etcdClient: EtcdClient,
-          broadcastProvider: BroadcastProvider,
-          sparkDataLocation: String,
-          partitionMap: Map[String, Int],
-          env: Environment,
-          hostname: String)
+          sparkContext,
+          etcdClient,
+          broadcastProvider,
+          sparkDataLocation,
+          partitionMap,
+          env,
+          hostname)
       case "NewsgroupsModel" =>
         val model = new NewsgroupsModel(
           name,
@@ -212,14 +212,13 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
           name,
           modelConfig.onlineUpdateDelayInMillis,
           modelConfig.batchRetrainDelayInMillis,
-          sparkContext: SparkContext,
-          etcdClient: EtcdClient,
-          broadcastProvider: BroadcastProvider,
-          sparkDataLocation: String,
-          partitionMap: Map[String, Int],
-          env: Environment,
-          hostname: String
-        )
+          sparkContext,
+          etcdClient,
+          broadcastProvider,
+          sparkDataLocation,
+          partitionMap,
+          env,
+          hostname)
     }
   }
 }
