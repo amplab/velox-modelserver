@@ -33,14 +33,6 @@
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-core_${scala.binary.version}</artifactId>
     </dependency>
-    <!-- <dependency> -->
-      <!--   <groupId>org.apache.spark</groupId> -->
-      <!--   <artifactId>spark&#45;core_${scala.binary.version}</artifactId> -->
-      <!-- </dependency> -->
-    <dependency>
-      <groupId>com.google.guava</groupId>
-      <artifactId>guava</artifactId>
-    </dependency>
     <dependency>
       <groupId>commons-io</groupId>
       <artifactId>commons-io</artifactId>
@@ -49,14 +41,6 @@
       <groupId>com.esotericsoftware.kryo</groupId>
       <artifactId>kryo</artifactId>
     </dependency>
-    <dependency>
-      <groupId>org.jblas</groupId>
-      <artifactId>jblas</artifactId>
-    </dependency>
-    <!-- <dependency> -->
-    <!--   <groupId>org.tachyonproject</groupId> -->
-    <!--   <artifactId>tachyon&#45;parent</artifactId> -->
-    <!-- </dependency> -->
     <dependency>
       <groupId>org.apache.spark</groupId>
       <artifactId>spark-mllib_${scala.binary.version}</artifactId>
@@ -70,15 +54,6 @@
       <artifactId>scalamock-scalatest-support_${scala.binary.version}</artifactId>
     </dependency>
     <dependency>
-      <groupId>com.datastax.cassandra</groupId>
-      <artifactId>cassandra-driver-core</artifactId>
-    </dependency>
-    <dependency>
-      <groupId>org.rocksdb</groupId>
-      <artifactId>rocksdbjni</artifactId>
-      <version>3.6.1</version>
-    </dependency>
-    <dependency>
       <groupId>net.databinder.dispatch</groupId>
       <artifactId>dispatch-core_${scala.binary.version}</artifactId>
     </dependency>
@@ -86,75 +61,6 @@
       <groupId>org.scala-lang</groupId>
       <artifactId>scalap</artifactId>
     </dependency>
-
-    <!-- <dependency> -->
-      <!--   <groupId>io.dropwizard</groupId> -->
-      <!--   <artifactId>dropwizard&#45;core</artifactId> -->
-      <!--   <version>${dropwizard.version}</version> -->
-      <!--   <exclusions> -->
-        <!--     <exclusion> -->
-          <!--       <groupId>org.slf4j</groupId> -->
-          <!--       <artifactId>log4j&#45;over&#45;slf4j</artifactId> -->
-          <!--     </exclusion> -->
-        <!--   </exclusions> -->
-      <!-- </dependency> -->
-    <!-- <dependency> -->
-      <!--   <groupId>org.tachyonproject</groupId> -->
-      <!--   <artifactId>tachyon&#45;parent</artifactId> -->
-      <!--   <version>0.6.0&#45;SNAPSHOT</version> -->
-      <!-- <exclusions> -->
-        <!--   <exclusion> -->
-          <!--     <groupId>com.fasterxml.jackson.core</groupId> -->
-          <!--     <artifactId>jackson&#45;databind</artifactId> -->
-          <!--   </exclusion> -->
-        <!--   <exclusion> -->
-          <!--     <groupId>log4j</groupId> -->
-          <!--     <artifactId>log4j</artifactId> -->
-          <!--   </exclusion> -->
-        <!--   <exclusion> -->
-          <!--     <groupId>org.apache.commons</groupId> -->
-          <!--     <artifactId>commons&#45;lang3</artifactId> -->
-          <!--   </exclusion> -->
-        <!--   <exclusion> -->
-          <!--     <groupId>org.jboss.netty</groupId> -->
-          <!--     <artifactId>netty</artifactId> -->
-          <!--   </exclusion> -->
-        <!--   <exclusion> -->
-          <!--     <groupId>org.slf4j</groupId> -->
-          <!--     <artifactId>slf4j&#45;log4j12</artifactId> -->
-          <!--   </exclusion> -->
-        <!--   <exclusion> -->
-          <!--     <groupId>org.codehaus.jackson</groupId> -->
-          <!--     <artifactId>jackson&#45;core&#45;asl</artifactId> -->
-          <!--   </exclusion> -->
-        <!--   <exclusion> -->
-          <!--     <groupId>org.jboss.netty</groupId> -->
-          <!--     <artifactId>netty</artifactId> -->
-          <!--   </exclusion> -->
-        <!--   <exclusion> -->
-          <!--     <groupId>org.slf4j</groupId> -->
-          <!--     <artifactId>slf4j&#45;api</artifactId> -->
-          <!--   </exclusion> -->
-        <!--   <exclusion> -->
-          <!-- <groupId>org.eclipse.jetty</groupId> -->
-          <!-- <artifactId>jetty&#45;server</artifactId> -->
-          <!--   </exclusion> -->
-        <!--   <exclusion> -->
-          <!--     <groupId>com.google.guava</groupId> -->
-          <!--     <artifactId>guava</artifactId> -->
-          <!--   </exclusion> -->
-        <!-- </exclusions> -->
-      <!-- </dependency> -->
-    <!-- <dependency> -->
-      <!--   <groupId>org.apache.commons</groupId> -->
-      <!--   <artifactId>commons&#45;lang3</artifactId> -->
-      <!--   <version>3.3.2</version> -->
-      <!-- </dependency> -->
-    <!-- <dependency> -->
-      <!--   <groupId>org.jblas</groupId> -->
-      <!--   <artifactId>jblas</artifactId> -->
-      <!--   <!&#45;&#45; <version>1.2.3</version> &#45;&#45;> -->
-      <!-- </dependency> -->
   </dependencies>
 
   <build>

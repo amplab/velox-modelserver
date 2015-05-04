@@ -35,15 +35,6 @@
       <groupId>net.databinder.dispatch</groupId>
       <artifactId>dispatch-core_${scala.binary.version}</artifactId>
     </dependency>
-    <!-- <dependency> -->
-    <!--     <groupId>org.json4s</groupId> -->
-    <!--     <artifactId>json4s&#45;jackson_${scala.binary.version}</artifactId> -->
-    <!--     <version>3.2.10</version> -->
-    <!-- </dependency> -->
-    <!-- <dependency> -->
-    <!--   <groupId>net.databinder.dispatch</groupId> -->
-    <!--   <artifactId>json4s&#45;jackson_${scala.binary.version}</artifactId> -->
-    <!-- </dependency> -->
     <dependency>
       <groupId>com.github.scopt</groupId>
       <artifactId>scopt_${scala.binary.version}</artifactId>
@@ -75,8 +66,6 @@
             </relocation>
           </relocations>
           <createDependencyReducedPom>true</createDependencyReducedPom>
-          <!-- <minimizeJar>true</minimizeJar> -->
-          <!-- <promoteTransitiveDependencies>true</promoteTransitiveDependencies> -->
           <filters>
             <filter>
               <artifact>*:*</artifact>

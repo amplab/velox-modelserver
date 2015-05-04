@@ -11,8 +11,7 @@ import edu.berkeley.veloxms.util._
 class RetrainServlet[T](
     batchRetrainManager: BatchRetrainManager[T],
     timer: Timer,
-    etcdClient: EtcdClient,
-    hostPartitionMap: Map[String, Int]) extends HttpServlet with Logging {
+    etcdClient: EtcdClient) extends HttpServlet with Logging {
 
   override def doGet(request: HttpServletRequest, resp: HttpServletResponse) {
     val timeContext = timer.time()

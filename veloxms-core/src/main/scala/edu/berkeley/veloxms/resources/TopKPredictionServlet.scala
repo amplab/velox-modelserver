@@ -1,15 +1,31 @@
 package edu.berkeley.veloxms.resources
 
-import com.codahale.metrics.Timer
+import java.util.concurrent.TimeUnit
 
+import com.codahale.metrics.Timer
+import dispatch._
+import scala.concurrent.Await
+import scala.concurrent.ExecutionContext.Implicits.global
 import edu.berkeley.veloxms.models.Model
 import edu.berkeley.veloxms._
 
 import javax.servlet.http.{HttpServlet, HttpServletRequest, HttpServletResponse}
 
+import edu.berkeley.veloxms.util.Utils
+import scala.concurrent.duration.Duration
 import scala.reflect._
 
-class TopKPredictionServlet[T : ClassTag](model: Model[T], timer: Timer) extends HttpServlet {
+class TopKPredictionServlet[T : ClassTag](
+    model: Model[T],
+    timer: Timer,
+    partitionMap: Seq[String],
+    hostname: String) extends HttpServlet {
+  private val http = Http.configure(_.setAllowPoolingConnection(true).setFollowRedirects(true))
+  val veloxPort = 8080
+  val hosts = partitionMap.map {
+    h => host(h, veloxPort).setContentType("application/json", "UTF-8")
+  }
+
   override def doPost(req: HttpServletRequest, resp: HttpServletResponse) = {
     val timeContext = timer.time()
     try {
@@ -19,11 +35,22 @@ class TopKPredictionServlet[T : ClassTag](model: Model[T], timer: Timer) extends
       require(input.has("context"))
 
       val uid: Long = input.get("uid").asLong()
-      val k: Int = input.get("k").asInt()
-      val context = input.get("context")
 
-      val candidateSet: Array[T] = fromJson[Array[T]](context)
-      val topK = model.predictTopK(uid, k, candidateSet, model.currentVersion)
+      val correctPartition = Utils.nonNegativeMod(uid.hashCode(), partitionMap.size)
+
+      val topK = if (partitionMap(correctPartition) == hostname) {
+        val k: Int = input.get("k").asInt()
+        val context = input.get("context")
+
+        val candidateSet: Array[T] = fromJson[Array[T]](context)
+        model.predictTopK(uid, k, candidateSet, model.currentVersion)
+      } else {
+        val h = hosts(correctPartition)
+        val forwardedReq = (h / "predict_top_k" / model.modelName)
+            .POST << input.toString
+        val httpReq = http(forwardedReq OK as.String)
+        Await.result(httpReq, Duration(3000, TimeUnit.MILLISECONDS))
+      }
 
       resp.setContentType("application/json")
       jsonMapper.writeValue(resp.getOutputStream, topK)

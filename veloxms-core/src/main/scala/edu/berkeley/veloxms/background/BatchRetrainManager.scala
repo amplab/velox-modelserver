@@ -17,8 +17,7 @@ import scala.concurrent.duration.Duration
 
 class BatchRetrainManager[T](
     model: Model[T],
-    hostPartitionMap: Map[String, Int],
-    masterPartition: Int,
+    hostPartitionMap: Seq[String],
     etcdClient: EtcdClient,
     sparkContext: SparkContext,
     sparkDataLocation: String,
@@ -48,9 +47,9 @@ class BatchRetrainManager[T](
     val modelName = model.modelName
     var retrainResult = ""
     val veloxPort = 8080
-    val hosts = hostPartitionMap.map({
-      case (h, _) => host(h, veloxPort).setContentType("application/json", "UTF-8")
-    })
+    val hosts = hostPartitionMap.map{
+      h => host(h, veloxPort).setContentType("application/json", "UTF-8")
+    }
 
     // coordinate retraining: returns false if retrain already going on
     logInfo(s"Starting retrain for model $modelName")
