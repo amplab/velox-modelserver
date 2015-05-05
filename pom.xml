@@ -33,7 +33,6 @@
 
   <modules>
     <module>veloxms-core</module>
-    <module>veloxms-client</module>
   </modules>
 
   <properties>
