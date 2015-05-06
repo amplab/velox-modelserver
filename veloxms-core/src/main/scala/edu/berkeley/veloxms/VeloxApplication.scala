@@ -52,7 +52,7 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
     // FIXME this assumes that etcd is running on each velox server
     val etcdClient = new EtcdClient(conf.hostname, 4001, conf.hostname, new DispatchUtil)
     try {
-      val partitionMap: Map[String, Int] = getPartitionMap(etcdClient)
+      val partitionMap: Seq[String] = getPartitionMap(etcdClient)
       val sparkMaster = etcdClient.getValue(s"$configEtcdPath/sparkMaster")
       // Location for the spark cluster to write data to & from
       // Looks like hdfs://ec2-54-158-166-184.compute-1.amazonaws.com:9000/velox
@@ -93,10 +93,10 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
     // env.jersey().register(new CacheHitResource(models.toMap))
   }
 
-  def getPartitionMap(etcdClient: EtcdClient): Map[String, Int] = {
+  def getPartitionMap(etcdClient: EtcdClient): Seq[String] = {
     val key = s"$configEtcdPath/veloxPartitions"
     val json = etcdClient.getValue(key)
-    jsonMapper.readValue(json, classOf[Map[String, Int]])
+    jsonMapper.readValue(json, classOf[Seq[String]])
   }
 
 
@@ -109,22 +109,36 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
       etcdClient: EtcdClient,
       broadcastProvider: BroadcastProvider,
       sparkDataLocation: String,
-      partitionMap: Map[String, Int],
+      partitionMap: Seq[String],
       env: Environment,
       hostname: String): Unit = {
+    val masterPartition = Utils.nonNegativeMod(name.hashCode, partitionMap.size)
     val onlineUpdateManager = new OnlineUpdateManager(model, onlineUpdateDelayInMillis, TimeUnit.MILLISECONDS, env.metrics().timer(s"$name/online_update"))
     val batchRetrainManager = new BatchRetrainManager(
       model,
       partitionMap,
-      0,
       etcdClient,
       sparkContext,
       sparkDataLocation,
       batchRetrainDelayInMillis,
       TimeUnit.MILLISECONDS)
 
-    val predictServlet = new PointPredictionServlet(model, env.metrics().timer(name + "/predict/"))
-    val topKServlet = new TopKPredictionServlet(model, env.metrics().timer(name + "/predict_top_k/"))
+    env.lifecycle().manage(onlineUpdateManager)
+    // If this is the master partition, schedule background bulk retrains
+    if (hostname == partitionMap(masterPartition)) {
+      env.lifecycle().manage(batchRetrainManager)
+    }
+
+    val predictServlet = new PointPredictionServlet(
+      model,
+      env.metrics().timer(name + "/predict/"),
+      partitionMap,
+      hostname)
+    val topKServlet = new TopKPredictionServlet(
+      model,
+      env.metrics().timer(name + "/predict_top_k/"),
+      partitionMap,
+      hostname)
     val enableOnlineUpdatesServlet = new EnableOnlineUpdates(
       onlineUpdateManager,
       env.metrics().timer(name + "/enableonlineupdates/"))
@@ -133,18 +147,20 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
       env.metrics().timer(name + "/disableonlineupdates/"))
     val observeServlet = new AddObservationServlet(
       onlineUpdateManager,
-      env.metrics().timer(name + "/observe/"))
+      env.metrics().timer(name + "/observe/"),
+      name,
+      partitionMap,
+      hostname)
     val writeTrainingDataServlet = new WriteTrainingDataServlet(
       model,
       env.metrics().timer(name + "/writetrainingdata/"),
       sparkContext,
       sparkDataLocation,
-      partitionMap.getOrElse(hostname, -1))
+      partitionMap.indexOf(hostname))
     val retrainServlet = new RetrainServlet(
       batchRetrainManager,
       env.metrics().timer(name + "/retrain/"),
-      etcdClient,
-      partitionMap)
+      etcdClient)
     val loadNewModelServlet = new LoadNewModelServlet(
       model,
       env.metrics().timer(name + "/loadmodel/"),
@@ -158,8 +174,6 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
     env.getApplicationContext.addServlet(new ServletHolder(disableOnlineUpdatesServlet), "/disableonlineupdates/" + name)
     env.getApplicationContext.addServlet(new ServletHolder(writeTrainingDataServlet), "/writetrainingdata/" + name)
     env.getApplicationContext.addServlet(new ServletHolder(loadNewModelServlet), "/loadmodel/" + name)
-    env.lifecycle().manage(onlineUpdateManager)
-    env.lifecycle().manage(batchRetrainManager)
   }
 
   def createModel(name: String,
@@ -167,7 +181,7 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
                   etcdClient: EtcdClient,
                   broadcastProvider: BroadcastProvider,
                   sparkDataLocation: String,
-                  partitionMap: Map[String, Int],
+                  partitionMap: Seq[String],
                   env: Environment,
                   hostname: String
                   ): Unit = {

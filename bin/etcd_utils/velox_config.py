@@ -15,12 +15,12 @@ base_path = "/v2/keys/cluster_config"
 
 pp = pprint.PrettyPrinter(indent=4)
 
-# Dict whose keys are hostnames or IP addresses and whose values are the
+# Array whose values are hostnames or IP addresses and whose indices are the
 # partition assignments of those machines. Partition assignments should be
 # unique
-partitions = {
-                '127.0.0.1': 0
-             }
+partitions = [
+                '127.0.0.1'
+             ]
 
 
 
