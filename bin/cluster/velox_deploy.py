@@ -174,11 +174,10 @@ def is_ssh_available():
             return not run("uname").failed
 
 
-# Convenience command for launching an ec2 cluster of spot instances
+# Convenience command for launching an ec2 cluster
 # and installing basic dependencies
 # Note that only hvm instance types are supported by the AMI, if you would like to use
 # a pvm instance type please launch the cluster some other way, or supply your own AMI.
-# This script launches spot instances.
 @task
 def launch_ec2_cluster(cluster_name,
                        cluster_size,
