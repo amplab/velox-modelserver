@@ -46,7 +46,7 @@ from velox_config import config
 
 env.roledefs = { 'servers': velox_hosts.servers }
 env.user = "ubuntu"
-env.key_filename = [os.getenv('VELOX_CLUSTER_KEY', os.path.expanduser("~/.ssh/id_rsa"))]
+env.key_filename = os.getenv('VELOX_CLUSTER_KEY')
 
 ### VELOX SETTINGS ###
 # HEAP_SIZE_GB = 45
@@ -72,32 +72,21 @@ class Cluster:
         cluster_id (str): tag to identify instances in this cluster
         instance_type (str): ec2 instance type
         ami (str): AMI used to initiate instances
-        spot_price (double): max spot price 
         security_group (str): name of the security group
         size (int): The number of Velox servers in this cluster
     """
 
-
-
-    # region = 'us-east-1'
-    # cluster_id = 'crankshaw-veloxms',
-    # instance_type = 'r3.2xlarge',
-    # ami = 'ami-10119778',
-    # spot_price = 1.5,
-    # security_group = 'veloxms'
     def __init__(self,
             region,
             cluster_id,
             instance_type,
             ami,
-            spot_price,
             security_group,
             cluster_size):
         self.region = region
         self.cluster_id = cluster_id
         self.instance_type = instance_type
         self.ami = ami
-        self.spot_price = spot_price
         self.security_group = security_group
         self.size = cluster_size
 
@@ -152,13 +141,14 @@ def wait_for_ssh_ready():
     start_time = datetime.now()
     time.sleep(3)  # seconds
     while True:
-        with hide('everything'):
-            result = execute(is_ssh_available, role='servers')
-            if all(result.values()):
-                break
-            else:
-                print "still waiting"
-                time.sleep(10)  # seconds
+        try:
+            with hide('everything', 'aborts'):
+                result = execute(is_ssh_available, role='servers')
+                if all(result.values()):
+                    break
+        except SystemExit, e:
+            print "still waiting"
+            time.sleep(10)  # seconds
     end_time = datetime.now()
     puts("Cluster is now in ssh-ready state. Took {tt} seconds".format(tt=(end_time-start_time).seconds))
 
@@ -192,11 +182,13 @@ def is_ssh_available():
 @task
 def launch_ec2_cluster(cluster_name,
                        cluster_size,
-                       spot_price,
                        localkey,
                        keyname, # name of AWS key pair
+                       spot_price=None,
                        instance_type='r3.2xlarge',
                        ami=VELOX_HVM_AMI):
+    if env.key_filename is None:
+        abort("Please provide a valid keypair file: export VELOX_CLUSTER_KEY=...")
     if EC2_INSTANCE_TYPES[instance_type] == 'pvm' and ami == VELOX_HVM_AMI:
         abort("Instance type is incompatible with ami")
 
@@ -205,7 +197,6 @@ def launch_ec2_cluster(cluster_name,
                       cluster_name,
                       instance_type,
                       ami,
-                      float(spot_price),
                       'veloxms',
                       int(cluster_size))
 
@@ -215,49 +206,72 @@ def launch_ec2_cluster(cluster_name,
     puts("Setting up security group")
     conn = ec2.connect_to_region(cluster.region)
     setup_security_group(conn, cluster)
-    puts("Requesting spot instances")
-    spot_requests = conn.request_spot_instances(
-            cluster.spot_price,
-            cluster.ami,
-            count=cluster.size,
-            key_name=keyname,
-            instance_type=cluster.instance_type,
-            security_groups=[cluster.security_group])
-    my_req_ids = [req.id for req in spot_requests]
-    puts("Waiting for instances in %s to start..." % cluster.region)
-    # time.sleep(10)
+    ###############
     try:
-        while True:
-            time.sleep(10)
-            reqs = conn.get_all_spot_instance_requests()
-            id_to_req = {}
-            for r in reqs:
-                id_to_req[r.id] = r
-            active_instance_ids = []
-            for i in my_req_ids:
-                if i in id_to_req and id_to_req[i].state == "active":
-                    active_instance_ids.append(id_to_req[i].instance_id)
-            if len(active_instance_ids) == cluster.size:
-                print("All %d instances granted" % cluster.size)
-                reservations = conn.get_all_reservations(active_instance_ids)
-                nodes = []
-                for r in reservations:
-                    nodes += r.instances
-                break
-            else:
-                print("%d of %d instances granted, waiting longer" % (
-                    len(active_instance_ids), cluster.size))
+        image = conn.get_all_images(image_ids=[cluster.ami])[0]
     except:
-        print("Canceling spot instance requests")
-        conn.cancel_spot_instance_requests(my_req_ids)
-        abort("Warning, some requests may have already been granted")
+        abort("Could not find AMI " + cluster.ami)
+    if spot_price is not None:
+        puts("Requesting spot instances")
+        spot_requests = conn.request_spot_instances(
+                float(spot_price),
+                cluster.ami,
+                count=cluster.size,
+                key_name=keyname,
+                instance_type=cluster.instance_type,
+                security_groups=[cluster.security_group])
+        my_req_ids = [req.id for req in spot_requests]
+        puts("Waiting for instances in %s to start..." % cluster.region)
+        # time.sleep(10)
+        try:
+            while True:
+                time.sleep(10)
+                reqs = conn.get_all_spot_instance_requests()
+                id_to_req = {}
+                for r in reqs:
+                    id_to_req[r.id] = r
+                active_instance_ids = []
+                for i in my_req_ids:
+                    if i in id_to_req and id_to_req[i].state == "active":
+                        active_instance_ids.append(id_to_req[i].instance_id)
+                if len(active_instance_ids) == cluster.size:
+                    print("All %d instances granted" % cluster.size)
+                    reservations = conn.get_all_reservations(active_instance_ids)
+                    nodes = []
+                    for r in reservations:
+                        nodes += r.instances
+                    break
+                else:
+                    print("%d of %d instances granted, waiting longer" % (
+                        len(active_instance_ids), cluster.size))
+        except:
+            print("Canceling spot instance requests")
+            conn.cancel_spot_instance_requests(my_req_ids)
+            abort("Warning, some requests may have already been granted")
+    else:
+        nodes_res = image.run(
+                key_name=keyname,
+                security_groups=[cluster.security_group],
+                instance_type=cluster.instance_type,
+                min_count=cluster.size,
+                max_count=cluster.size)
+        time.sleep(10)
+        node_ids = [n.id for n in nodes_res.instances]
+        print node_ids
+        nodes = conn.get_only_instances(node_ids)
+        print nodes
+        while any(n.public_dns_name == '' for n in nodes):
+            print "waiting for metadata to propagate"
+            time.sleep(5)
+            nodes = conn.get_only_instances(node_ids)
+            print "NEW NODES:", nodes
 
-    server_ips = []
+    server_ips = [n.public_dns_name for n in nodes]
+    print server_ips
     for n in nodes:
         n.add_tag(
             key='Name',
             value='{cn}-velox-{iid}'.format(cn=cluster.cluster_id, iid=n.id))
-        server_ips.append(n.public_dns_name)
 
     # save ip_addresses of cluster
     with open('hosts/velox_hosts.py', 'w') as hosts_file:
@@ -274,8 +288,7 @@ def launch_ec2_cluster(cluster_name,
     puts("starting etcd")
     start_new_etcd_cluster()
 
-    for h in env.roledefs['servers']:
-        execute(set_hostname, h, host=h)
+    set_hostnames()
 
     ####### TODO remove once Velox is open source
     execute(upload_deploy_key, localkey, role='servers')
@@ -285,8 +298,15 @@ def launch_ec2_cluster(cluster_name,
             branch="develop",
             role='servers')
 
+@task
+def set_hostnames():
+    for h in env.roledefs['servers']:
+        execute(set_hostname, h, host=h)
+
+
 # END CLUSTER LAUNCH
 ############################################################
+
 
 @task
 def install_velox_local(etcd_loc):
@@ -381,7 +401,6 @@ Host github.com
     sudo("chmod 600 /home/ubuntu/.ssh/*")
 
 @task
-@parallel
 def start_new_etcd_cluster():
     cluster_ips = env.roledefs['servers']
     token = "velox_etcd_%d" % int(time.time()) # unique ID for etcd cluster
@@ -441,12 +460,16 @@ def start_velox(start_local="n"):
                                cls=VELOX_SERVER_CLASS)
         local(server_cmd)
     else:
+        if env.key_filename is None:
+            abort("Please provide a valid keypair file: export VELOX_CLUSTER_KEY=...")
         velox_root_dir = "~/velox-modelserver" # assumes cluster deployed using this script
         execute(start_velox_node, velox_root_dir, role='servers')
 
 @task
 def stop_velox():
     # with hide('everything'):
+    if env.key_filename is None:
+        abort("Please provide a valid keypair file: export VELOX_CLUSTER_KEY=...")
     execute(kill_velox_node, role='servers')
 
 @parallel
@@ -499,8 +522,4 @@ def upload_config_to_etcd():
     config['veloxPartitions'] = json.dumps(velox_hosts.servers)
     etcd_host = "http://{host}:{port}".format(host=velox_hosts.servers[0], port=ETCD_PORT)
     add_settings(etcd_host, ETCD_BASE_PATH, config)
-
-
-# Still need:
-#  - resume cluster launch if it fails partway through
 

@@ -18,8 +18,9 @@ And add an observation
 `curl -H "Content-Type: application/json" -d '{"context": 4, "uid":4, "score":1.3}' http://localhost:8080/observe/matrixfact`
 
 And retrain in Spark:
-`curl http://localhost:8080/observe/matrixfact`
+`curl http://localhost:8080/retrain/matrixfact`
 
+__TODO__ once we add support for bulk load, have an example of that
 
 ### Running Velox On a Cluster
 
@@ -38,11 +39,33 @@ export VELOX_CLUSTER_KEY=~/.ssh/my_key_pair.pem
 ```
 
 ####Launch a cluster
-+ `fab launch_ec2_cluster:cluster_name=my-application,cluster_size=3,spot_price=1.5,localkey=my_github_ssh_key,keyname=aws_knox` to launch a cluster
++ `fab launch_ec2_cluster:cluster_name=my-application,cluster_size=3,localkey=my_github_ssh_key,keyname=my_aws_keypair` to launch a cluster. The default is to launch reserved instances. If you
+would like to launch spot instances instead, specify the `spot_price` as an additional argument
+to the launch command.
 + edit `velox_config.py` to configure your Velox deployment (see [Configuration](#secconfig) for details).
 + `fab start_velox` to start the cluster
 
 __TODO__ remove localkey once Velox is open-sourced
+
+####Using your own cluster
+If you'd like to launch a cluster some other way, you can still use the `velox_deploy.py` script
+to install Velox and dependencies and start the service as long as you have ssh access to all the
+machines.
+
+
+1. Set `VELOX_CLUSTER_KEY` to the path to your ssh key
+1. In [`velox_hosts.py`](hosts/velox_hosts.py), set `servers` to be a list of strings
+containing the hostnames of all the nodes in your cluster.
+1. In [`velox_deploy.py`], change `env.user` to the ssh username of your cluster (default is ubuntu).
+1. Install etcd: `fab install_etcd:role=servers`
+1. Start etcd: `fab start_new_etcd_cluster`
+1. Set hostnames: `fab set_hostnames`
+1. Build velox: `fab build_velox:https://github.com/amplab/velox-modelserver.git,develop,role=servers`. Your
+cluster should now be functionally equivalent to a cluster launched using the script.
+1. Start Velox: `fab start_velox`
+
+
+
 
 #### Stopping Velox
 To stop Velox on all nodes, run `fab stop_velox`.
@@ -64,7 +87,9 @@ local Spark instance when running a Velox cluster, each Velox node will start it
 local Spark instance.
 + `sparkDataLocation` is a directory location that Velox uses to persist data for sharing
 across multiple SparkContexts. It can be set to any path that Spark can read from and write to.
-Common choices include the local filesystem, HDFS, and Tachyon.
+Common choices include the local filesystem, HDFS, and Tachyon. Note that _all_ SparkContext's must
+be able to access the same location, so it cannot be the local filesystem if you are
+running more than one Velox instance.
 + `models` is a a list of model configuration objects. See the next section for model-specific configuration.
 
 ####Model Configuration
