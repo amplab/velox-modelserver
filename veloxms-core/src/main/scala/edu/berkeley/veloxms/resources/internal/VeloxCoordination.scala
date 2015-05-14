@@ -6,8 +6,10 @@ import com.codahale.metrics.Timer
 import edu.berkeley.veloxms._
 import edu.berkeley.veloxms.background.OnlineUpdateManager
 import edu.berkeley.veloxms.models.Model
-import edu.berkeley.veloxms.util.Logging
+import edu.berkeley.veloxms.util.{Logging, Utils}
 import org.apache.spark.SparkContext
+
+import scala.reflect.ClassTag
 
 case class HDFSLocation(loc: String)
 case class LoadModelParameters(userWeightsLoc: String, version: Version)
@@ -100,6 +102,37 @@ class LoadNewModelServlet(model: Model[_], timer: Timer, sparkContext: SparkCont
 
     } finally {
 
+      timeContext.stop()
+    }
+  }
+}
+
+class DownloadBulkObservationsServlet[T : ClassTag](
+    onlineUpdateManager: OnlineUpdateManager[T],
+    timer: Timer,
+    modelName: String,
+    partitionMap: Seq[String],
+    hostname: String,
+    sparkContext: SparkContext) extends HttpServlet with Logging {
+
+  override def doPost(req: HttpServletRequest, resp: HttpServletResponse) {
+    val timeContext = timer.time()
+    try {
+      val obsLocation = jsonMapper.readValue(req.getInputStream, classOf[HDFSLocation])
+
+      val thisPartition = partitionMap.indexOf(hostname)
+      val observations = sparkContext.objectFile[(UserID, T, Double)](obsLocation.loc).filter { x =>
+        val uid = x._1
+        Utils.nonNegativeMod(uid.hashCode(), partitionMap.size) == thisPartition
+      }
+
+      observations.foreach { case (uid, item, score) =>
+        onlineUpdateManager.addObservation(uid, item, score)
+      }
+
+      resp.setContentType("application/json")
+      jsonMapper.writeValue(resp.getOutputStream, "success")
+    } finally {
       timeContext.stop()
     }
   }
