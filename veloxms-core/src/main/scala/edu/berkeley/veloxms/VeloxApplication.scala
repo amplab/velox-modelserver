@@ -2,27 +2,20 @@ package edu.berkeley.veloxms
 
 import java.util.concurrent.TimeUnit
 
-import edu.berkeley.veloxms.background.{OnlineUpdateManager, BatchRetrainManager}
+import com.fasterxml.jackson.module.scala.DefaultScalaModule
+import edu.berkeley.veloxms.background.{BatchRetrainManager, OnlineUpdateManager}
+import edu.berkeley.veloxms.models._
 import edu.berkeley.veloxms.resources._
 import edu.berkeley.veloxms.resources.internal._
 import edu.berkeley.veloxms.storage._
-import edu.berkeley.veloxms.models._
 import edu.berkeley.veloxms.util._
-import io.dropwizard.Configuration
-import io.dropwizard.Application
-import io.dropwizard.setup.Bootstrap
-import io.dropwizard.setup.Environment
-import com.fasterxml.jackson.annotation.JsonProperty
-import javax.validation.constraints.NotNull
-import org.apache.spark.{SparkContext, SparkConf}
+import io.dropwizard.{Application, Configuration}
+import io.dropwizard.setup.{Bootstrap, Environment}
+import org.apache.spark.{SparkConf, SparkContext}
+import org.eclipse.jetty.servlet.ServletHolder
 
-import scala.collection.mutable
-import com.fasterxml.jackson.module.scala.DefaultScalaModule
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
-
-import edu.berkeley.veloxms.util._
-import org.eclipse.jetty.servlet.ServletHolder
 
 class VeloxConfiguration extends Configuration {
   val hostname: String = "none"
@@ -193,8 +186,6 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
     // TODO(crankshaw) cleanup model constructor code after Tomer
     // finishes refactoring model and storage configuration
     val averageUser = Array.fill[Double](modelConfig.dimensions)(1.0)
-    // TODO add newsgroups model loc
-    val modelLoc = ""
     modelConfig.modelType match {
       case "MatrixFactorizationModel" =>
         val model = new MatrixFactorizationModel(
@@ -218,9 +209,8 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
         val model = new NewsgroupsModel(
           name,
           broadcastProvider,
-          modelConfig.modelLoc.get,
-          modelConfig.dimensions,
-          averageUser)
+          averageUser,
+          modelConfig.trainPath.get)
         registerModelResources(
           model,
           name,
@@ -240,7 +230,7 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
 case class VeloxModelConfig(
   dimensions: Int,
   modelType: String,
-  modelLoc: Option[String],
+  trainPath: Option[String],
   onlineUpdateDelayInMillis: Long,
   batchRetrainDelayInMillis: Long
 )
