@@ -324,7 +324,7 @@ def install_velox_local(etcd_loc):
         abort("{pl} is unsupported".format(pl=sys.platform))
     with lcd(velox_root_dir + "/lib"):
         local("rm -rf keystone")
-        local("git clone https://github.com/amplab/keystone.git")
+        local("git clone git@github.com:amplab/keystone.git")
     with lcd(velox_root_dir + "/lib/keystone"):
         local("sbt/sbt publish-m2")
     with lcd(velox_root_dir):
@@ -382,7 +382,7 @@ def build_velox(git_remote, branch):
             run("git checkout -b veloxbranch vremote/%s" % branch)
             run("git reset --hard vremote/%s" % branch)
         with cd("~/velox-modelserver/lib"):
-            run("git clone https://github.com/amplab/keystone.git")
+            run("git clone git@github.com:amplab/keystone.git")
         with cd("~/velox-modelserver/lib/keystone"):
             run("sbt/sbt publish-m2")
         with cd("~/velox-modelserver"):
