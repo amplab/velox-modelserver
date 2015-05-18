@@ -33,11 +33,11 @@ class NewsgroupsModel(
     // Build the classifier estimator
     logInfo("Training classifier")
     val predictor = Trim.then(LowerCase())
-        .then(Tokenizer()).then(new NGramsFeaturizer(1 to 2)).to[Seq[Any]].then(TermFrequency(x => 1))
-        .thenEstimator(CommonSparseFeatures(50000)).fit(trainData.data).to[Vector[Double]]
+        .then(Tokenizer()).then(new NGramsFeaturizer(1 to 2)).then(TermFrequency(x => 1))
+        .thenEstimator(CommonSparseFeatures(50000)).fit(trainData.data)
         .thenLabelEstimator(NaiveBayesEstimator(numClasses))
-        .fit(trainData.data, trainData.labels).then(x => normalize(exp(x), 1))
+        .fit(trainData.data, trainData.labels).thenFunction(x => normalize(exp(x), 1))
 
-    predictor.then(_.toArray)
+    predictor.thenFunction(_.toArray)
   }
 }
