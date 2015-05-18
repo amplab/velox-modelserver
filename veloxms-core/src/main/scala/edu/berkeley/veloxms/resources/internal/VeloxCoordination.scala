@@ -86,9 +86,11 @@ class LoadNewModelServlet(model: Model[_], timer: Timer, sparkContext: SparkCont
         (userId, userFeatures)
       }).collect().toMap
 
-      val firstUser = users.head
-      logInfo(s"Loaded new models for ${users.size} users. " +
-        s"First one is:\n${firstUser._1}, ${firstUser._2.mkString(", ")}")
+      if (users.size > 0) {
+        val firstUser = users.head
+        logInfo(s"Loaded new models for ${users.size} users. " +
+          s"First one is:\n${firstUser._1}, ${firstUser._2.mkString(", ")}")
+      }
 
 
       // TODO: Should make sure it's sufficiently atomic
