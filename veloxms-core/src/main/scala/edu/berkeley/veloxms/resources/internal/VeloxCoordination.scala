@@ -57,7 +57,7 @@ class WriteTrainingDataServlet[T](
     val timeContext = timer.time()
     try {
       val obsLocation = jsonMapper.readValue(req.getInputStream, classOf[HDFSLocation])
-      val uri = s"$sparkDataLocation/${obsLocation.loc}/part_$partition"
+      val uri = s"${obsLocation.loc}/part_$partition"
 
       val observations = model.getObservationsAsRDD(sparkContext)
       observations.saveAsObjectFile(uri)
@@ -121,12 +121,13 @@ class DownloadBulkObservationsServlet[T : ClassTag](
       val obsLocation = jsonMapper.readValue(req.getInputStream, classOf[HDFSLocation])
 
       val thisPartition = partitionMap.indexOf(hostname)
+      val numPartitions = partitionMap.size
       val observations = sparkContext.objectFile[(UserID, T, Double)](obsLocation.loc).filter { x =>
         val uid = x._1
-        Utils.nonNegativeMod(uid.hashCode(), partitionMap.size) == thisPartition
+        Utils.nonNegativeMod(uid.hashCode(), numPartitions) == thisPartition
       }
 
-      observations.foreach { case (uid, item, score) =>
+      observations.collect().foreach { case (uid, item, score) =>
         onlineUpdateManager.addObservation(uid, item, score)
       }
 

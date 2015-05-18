@@ -6,8 +6,9 @@ import edu.berkeley.veloxms._
 import edu.berkeley.veloxms.storage.BroadcastProvider
 import loaders.{LabeledData, NewsgroupsDataLoader}
 import nodes.learning.NaiveBayesEstimator
-import nodes.misc.{CommonSparseFeatures, TermFrequency}
 import nodes.nlp.{LowerCase, NGramsFeaturizer, Tokenizer, Trim}
+import nodes.stats.TermFrequency
+import nodes.util.CommonSparseFeatures
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.{UnionRDD, RDD}
 import pipelines.Transformer

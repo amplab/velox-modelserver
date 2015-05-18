@@ -159,12 +159,13 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
       env.metrics().timer(name + "/loadmodel/"),
       sparkContext,
       sparkDataLocation)
-    val downloadObservationsServlet = new AddObservationServlet(
+    val downloadObservationsServlet = new DownloadBulkObservationsServlet(
       onlineUpdateManager,
       env.metrics().timer(name + "/downloadobservations/"),
       name,
       partitionMap,
-      hostname)
+      hostname,
+      sparkContext)
     val saveObservationsServlet = new SaveObservationsServlet(
       env.metrics().timer(name + "/saveobservations/"),
       name,

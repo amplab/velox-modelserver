@@ -32,7 +32,7 @@ class LoadObservationsServlet(
       val writeRequests = hosts.map(
         h => {
           val req = (h / "downloadobservations" / modelName)
-              .POST << jsonMapper.writeValueAsString(obsLocation)
+              .POST << jsonMapper.writeValueAsString(new HDFSLocation(s"${obsLocation.loc}/*"))
           http(req OK as.String)
         })
 
