@@ -13,12 +13,12 @@ etcd should be downloaded as an argument
 1. Start velox: `fab start_velox:start_local=y`
 
 Now try it out. Make a prediction
-`curl -H "Content-Type: application/json" -d '{"context": 4, "uid":1000}' http://localhost:8080/predict/matrixfact`.
-And add an observation
-`curl -H "Content-Type: application/json" -d '{"context": 4, "uid":4, "score":1.3}' http://localhost:8080/observe/matrixfact`
+```curl -H "Content-Type: application/json" -d '{"context": 4, "uid":1000}' http://localhost:8080/predict/matrixfact```
+Add an observation
+```curl -H "Content-Type: application/json" -d '{"context": 4, "uid":4, "score":1.3}' http://localhost:8080/observe/matrixfact```
 
-And retrain in Spark:
-`curl http://localhost:8080/retrain/matrixfact`
+Batch retrain in Spark:
+```curl http://localhost:8080/retrain/matrixfact```
 
 __TODO__ once we add support for bulk load, have an example of that
 
@@ -65,10 +65,11 @@ cluster should now be functionally equivalent to a cluster launched using the sc
 1. Start Velox: `fab start_velox`
 
 
-
-
 #### Stopping Velox
+
 To stop Velox on all nodes, run `fab stop_velox`.
+__Important:__ When you are done using the cluster, log in to the AWS management console and terminate
+the instances. If you forget, you may be charged a lot of money by Amazon.
 
 ###<a name="secconfig"></a>Configuration
 Velox is configured by defining the `config` variable located in
