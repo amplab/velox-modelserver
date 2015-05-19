@@ -58,7 +58,7 @@ class BatchRetrainManager[T](
     if (lockAcquired) {
       try {
         val nextVersion = new Date().getTime
-        val obsDataLocation = HDFSLocation(s"$modelName/observations/$nextVersion")
+        val obsDataLocation = HDFSLocation(s"$sparkDataLocation/$modelName/observations/$nextVersion")
         val newModelLocation = LoadModelParameters(s"$modelName/retrained_model/$nextVersion", nextVersion)
 
         // Disable online updates

@@ -159,6 +159,24 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
       env.metrics().timer(name + "/loadmodel/"),
       sparkContext,
       sparkDataLocation)
+    val downloadObservationsServlet = new DownloadBulkObservationsServlet(
+      onlineUpdateManager,
+      env.metrics().timer(name + "/downloadobservations/"),
+      name,
+      partitionMap,
+      hostname,
+      sparkContext)
+    val saveObservationsServlet = new SaveObservationsServlet(
+      env.metrics().timer(name + "/saveobservations/"),
+      name,
+      partitionMap,
+      hostname)
+    val loadObservationsServlet = new LoadObservationsServlet(
+      env.metrics().timer(name + "/loadobservations/"),
+      name,
+      partitionMap,
+      hostname)
+
     env.getApplicationContext.addServlet(new ServletHolder(predictServlet), "/predict/" + name)
     env.getApplicationContext.addServlet(new ServletHolder(topKServlet), "/predict_top_k/" + name)
     env.getApplicationContext.addServlet(new ServletHolder(observeServlet), "/observe/" + name)
@@ -167,6 +185,9 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
     env.getApplicationContext.addServlet(new ServletHolder(disableOnlineUpdatesServlet), "/disableonlineupdates/" + name)
     env.getApplicationContext.addServlet(new ServletHolder(writeTrainingDataServlet), "/writetrainingdata/" + name)
     env.getApplicationContext.addServlet(new ServletHolder(loadNewModelServlet), "/loadmodel/" + name)
+    env.getApplicationContext.addServlet(new ServletHolder(downloadObservationsServlet), "/downloadobservations/" + name)
+    env.getApplicationContext.addServlet(new ServletHolder(saveObservationsServlet), "/saveobservations/" + name)
+    env.getApplicationContext.addServlet(new ServletHolder(loadObservationsServlet), "/loadobservations/" + name)
   }
 
   def createModel(name: String,
