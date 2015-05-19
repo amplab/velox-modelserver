@@ -7,7 +7,7 @@
 Velox is a system for serving machine learning predictions.
 
 + Supports real-time personalized predictions
-+ Integration with [Spark](spark.apache.org) and [KeystoneML](keystone-ml.org)
++ Integration with [Spark](http://spark.apache.org) and [KeystoneML](http://keystone-ml.org)
 + Automatic model training in batch and online
 
 ![Velox In BDAS](docs/missing_piece.png)
