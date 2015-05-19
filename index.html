@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <link href='https://fonts.googleapis.com/css?family=Chivo:900' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-dark.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <title>Velox Modelserver by amplab</title>
+  </head>
+
+  <body>
+    <div id="container">
+      <div class="inner">
+
+        <header>
+          <h1>Velox Modelserver</h1>
+          <h2></h2>
+        </header>
+
+        <section id="downloads" class="clearfix">
+          <a href="https://github.com/amplab/velox-modelserver/zipball/master" id="download-zip" class="button"><span>Download .zip</span></a>
+          <a href="https://github.com/amplab/velox-modelserver/tarball/master" id="download-tar-gz" class="button"><span>Download .tar.gz</span></a>
+          <a href="https://github.com/amplab/velox-modelserver" id="view-on-github" class="button"><span>View on GitHub</span></a>
+        </section>
+
+        <hr>
+
+        <section id="main_content">
+          <h2>
+<a id="velox-model-server" class="anchor" href="#velox-model-server" aria-hidden="true"><span class="octicon octicon-link"></span></a>Velox Model Server</h2>
+
+<p><a href="https://amplab.cs.berkeley.edu/jenkins/job/velox%20testing/"><img src="https://amplab.cs.berkeley.edu/jenkins/buildStatus/icon?job=velox%20testing" alt="Build Status"></a></p>
+
+<h1>
+<a id="velox" class="anchor" href="#velox" aria-hidden="true"><span class="octicon octicon-link"></span></a>VELOX</h1>
+
+<p>Velox is a system for serving machine learning predictions.</p>
+
+<ul>
+<li>Supports real-time personalized predictions</li>
+<li>Integration with <a href="spark.apache.org">Spark</a> and <a href="keystone-ml.org">KeystoneML</a>
+</li>
+<li>Automatic model training in batch and online</li>
+</ul>
+
+<p><img src="docs/missing_piece.png" alt="Velox In BDAS"></p>
+
+<h2>
+<a id="quickstart" class="anchor" href="#quickstart" aria-hidden="true"><span class="octicon octicon-link"></span></a>Quickstart</h2>
+
+<p>Installing Velox using the provided scripts requires <a href="http://www.fabfile.org/installing.html"><code>fabric</code></a> &gt;= 1.10.0 and dependencies (Paramiko &gt;= 1.10.0)</p>
+
+<p>Install and start Velox:</p>
+
+<pre><code>git clone https://github.com/amplab/velox-modelserver.git
+cd velox-modelserver/bin/cluster
+pip install fabric
+fab install_velox_local:~/
+fab start_velox:start_local=y
+</code></pre>
+
+<p>This start a local Velox instance listening on localhost at port 8080.</p>
+
+<p>You can interact with the Velox REST API using cURL.</p>
+
+<pre><code>curl -H "Content-Type: application/json" -d '{"context": 4, "uid":1000}' http://localhost:8080/predict/matrixfact
+curl -H "Content-Type: application/json" -d '{"context": 4, "uid":4, "score":1.3}' http://localhost:8080/observe/matrixfact
+curl http://localhost:8080/retrain/matrixfact
+</code></pre>
+
+<p>For more details and a guide to deploying Velox on a cluster, check out our <a href="docs/deployment_guide.md">deployment guide</a>.</p>
+
+<h2>
+<a id="contact" class="anchor" href="#contact" aria-hidden="true"><span class="octicon octicon-link"></span></a>Contact</h2>
+
+<ul>
+<li>Mailing list: <a href="mailto:velox-modelserver@googlegroups.com">velox-modelserver@googlegroups.com</a>
+</li>
+<li><a href="mailto:crankshaw@cs.berkeley.edu">crankshaw@cs.berkeley.edu</a></li>
+</ul>
+
+<h2>
+<a id="contributing-to-velox" class="anchor" href="#contributing-to-velox" aria-hidden="true"><span class="octicon octicon-link"></span></a>Contributing to Velox</h2>
+
+<p>We are actively seeking comments and contributions through Github. Please file a Github issue with any bugs or feature requests.
+If you'd like to contribute code, please submit Github Pull Request for review and merging.</p>
+
+<h2>
+<a id="additional-resources" class="anchor" href="#additional-resources" aria-hidden="true"><span class="octicon octicon-link"></span></a>Additional resources</h2>
+
+<ul>
+<li><a href="http://arxiv.org/abs/1409.3809">CIDR paper</a></li>
+<li><a href="http://www.slideshare.net/dscrankshaw/velox-at-sf-data-mining-meetup">Tech talk</a></li>
+<li>
+<a href="https://www.youtube.com/watch?v=rESINg9lfGY">Video</a> and <a href="http://www.slideshare.net/dscrankshaw/veloxampcamp5-final">slides</a> from presentation at AMPCamp 5</li>
+</ul>
+
+<h2>
+<a id="license" class="anchor" href="#license" aria-hidden="true"><span class="octicon octicon-link"></span></a>License</h2>
+
+<p>Velox is under the Apache 2.0 <a href="LICENSE">License</a>.</p>
+
+<p><strong>More documentation coming soon</strong></p>
+        </section>
+
+        <footer>
+          Velox Modelserver is maintained by <a href="https://github.com/amplab">amplab</a><br>
+          This page was generated by <a href="https://pages.github.com">GitHub Pages</a>. Tactile theme by <a href="https://twitter.com/jasonlong">Jason Long</a>.
+        </footer>
+
+        
+      </div>
+    </div>
+  </body>
+</html>
