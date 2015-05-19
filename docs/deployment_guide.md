@@ -20,8 +20,6 @@ Add an observation
 Batch retrain in Spark:
 ```curl http://localhost:8080/retrain/matrixfact```
 
-__TODO__ once we add support for bulk load, have an example of that
-
 ### Running Velox On a Cluster
 
 ####Set environment variables:
