@@ -1,5 +1,4 @@
 ##Velox Model Server
-=================
 
 [![Build Status](https://amplab.cs.berkeley.edu/jenkins/buildStatus/icon?job=velox testing)](https://amplab.cs.berkeley.edu/jenkins/job/velox%20testing/)
 
@@ -11,7 +10,7 @@ Velox is a system for serving machine learning predictions.
 + Integration with [Spark](spark.apache.org) and [KeystoneML](keystone-ml.org)
 + Automatic model training in batch and online
 
-![Velox In BDAS](docs/missing_piece.pdf)
+![Velox In BDAS](docs/missing_piece.png)
 
 
 ##Quickstart
