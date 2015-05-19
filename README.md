@@ -1,19 +1,64 @@
-#Velox Model Server
-=================
+##Velox Model Server
 
 [![Build Status](https://amplab.cs.berkeley.edu/jenkins/buildStatus/icon?job=velox testing)](https://amplab.cs.berkeley.edu/jenkins/job/velox%20testing/)
 
-## [Instructions for installing and running Velox](https://github.com/amplab/velox-modelserver/wiki/Installing-and-Running-Velox-on-ec2)
+#VELOX
+
+Velox is a system for serving machine learning predictions.
+
++ Supports real-time personalized predictions
++ Integration with [Spark](spark.apache.org) and [KeystoneML](keystone-ml.org)
++ Automatic model training in batch and online
+
+![Velox In BDAS](docs/missing_piece.png)
 
 
-## Git Development Workflow
-We are going to try using gitflow as our git development workflow. You can find a description of
-the workflow in [this blogpost](http://nvie.com/posts/a-successful-git-branching-model/). Until our
-first release, the TL;DR is that we will use the `develop` branch as our "master" branch, merging
-PRs into that branch. When you have developed and tested a feature, make sure that the feature is fully
-rebased against `develop` and then create a pull request against `develop`. Someone will do a code review and
-once all comments are addressed, they will merge the PR into `develop`. Basically, the rule here is never
-push directly to master, pull-requests should be able to be auto-merged, and you shouldn't be merging
-your own pull requests. The other important component of gitflow is that merged pull-requests shouldn't use
-fast-forward `git merge --no-ff myfeature` so that we can easily see the group of commits corresponding
-to a pull-request. GitHub does this automatically when merging the pull-request from the web interface.
+##Quickstart
+
+Installing Velox using the provided scripts requires [`fabric`](http://www.fabfile.org/installing.html) >= 1.10.0 and dependencies (Paramiko >= 1.10.0)
+
+Install and start Velox:
+
+```
+git clone https://github.com/amplab/velox-modelserver.git
+cd velox-modelserver/bin/cluster
+pip install fabric
+fab install_velox_local:~/
+fab start_velox:start_local=y
+```
+
+This start a local Velox instance listening on localhost at port 8080.
+
+You can interact with the Velox REST API using cURL.
+
+```
+curl -H "Content-Type: application/json" -d '{"context": 4, "uid":1000}' http://localhost:8080/predict/matrixfact
+curl -H "Content-Type: application/json" -d '{"context": 4, "uid":4, "score":1.3}' http://localhost:8080/observe/matrixfact
+curl http://localhost:8080/retrain/matrixfact
+```
+
+For more details and a guide to deploying Velox on a cluster, check out our [deployment guide](docs/deployment_guide.md).
+
+##Contact
+
++ Mailing list: velox-modelserver@googlegroups.com
++ crankshaw@cs.berkeley.edu
+
+## Contributing to Velox
+
+We are actively seeking comments and contributions through Github. Please file a Github issue with any bugs or feature requests.
+If you'd like to contribute code, please submit Github Pull Request for review and merging.
+
+## Additional resources
+
++ [CIDR paper](http://arxiv.org/abs/1409.3809)
++ [Tech talk](http://www.slideshare.net/dscrankshaw/velox-at-sf-data-mining-meetup)
++ [Video](https://www.youtube.com/watch?v=rESINg9lfGY) and [slides](http://www.slideshare.net/dscrankshaw/veloxampcamp5-final) from presentation at AMPCamp 5
+
+##License
+
+Velox is under the Apache 2.0 [License](LICENSE).
+
+
+
+__More documentation coming soon__

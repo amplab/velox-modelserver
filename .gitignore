@@ -8,8 +8,8 @@
 *.war
 *.ear
 
-*.pdf
-*.png
+# *.pdf
+# *.png
 
 *.idea
 dependency-reduced-pom.xml
