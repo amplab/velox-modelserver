@@ -181,7 +181,6 @@ def is_ssh_available():
 @task
 def launch_ec2_cluster(cluster_name,
                        cluster_size,
-                       localkey,
                        keyname, # name of AWS key pair
                        spot_price=None,
                        instance_type='r3.2xlarge',
@@ -289,11 +288,9 @@ def launch_ec2_cluster(cluster_name,
 
     set_hostnames()
 
-    ####### TODO remove once Velox is open source
-    execute(upload_deploy_key, localkey, role='servers')
     puts("Building Velox")
     execute(build_velox,
-            git_remote="git@github.com:amplab/velox-modelserver.git",
+            git_remote="https://github.com/amplab/velox-modelserver.git",
             branch="develop",
             role='servers')
 
@@ -324,7 +321,7 @@ def install_velox_local(etcd_loc):
         abort("{pl} is unsupported".format(pl=sys.platform))
     with lcd(velox_root_dir + "/lib"):
         local("rm -rf keystone")
-        local("git clone git@github.com:amplab/keystone.git")
+        local("git clone https://github.com/amplab/keystone.git")
     with lcd(velox_root_dir + "/lib/keystone"):
         local("sbt/sbt publish-m2")
     with lcd(velox_root_dir):
@@ -382,7 +379,7 @@ def build_velox(git_remote, branch):
             run("git checkout -b veloxbranch vremote/%s" % branch)
             run("git reset --hard vremote/%s" % branch)
         with cd("~/velox-modelserver/lib"):
-            run("git clone git@github.com:amplab/keystone.git")
+            run("git clone https://github.com/amplab/keystone.git")
         with cd("~/velox-modelserver/lib/keystone"):
             run("sbt/sbt publish-m2")
         with cd("~/velox-modelserver"):
