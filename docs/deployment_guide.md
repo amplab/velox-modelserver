@@ -37,13 +37,12 @@ export VELOX_CLUSTER_KEY=~/.ssh/my_key_pair.pem
 ```
 
 ####Launch a cluster
-+ `fab launch_ec2_cluster:cluster_name=my-application,cluster_size=3,localkey=my_github_ssh_key,keyname=my_aws_keypair` to launch a cluster. The default is to launch reserved instances. If you
++ `fab launch_ec2_cluster:cluster_name=my-application,cluster_size=3,keyname=my_aws_keypair` to launch a cluster. The default is to launch reserved instances. If you
 would like to launch spot instances instead, specify the `spot_price` as an additional argument
 to the launch command.
 + edit `velox_config.py` to configure your Velox deployment (see [Configuration](#secconfig) for details).
 + `fab start_velox` to start the cluster
 
-__TODO__ remove localkey once Velox is open-sourced
 
 ####Using your own cluster
 If you'd like to launch a cluster some other way, you can still use the `velox_deploy.py` script
