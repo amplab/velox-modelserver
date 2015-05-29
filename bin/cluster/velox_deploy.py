@@ -20,6 +20,7 @@
 #
 
 
+
 from fabric.api import *
 from fabric.colors import green as _green, yellow as _yellow
 from fabric.contrib.console import confirm
@@ -50,11 +51,11 @@ env.key_filename = os.getenv('VELOX_CLUSTER_KEY')
 
 ### VELOX SETTINGS ###
 # HEAP_SIZE_GB = 45
-VELOX_SERVER_JAR = "veloxms-core/target/veloxms-core-0.0.1-SNAPSHOT.jar"
+VELOX_SERVER_JAR = "veloxms-examples/target/veloxms-examples-0.0.1-SNAPSHOT.jar"
 VELOX_SERVER_CLASS = "edu.berkeley.veloxms.VeloxEntry"
 VELOX_GARBAGE_COLLECTOR = "UseConcMarkSweepGC"
 VELOX_HVM_AMI = 'ami-10119778'
-VELOX_HEAP_SIZE_GB = 2
+VELOX_HEAP_SIZE_GB = 8
 
 ETCD_PORT = 4001
 ETCD_BASE_PATH = "/v2/keys/cluster_config"
@@ -184,7 +185,8 @@ def launch_ec2_cluster(cluster_name,
                        keyname, # name of AWS key pair
                        spot_price=None,
                        instance_type='r3.2xlarge',
-                       ami=VELOX_HVM_AMI):
+                       ami=VELOX_HVM_AMI,
+                       keystone_commit="master"):
     if env.key_filename is None:
         abort("Please provide a valid keypair file: export VELOX_CLUSTER_KEY=...")
     if EC2_INSTANCE_TYPES[instance_type] == 'pvm' and ami == VELOX_HVM_AMI:
@@ -292,7 +294,8 @@ def launch_ec2_cluster(cluster_name,
     execute(build_velox,
             git_remote="https://github.com/amplab/velox-modelserver.git",
             branch="develop",
-            role='servers')
+            keystone_git_hash=keystone_commit,
+            role="servers")
 
 @task
 def set_hostnames():
@@ -305,7 +308,7 @@ def set_hostnames():
 
 
 @task
-def install_velox_local(etcd_loc):
+def install_velox_local(etcd_loc, keystone_git_hash="master"):
     velox_root_dir = os.path.abspath("../..") # this script is in velox-modelserver/bin/cluster
     server_ips = ["127.0.0.1"]
     env.roledefs['servers'] = server_ips
@@ -323,6 +326,7 @@ def install_velox_local(etcd_loc):
         local("rm -rf keystone")
         local("git clone https://github.com/amplab/keystone.git")
     with lcd(velox_root_dir + "/lib/keystone"):
+        local("git checkout %s" % keystone_git_hash)
         local("sbt/sbt publish-m2")
     with lcd(velox_root_dir):
         local("mvn install:install-file -Dfile=lib/mlmatrix_2.10-0.1.jar -DgroupId=edu.berkeley.cs.amplab -DartifactId=mlmatrix -Dversion=0.1 -Dpackaging=jar")
@@ -360,7 +364,7 @@ def install_etcd_local(etcd_loc, platform):
 
 @task
 @parallel
-def build_velox(git_remote, branch):
+def build_velox(git_remote, branch, keystone_git_hash="master"):
     with hide('stdout', 'stderr'):
         with settings(warn_only=True):
             if run("test -d ~/velox-modelserver").failed:
@@ -381,6 +385,7 @@ def build_velox(git_remote, branch):
         with cd("~/velox-modelserver/lib"):
             run("git clone https://github.com/amplab/keystone.git")
         with cd("~/velox-modelserver/lib/keystone"):
+            run("git checkout %s" % keystone_git_hash)
             run("sbt/sbt publish-m2")
         with cd("~/velox-modelserver"):
             run("mvn install:install-file -Dfile=lib/mlmatrix_2.10-0.1.jar -DgroupId=edu.berkeley.cs.amplab -DartifactId=mlmatrix -Dversion=0.1 -Dpackaging=jar")
@@ -459,7 +464,7 @@ def start_velox(start_local="n"):
     upload_config_to_etcd()
     if start_local.lower() == "y":
         velox_root_dir = os.path.abspath("../..")
-        server_cmd = ("java -XX:+{gc} -Xms{hs}g -Xmx{hs}g "
+        server_cmd = ("java -XX:+{gc} -Xms{hs}g -Xmx{hs}g -XX:MaxPermSize=512M "
                       "-Ddw.hostname=127.0.0.1 -cp {vr}/{jar} {cls} server & sleep 5; exit 0"
                       ).format(gc=VELOX_GARBAGE_COLLECTOR,
                                hs=VELOX_HEAP_SIZE_GB,

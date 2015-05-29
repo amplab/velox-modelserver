@@ -85,7 +85,8 @@ class BatchRetrainManager[T](
         logInfo(s"Write to spark cluster responses: ${writeResponses.mkString("\n")}")
 
         // Do the core batch retrain on spark
-        val trainingData: RDD[(UserID, T, Double)] = sparkContext.objectFile(s"$sparkDataLocation/${obsDataLocation.loc}/*/*")
+        val trainingData: RDD[(UserID, T, Double)] = sparkContext.objectFile(s"${obsDataLocation.loc}/*/*")
+
         val itemFeatures = model.retrainFeatureModelsInSpark(trainingData, nextVersion)
         val userWeights = model.retrainUserWeightsInSpark(itemFeatures, trainingData).map {
           case (userId, weights) => s"$userId, ${weights.mkString(", ")}"

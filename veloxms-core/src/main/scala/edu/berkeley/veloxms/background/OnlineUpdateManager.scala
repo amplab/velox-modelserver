@@ -9,7 +9,13 @@ import edu.berkeley.veloxms.models.Model
 
 import scala.collection.mutable
 
-class OnlineUpdateManager[T](model: Model[T], delay: Long, unit: TimeUnit, timer: Timer) extends BackgroundTask(delay, unit) {
+class OnlineUpdateManager[T](
+    val model: Model[T],
+    val delay: Long,
+    val unit: TimeUnit,
+    val timer: Timer)
+  extends BackgroundTask(delay, unit) {
+
   private val onlineUpdatesEnabled: AtomicBoolean = new AtomicBoolean(true)
   private val observations = new ConcurrentLinkedQueue[(UserID, T, Double)]()
 
