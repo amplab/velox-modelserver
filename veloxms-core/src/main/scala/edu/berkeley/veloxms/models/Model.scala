@@ -65,6 +65,7 @@ abstract class Model[T: ClassTag](
    **/
   val averageUser = broadcast[WeightVector]("avg_user")
 
+
   /**
    * User provided implementation for the given model. Will be called
    * by Velox on feature cache miss.
@@ -81,10 +82,39 @@ abstract class Model[T: ClassTag](
       observations: RDD[(UserID, T, Double)],
       nextVersion: Version): RDD[(T, FeatureVector)]
 
-  final def retrainUserWeightsInSpark(itemFeatures: RDD[(T, FeatureVector)], observations: RDD[(UserID, T, Double)]): RDD[(UserID, WeightVector)] = {
+  final def retrainUserWeightsInSpark(
+      itemFeatures: RDD[(T, FeatureVector)],
+      observations: RDD[(UserID, T, Double)],
+      nextVersion: Version)
+    : RDD[(UserID, WeightVector)] = {
+
+    val newAvgUser = retrainAvgUserInSpark(itemFeatures, observations)
+    averageUser.put(newAvgUser, nextVersion)
+
     val obs = observations.map(x => (x._2, (x._1, x._3)))
     val ratings = itemFeatures.join(obs).map(x => (x._2._2._1, x._2._1, x._2._2._2))
     UserWeightUpdateMethods.calculateMultiUserWeights(ratings, numFeatures)
+  }
+
+  /**
+   * Calculates the optimal cold-start user model for the case when we have
+   * no training data for a user.
+   *
+   * Implementation: Take the average score for each item across the
+   * entire training data set and use that as the training data for
+   * the average user model.
+   */
+  final def retrainAvgUserInSpark(
+      itemFeatures: RDD[(T, FeatureVector)],
+      observations: RDD[(UserID, T, Double)]): WeightVector = {
+    // drop user id from observations
+    val avgObservations = observations
+        .map(o => (o._2, o._3))
+        .groupByKey()
+        .map( {case(item, scores) => (item, (scores.reduce(_+_) / scores.size))})
+        .join(itemFeatures).map({case(item, (score, features)) => (features, score)})
+        .collect()
+    UserWeightUpdateMethods.calculateSingleUserWeights(avgObservations, numFeatures)._1
   }
 
   /**
@@ -103,7 +133,7 @@ abstract class Model[T: ClassTag](
   }
 
   def predict(uid: UserID, item: T, version: Version): Double = {
-    println(item.getClass)
+    logWarning(s"\n\nAVERAGE USER MODEL: ${averageUser.get(currentVersion).get.mkString(", ")}\n\n")
     val features = computeFeatures(item, version)
     val weightVector = getWeightVector(uid, version)
     var i = 0

@@ -46,7 +46,6 @@ class PointPredictionServlet[T](
       val output = if (partitionMap(correctPartition) == hostname) {
         // val item: T = fromJson[T](context)
         val item: T = model.jsonToInput(context)
-        println(item.getClass)
         model.predict(uid, item, model.currentVersion)
       } else {
         val h = hosts(correctPartition)
@@ -55,6 +54,7 @@ class PointPredictionServlet[T](
         val httpReq = http(forwardedReq OK as.String)
         Await.result(httpReq, Duration(3000, TimeUnit.MILLISECONDS))
       }
+
 
       resp.setContentType("application/json")
       jsonMapper.writeValue(resp.getOutputStream, output)
