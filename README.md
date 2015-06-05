@@ -1,6 +1,6 @@
 ##Velox Model Server
 
-[![Build Status](https://amplab.cs.berkeley.edu/jenkins/buildStatus/icon?job=velox testing)](https://amplab.cs.berkeley.edu/jenkins/job/velox%20testing/)
+<!---[![Build Status](https://amplab.cs.berkeley.edu/jenkins/buildStatus/icon?job=velox testing)](https://amplab.cs.berkeley.edu/jenkins/job/velox%20testing/)-->
 
 #VELOX
 
