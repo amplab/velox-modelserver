@@ -61,7 +61,6 @@ abstract class Model[T: ClassTag](
 
   /** Average user weight vector.
    * Used for warmstart for new users
-   * TODO: SHOULD BE RETRAINED WHEN BULK RETRAINING!!!
    **/
   val averageUser = broadcast[WeightVector]("avg_user")
 

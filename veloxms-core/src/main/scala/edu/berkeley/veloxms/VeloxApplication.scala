@@ -118,6 +118,15 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
     } else {
       None
     }
+
+    // This section on reflection is adapted from the example in
+    // http://docs.scala-lang.org/overviews/reflection/overview.html
+    // It automatically calls the constructor for the concrete subclass
+    // of Model provided in the configuration. The only restriction here
+    // is that the model constructor must have the same exact
+    // three arguments as Model. Subclass specific configuration can be provided
+    // in the model configuration as additional json that will be passed
+    // directly to the instance.
     val mirror = ru.runtimeMirror(getClass.getClassLoader)
     val clz = Class.forName(modelType)
     val classSymbol = mirror.classSymbol(clz)
