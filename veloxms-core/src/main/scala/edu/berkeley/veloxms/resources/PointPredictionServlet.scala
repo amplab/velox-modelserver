@@ -21,7 +21,7 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.reflect._
 
-class PointPredictionServlet[T : ClassTag](
+class PointPredictionServlet[T](
     model: Model[T],
     timer: Timer,
     partitionMap: Seq[String],
@@ -44,7 +44,8 @@ class PointPredictionServlet[T : ClassTag](
 
       val correctPartition = Utils.nonNegativeMod(uid.hashCode(), partitionMap.size)
       val output = if (partitionMap(correctPartition) == hostname) {
-        val item: T = fromJson(context)
+        // val item: T = fromJson[T](context)
+        val item: T = model.jsonToInput(context)
         model.predict(uid, item, model.currentVersion)
       } else {
         val h = hosts(correctPartition)
@@ -53,6 +54,7 @@ class PointPredictionServlet[T : ClassTag](
         val httpReq = http(forwardedReq OK as.String)
         Await.result(httpReq, Duration(3000, TimeUnit.MILLISECONDS))
       }
+
 
       resp.setContentType("application/json")
       jsonMapper.writeValue(resp.getOutputStream, output)

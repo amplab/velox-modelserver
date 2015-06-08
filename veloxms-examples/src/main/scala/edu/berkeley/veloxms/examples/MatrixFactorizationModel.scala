@@ -1,21 +1,30 @@
-package edu.berkeley.veloxms.models
+package edu.berkeley.veloxms.examples
 
 import edu.berkeley.veloxms._
+import edu.berkeley.veloxms.models.Model
 import edu.berkeley.veloxms.storage.BroadcastProvider
 import org.apache.spark.rdd._
 import org.apache.spark.SparkContext
 import org.apache.spark.mllib.recommendation.{ALS,Rating}
 import edu.berkeley.veloxms.util._
+import com.fasterxml.jackson.databind.JsonNode
+
+case class MFConfig(numFeatures: Int)
+
+
 class MatrixFactorizationModel(
-    val modelName: String,
-    val broadcastProvider: BroadcastProvider,
-    val numFeatures: Int,
-    val averageUser: WeightVector
-  ) extends Model[Long] {
+    override val modelName: String,
+    override val broadcastProvider: BroadcastProvider,
+    override val jsonConfig: Option[JsonNode])
+ extends Model[Long](modelName, broadcastProvider, jsonConfig) {
+
+
+  val itemStorage = broadcast[Map[Long, FeatureVector]]("items")
+
+  val numFeatures = fromJson[MFConfig](jsonConfig.get).numFeatures
 
   val defaultItem: FeatureVector = Array.fill[Double](numFeatures)(0.0)
 
-  val itemStorage = broadcast[Map[Long, FeatureVector]]("items")
 
   /**
    * User provided implementation for the given model. Will be called
@@ -40,7 +49,7 @@ class MatrixFactorizationModel(
    */
   override def retrainFeatureModelsInSpark(
       observations: RDD[(UserID, Long, Double)],
-      nextVersion: Version): RDD[(UserID, FeatureVector)] = {
+      nextVersion: Version): RDD[(Long, FeatureVector)] = {
     val trainingData = observations.map(y => Rating(y._1.toInt, y._2.toInt, y._3))
     val iterations = 5
     val lambda = 1

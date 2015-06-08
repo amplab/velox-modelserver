@@ -15,7 +15,7 @@ import edu.berkeley.veloxms.util.Utils
 import scala.concurrent.duration.Duration
 import scala.reflect._
 
-class TopKPredictionServlet[T : ClassTag](
+class TopKPredictionServlet[T](
     model: Model[T],
     timer: Timer,
     partitionMap: Seq[String],
@@ -42,7 +42,7 @@ class TopKPredictionServlet[T : ClassTag](
         val k: Int = input.get("k").asInt()
         val context = input.get("context")
 
-        val candidateSet: Array[T] = fromJson[Array[T]](context)
+        val candidateSet: Array[T] = model.jsonArrayToInput(context)
         model.predictTopK(uid, k, candidateSet, model.currentVersion)
       } else {
         val h = hosts(correctPartition)

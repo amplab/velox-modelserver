@@ -16,6 +16,8 @@ import org.eclipse.jetty.servlet.ServletHolder
 
 import scala.reflect.ClassTag
 import scala.util.control.NonFatal
+import scala.reflect.runtime.{universe => ru}
+import com.fasterxml.jackson.databind.JsonNode
 
 class VeloxConfiguration extends Configuration {
   val hostname: String = "none"
@@ -92,9 +94,62 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
     jsonMapper.readValue(json, classOf[Seq[String]])
   }
 
+  def createModel(name: String,
+                  sparkContext: SparkContext,
+                  etcdClient: EtcdClient,
+                  broadcastProvider: BroadcastProvider,
+                  sparkDataLocation: String,
+                  partitionMap: Seq[String],
+                  env: Environment,
+                  hostname: String
+                  ): Unit = {
 
-  def registerModelResources[T : ClassTag](
-      model: Model[T],
+    val key = s"$configEtcdPath/models/$name"
+    val json = etcdClient.getValue(key)
+    val jsonTree = jsonMapper.readTree(json)
+    require(jsonTree.has("modelType"))
+    require(jsonTree.has("onlineUpdateDelayInMillis"))
+    require(jsonTree.has("batchRetrainDelayInMillis"))
+    val modelType = jsonTree.get("modelType").asText
+    val onlineUpdateDelay = jsonTree.get("onlineUpdateDelayInMillis").asLong
+    val batchRetrainDelay = jsonTree.get("batchRetrainDelayInMillis").asLong
+    val modelSpecificConfig: Option[JsonNode] = if (jsonTree.has("config")) {
+      Some(jsonTree.get("config"))
+    } else {
+      None
+    }
+
+    // This section on reflection is adapted from the example in
+    // http://docs.scala-lang.org/overviews/reflection/overview.html
+    // It automatically calls the constructor for the concrete subclass
+    // of Model provided in the configuration. The only restriction here
+    // is that the model constructor must have the same exact
+    // three arguments as Model. Subclass specific configuration can be provided
+    // in the model configuration as additional json that will be passed
+    // directly to the instance.
+    val mirror = ru.runtimeMirror(getClass.getClassLoader)
+    val clz = Class.forName(modelType)
+    val classSymbol = mirror.classSymbol(clz)
+    val cm = mirror.reflectClass(classSymbol)
+    val constructor = classSymbol.toType.declaration(ru.nme.CONSTRUCTOR).asMethod
+    val ctorm = cm.reflectConstructor(constructor)
+    val model = ctorm(name, broadcastProvider, modelSpecificConfig).asInstanceOf[Model[_]]
+    registerModelResources(
+      model,
+      name,
+      onlineUpdateDelay,
+      batchRetrainDelay,
+      sparkContext,
+      etcdClient,
+      broadcastProvider,
+      sparkDataLocation,
+      partitionMap,
+      env,
+      hostname)
+  }
+
+  def registerModelResources(
+      model: Model[_],
       name: String,
       onlineUpdateDelayInMillis: Long,
       batchRetrainDelayInMillis: Long,
@@ -190,72 +245,5 @@ class VeloxApplication extends Application[VeloxConfiguration] with Logging {
     env.getApplicationContext.addServlet(new ServletHolder(loadObservationsServlet), "/loadobservations/" + name)
   }
 
-  def createModel(name: String,
-                  sparkContext: SparkContext,
-                  etcdClient: EtcdClient,
-                  broadcastProvider: BroadcastProvider,
-                  sparkDataLocation: String,
-                  partitionMap: Seq[String],
-                  env: Environment,
-                  hostname: String
-                  ): Unit = {
-
-    val key = s"$configEtcdPath/models/$name"
-    val json = etcdClient.getValue(key)
-    val modelConfig = jsonMapper.readValue(json, classOf[VeloxModelConfig])
-
-    // TODO(crankshaw) cleanup model constructor code after Tomer
-    // finishes refactoring model and storage configuration
-    val averageUser = Array.fill[Double](modelConfig.dimensions)(1.0)
-    modelConfig.modelType match {
-      case "MatrixFactorizationModel" =>
-        val model = new MatrixFactorizationModel(
-          name,
-          broadcastProvider,
-          modelConfig.dimensions,
-          averageUser)
-        registerModelResources(
-          model,
-          name,
-          modelConfig.onlineUpdateDelayInMillis,
-          modelConfig.batchRetrainDelayInMillis,
-          sparkContext,
-          etcdClient,
-          broadcastProvider,
-          sparkDataLocation,
-          partitionMap,
-          env,
-          hostname)
-      case "NewsgroupsModel" =>
-        val model = new NewsgroupsModel(
-          name,
-          broadcastProvider,
-          averageUser,
-          modelConfig.trainPath.get)
-        registerModelResources(
-          model,
-          name,
-          modelConfig.onlineUpdateDelayInMillis,
-          modelConfig.batchRetrainDelayInMillis,
-          sparkContext,
-          etcdClient,
-          broadcastProvider,
-          sparkDataLocation,
-          partitionMap,
-          env,
-          hostname)
-    }
-  }
 }
-
-case class VeloxModelConfig(
-  dimensions: Int,
-  modelType: String,
-  trainPath: Option[String],
-  onlineUpdateDelayInMillis: Long,
-  batchRetrainDelayInMillis: Long
-)
-
-
-
 

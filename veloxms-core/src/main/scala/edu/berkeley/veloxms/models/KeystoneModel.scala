@@ -4,13 +4,19 @@ import edu.berkeley.veloxms.{UserID, Version, FeatureVector}
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.RDD
 import pipelines.Transformer
+import com.fasterxml.jackson.databind.JsonNode
+import edu.berkeley.veloxms.storage.BroadcastProvider
 
 import scala.reflect.ClassTag
 
 /**
  * A model that uses a Keystone [[Transformer]] to featurize the context
  */
-abstract class KeystoneModel[T : ClassTag] extends Model[T] {
+abstract class KeystoneModel[T : ClassTag](
+    override val modelName: String,
+    override val broadcastProvider: BroadcastProvider,
+    override val jsonConfig: Option[JsonNode])
+  extends Model[T](modelName, broadcastProvider, jsonConfig) {
   private val modelBroadcast = broadcast[Transformer[T, FeatureVector]]("model")
 
   override def computeFeatures(data: T, version: Version): FeatureVector = {

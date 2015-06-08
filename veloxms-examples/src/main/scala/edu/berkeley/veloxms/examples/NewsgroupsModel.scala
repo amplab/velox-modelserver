@@ -1,8 +1,9 @@
-package edu.berkeley.veloxms.models
+package edu.berkeley.veloxms.examples
 
 import breeze.linalg.{Vector, normalize}
 import breeze.numerics.exp
 import edu.berkeley.veloxms._
+import edu.berkeley.veloxms.models._
 import edu.berkeley.veloxms.storage.BroadcastProvider
 import loaders.{LabeledData, NewsgroupsDataLoader}
 import nodes.learning.NaiveBayesEstimator
@@ -12,14 +13,17 @@ import nodes.util.CommonSparseFeatures
 import org.apache.spark.SparkContext
 import org.apache.spark.rdd.{UnionRDD, RDD}
 import pipelines.Transformer
+import com.fasterxml.jackson.databind.JsonNode
 
+case class NewsConfig(dataPath: String)
 
 class NewsgroupsModel(
-    val modelName: String,
-    val broadcastProvider: BroadcastProvider,
-    val averageUser: WeightVector,
-    val trainPath: String
-  ) extends KeystoneModel[String] {
+    override val modelName: String,
+    override val broadcastProvider: BroadcastProvider,
+    override val jsonConfig: Option[JsonNode])
+  extends KeystoneModel[String](modelName, broadcastProvider, jsonConfig) {
+
+  val trainPath = fromJson[NewsConfig](jsonConfig.get).dataPath
 
   val numFeatures = NewsgroupsDataLoader.classes.length
   def fit(sc: SparkContext): Transformer[String, FeatureVector] = {
@@ -41,3 +45,5 @@ class NewsgroupsModel(
     predictor.thenFunction(_.toArray)
   }
 }
+
+

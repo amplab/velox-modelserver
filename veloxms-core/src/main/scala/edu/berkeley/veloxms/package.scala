@@ -15,6 +15,8 @@ package object veloxms {
 
   // TODO: Probably shouldn't be in the package object
   val jsonMapper = new ObjectMapper().registerModule(new DefaultScalaModule)
-  def fromJson[T : ClassTag](node: JsonNode): T = jsonMapper.treeToValue(node, classTag[T].runtimeClass.asInstanceOf[Class[T]])
+  def fromJson[T : ClassTag](node: JsonNode): T = {
+    jsonMapper.treeToValue(node, classTag[T].runtimeClass.asInstanceOf[Class[T]])
+  }
 
 }

@@ -6,6 +6,7 @@ import javax.servlet.http.{HttpServlet, HttpServletRequest, HttpServletResponse}
 import com.codahale.metrics.Timer
 import dispatch._
 import edu.berkeley.veloxms._
+import edu.berkeley.veloxms.models.Model
 import edu.berkeley.veloxms.background.OnlineUpdateManager
 import edu.berkeley.veloxms.util.{Utils, Logging}
 
@@ -14,7 +15,7 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.reflect._
 
-class AddObservationServlet[T : ClassTag](
+class AddObservationServlet[T](
     onlineUpdateManager: OnlineUpdateManager[T],
     timer: Timer,
     modelName: String,
@@ -39,7 +40,7 @@ class AddObservationServlet[T : ClassTag](
 
       val correctPartition = Utils.nonNegativeMod(uid.hashCode(), partitionMap.size)
       val output = if (partitionMap(correctPartition) == hostname) {
-        val item: T = fromJson(context)
+        val item: T = onlineUpdateManager.model.jsonToInput(context)
         onlineUpdateManager.addObservation(uid, item, score)
         "Successfully added observation"
       } else {

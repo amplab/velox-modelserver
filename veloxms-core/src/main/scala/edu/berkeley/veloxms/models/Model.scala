@@ -13,16 +13,17 @@ import org.apache.spark.rdd.RDD
 import scala.collection.JavaConversions._
 import scala.reflect._
 import scala.util.Sorting
+import com.fasterxml.jackson.databind.JsonNode
 
 
 /**
  * Model interface
- * @tparam T The scala type of the item, deserialized from Array[Byte]
- * We defer deserialization to the model interface to encapsulate everything
- * the user must implement into a single class.
  */
-abstract class Model[T: ClassTag] extends Logging {
-  val clss = classTag[T].runtimeClass.asInstanceOf[Class[T]]
+abstract class Model[T: ClassTag](
+    val modelName: String,
+    val broadcastProvider: BroadcastProvider,
+    val jsonConfig: Option[JsonNode])
+  extends Logging {
 
   private var version: Version = new Date(0).getTime
   def currentVersion: Version = version
@@ -30,13 +31,6 @@ abstract class Model[T: ClassTag] extends Logging {
     broadcasts.foreach(_.cache(version))
     this.version = version
   }
-
-  // Abstract members should be def, not val, as this provides
-  // much more flexibility about how they are implemented
-
-  def broadcastProvider: BroadcastProvider
-
-  def modelName: String
 
   // TODO: Observations should be stored w/ Timestamps, and in a more relational format w/ persistence
   val observations: ConcurrentHashMap[UserID, ConcurrentHashMap[T, Double]] = new ConcurrentHashMap()
@@ -47,11 +41,16 @@ abstract class Model[T: ClassTag] extends Logging {
    */
   def numFeatures: Int
 
-  /** Average user weight vector.
-   * Used for warmstart for new users
-   * TODO: SHOULD BE RETRAINED WHEN BULK RETRAINING!!!
-   **/
-  def averageUser: WeightVector
+  def jsonToInput(context: JsonNode): T = {
+    val item: T = fromJson[T](context)
+    item
+  }
+
+  def jsonArrayToInput(context: JsonNode): Array[T] = {
+    val items: Array[T] = fromJson[Array[T]](context)
+    items
+  }
+
 
   val broadcasts = new ConcurrentLinkedQueue[VersionedBroadcast[_]]()
   protected def broadcast[V: ClassTag](id: String): VersionedBroadcast[V] = {
@@ -59,6 +58,12 @@ abstract class Model[T: ClassTag] extends Logging {
     broadcasts.add(b)
     b
   }
+
+  /** Average user weight vector.
+   * Used for warmstart for new users
+   **/
+  val averageUser = broadcast[WeightVector]("avg_user")
+
 
   /**
    * User provided implementation for the given model. Will be called
@@ -72,30 +77,62 @@ abstract class Model[T: ClassTag] extends Logging {
    * @param nextVersion
    * @return
    */
-  def retrainFeatureModelsInSpark(observations: RDD[(UserID, T, Double)], nextVersion: Version): RDD[(T, FeatureVector)]
+  def retrainFeatureModelsInSpark(
+      observations: RDD[(UserID, T, Double)],
+      nextVersion: Version): RDD[(T, FeatureVector)]
 
-  final def retrainUserWeightsInSpark(itemFeatures: RDD[(T, FeatureVector)], observations: RDD[(UserID, T, Double)]): RDD[(UserID, WeightVector)] = {
+  final def retrainUserWeightsInSpark(
+      itemFeatures: RDD[(T, FeatureVector)],
+      observations: RDD[(UserID, T, Double)],
+      nextVersion: Version)
+    : RDD[(UserID, WeightVector)] = {
+
+    val newAvgUser = retrainAvgUserInSpark(itemFeatures, observations)
+    averageUser.put(newAvgUser, nextVersion)
+
     val obs = observations.map(x => (x._2, (x._1, x._3)))
     val ratings = itemFeatures.join(obs).map(x => (x._2._2._1, x._2._1, x._2._2._2))
     UserWeightUpdateMethods.calculateMultiUserWeights(ratings, numFeatures)
   }
 
   /**
-   * Velox implemented - fetch from local Tachyon partition
+   * Calculates the optimal cold-start user model for the case when we have
+   * no training data for a user.
+   *
+   * Implementation: Take the average score for each item across the
+   * entire training data set and use that as the training data for
+   * the average user model.
+   */
+  final def retrainAvgUserInSpark(
+      itemFeatures: RDD[(T, FeatureVector)],
+      observations: RDD[(UserID, T, Double)]): WeightVector = {
+    // drop user id from observations
+    val avgObservations = observations
+        .map(o => (o._2, o._3))
+        .groupByKey()
+        .map( {case(item, scores) => (item, (scores.reduce(_+_) / scores.size))})
+        .join(itemFeatures).map({case(item, (score, features)) => (features, score)})
+        .collect()
+    UserWeightUpdateMethods.calculateSingleUserWeights(avgObservations, numFeatures)._1
+  }
+
+  /**
    *
    */
   private def getWeightVector(userId: Long, version: Version) : WeightVector = {
+    val defaultAverage = Array.fill[Double](numFeatures)(1.0)
     val result: Option[Array[Double]] = Option(userWeights.get((userId, version)))
     result match {
       case Some(u) => u
       case None => {
         logWarning(s"User weight not found, userID: $userId")
-        averageUser
+        averageUser.get(version).getOrElse(defaultAverage)
       }
     }
   }
 
   def predict(uid: UserID, item: T, version: Version): Double = {
+    logWarning(s"\n\nAVERAGE USER MODEL: ${averageUser.get(currentVersion).get.mkString(", ")}\n\n")
     val features = computeFeatures(item, version)
     val weightVector = getWeightVector(uid, version)
     var i = 0
@@ -107,7 +144,7 @@ abstract class Model[T: ClassTag] extends Logging {
     score
   }
 
-  def predictTopK(uid: Long, k: Int, candidateSet: Array[T], version: Version): Array[T] = {
+  def predictTopK(uid: UserID, k: Int, candidateSet: Array[T], version: Version): Array[T] = {
     // FIXME: There is probably some threshhold of k for which it makes more sense to iterate over the unsorted list
     // instead of sorting the whole list.
     val itemOrdering = new Ordering[T] {
