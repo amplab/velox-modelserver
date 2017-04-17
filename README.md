@@ -1,8 +1,8 @@
-## Velox Model Server
+# Velox Model Server
 
-<!---[![Build Status](https://amplab.cs.berkeley.edu/jenkins/buildStatus/icon?job=velox testing)](https://amplab.cs.berkeley.edu/jenkins/job/velox%20testing/)-->
+## This project is deprecated. Please check out https://github.com/ucbrise/clipper for more recent work in model serving.
 
-# VELOX
+## VELOX
 
 Velox is a system for serving machine learning predictions.
 
@@ -43,11 +43,6 @@ For more details and a guide to deploying Velox on a cluster, check out our [dep
 
 + Mailing list: velox-modelserver@googlegroups.com
 + crankshaw@cs.berkeley.edu
-
-## Contributing to Velox
-
-We are actively seeking comments and contributions through Github. Please file a Github issue with any bugs or feature requests.
-If you'd like to contribute code, please submit Github Pull Request for review and merging.
 
 ## Additional resources
 
