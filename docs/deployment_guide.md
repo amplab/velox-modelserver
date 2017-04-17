@@ -1,7 +1,7 @@
-##Velox Deployment Guide
+## Velox Deployment Guide
 
 
-###Running Velox Locally
+### Running Velox Locally
 1. `git clone https://github.com/amplab/velox-modelserver.git; cd velox-modelserver`
 1. `cd bin/cluster`
 1. edit `velox_config.py` to configure your Velox deployment (see [Configuration](#secconfig) for details).

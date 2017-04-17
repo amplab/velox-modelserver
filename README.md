@@ -1,8 +1,8 @@
-##Velox Model Server
+## Velox Model Server
 
 <!---[![Build Status](https://amplab.cs.berkeley.edu/jenkins/buildStatus/icon?job=velox testing)](https://amplab.cs.berkeley.edu/jenkins/job/velox%20testing/)-->
 
-#VELOX
+# VELOX
 
 Velox is a system for serving machine learning predictions.
 
@@ -13,7 +13,7 @@ Velox is a system for serving machine learning predictions.
 ![Velox In BDAS](docs/missing_piece.png)
 
 
-##Quickstart
+## Quickstart
 
 Installing Velox using the provided scripts requires [`fabric`](http://www.fabfile.org/installing.html) >= 1.10.0 and dependencies (Paramiko >= 1.10.0)
 
@@ -39,7 +39,7 @@ curl http://localhost:8080/retrain/matrixfact
 
 For more details and a guide to deploying Velox on a cluster, check out our [deployment guide](docs/deployment_guide.md).
 
-##Contact
+## Contact
 
 + Mailing list: velox-modelserver@googlegroups.com
 + crankshaw@cs.berkeley.edu
@@ -55,7 +55,7 @@ If you'd like to contribute code, please submit Github Pull Request for review a
 + [Tech talk](http://www.slideshare.net/dscrankshaw/velox-at-sf-data-mining-meetup)
 + [Video](https://www.youtube.com/watch?v=rESINg9lfGY) and [slides](http://www.slideshare.net/dscrankshaw/veloxampcamp5-final) from presentation at AMPCamp 5
 
-##License
+## License
 
 Velox is under the Apache 2.0 [License](LICENSE).
 
